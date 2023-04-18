@@ -1,0 +1,26 @@
+name: Cargo Clippy
+concurrency:
+    group: Cargo Clippy-${{ github.ref }}
+    cancel-in-progress: true
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - uses: lyricwulf/abc@v1
+        with:
+          linux: m4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          components: rustfmt, clippy
+
+      - name: cargo-clippy
+        run: make clippy && git diff --exit-code Cargo.lock

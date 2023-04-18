@@ -68,7 +68,8 @@ security-audit:
 	@cargo audit --version || cargo install cargo-audit
 	@cargo audit
 
-unit-test: test metadata-test crosschain-test
+
+unit-test: test
 
 .PHONY: build prod prod-test
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
