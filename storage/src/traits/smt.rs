@@ -1,22 +1,30 @@
 use std::{collections::HashMap, sync::Arc};
 
-use sparse_merkle_tree::error::Error;
+use parking_lot::Mutex;
+use sparse_merkle_tree::{error::Error, H256};
 
 use rocksdb::DB;
 
-use crate::{types::smt::{Address, Amount, Delegator, Epoch, Leaf, Proof, Root, Staker}, smt::Smt};
+use crate::{
+    smt::Smt,
+    types::smt::{Address, Amount, Delegator, Epoch, Leaf, LeafValue, Proof, Root, Staker},
+};
 
 // Low level single SMT APIs
 pub trait SmtStorage {
-    fn insert(&mut self, key: Address, value: Amount) -> Result<(), Error>;
+    fn insert(&mut self, key: H256, value: LeafValue) -> Result<(), Error>;
 
-    fn get(&self, key: Address) -> Result<Option<Amount>, Error>;
+    fn get(&self, key: H256) -> Result<Option<LeafValue>, Error>;
 
-    fn remove(&mut self, address: Address) -> Result<(), Error>;
+    fn get_leaves(&self) -> Result<HashMap<H256, LeafValue>, Error>;
 
-    fn compute_root(&self, leaves: Vec<Leaf>) -> Result<Root, Error>;
+    fn remove(&mut self, key: H256) -> Result<(), Error>;
 
-    fn verify_root(&self, root_hash: Root, leaves: Vec<Leaf>) -> Result<bool, Error>;
+    fn compute_root(&self, leaves: Vec<(H256, LeafValue)>) -> Result<Root, Error>;
+
+    fn verify_root(&self, root_hash: Root, leaves: Vec<(H256, LeafValue)>) -> Result<bool, Error>;
+
+    fn generate_proof(&self, leaves_keys: Vec<H256>) -> Result<Proof, Error>;
 
     fn save_db(&self, db: DB) -> Result<(), Error>;
 
@@ -25,35 +33,35 @@ pub trait SmtStorage {
 
 // Mid level multiple SMTs APIs
 // in memory, needs persistence storage
-pub trait SmtMapManager {
-    fn get_smt(&self, key: Address) -> Option<Arc<Smt>>;
+pub trait SmtMapStorage<K> {
+    fn get_smt(&self, key: K) -> Option<Arc<Mutex<Smt>>>;
 
-    fn get_roots(&self, keys: Vec<Address>) -> Result<HashMap<Address, Root>, Error>;
+    fn get_root(&self, key: K) -> Result<Option<Root>, Error>;
 
-    fn insert_smt(&self, key: Address, smt: Arc<Smt>) -> Result<(), Error>;
+    fn get_roots(&self, keys: Vec<K>) -> Result<HashMap<K, Option<Root>>, Error>;
 
-    fn remove_smt(&self, key: Address) -> Result<(), Error>;
+    fn insert_smt(&mut self, key: K, smt: Smt) -> Result<(), Error>;
 
-    fn load(&self, keys: Vec<Address>) -> Result<Smt, Error>;
+    fn remove_smt(&mut self, key: K) -> Result<(), Error>;
+
+    fn load(&self, keys: Vec<K>) -> Result<Smt, Error>;
 }
 
 // High level business logic SMT APIs
-pub trait StakeSmtManager {
-    fn insert(&self, epoch: Epoch, staker_infos: (Staker, Amount)) -> Result<(), Error>;
+pub trait StakeSmtStorage {
+    fn insert(&mut self, epoch: Epoch, staker_infos: Vec<(Staker, Amount)>) -> Result<(), Error>;
 
-    fn insert_batch(&self, epoch: Epoch, staker_infos: Vec<(Staker, Amount)>) -> Result<(), Error>;
+    fn remove(&mut self, epoch: Epoch, staker: Staker) -> Result<(), Error>;
 
-    fn remove(&self, epoch: Epoch, staker: Staker) -> Result<(), Error>;
+    fn remove_batch(&mut self, epoch: Epoch, stakers: Vec<Staker>) -> Result<(), Error>;
 
-    fn remove_batch(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<(), Error>;
+    fn get_amount(&self, staker: Staker, epoch: Epoch) -> Result<Option<Amount>, Error>;
 
-    fn get_amount(&self, staker: Staker, epoch: Epoch) -> Result<Amount, Error>;
+    fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Staker, Amount>, Error>;
 
-    fn get_sub_leaves(&self, epoch: Epoch) -> Result<Vec<Leaf>, Error>;
+    fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>, Error>;
 
-    fn get_sub_root(&self, epoch: Epoch) -> Result<Root, Error>;
-
-    fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Root>, Error>;
+    fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>, Error>;
 
     fn get_top_root(&self) -> Result<Root, Error>;
 
@@ -62,12 +70,8 @@ pub trait StakeSmtManager {
     fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof, Error>;
 }
 
-pub trait DelegateSmtManager {
-    fn insert(
-        &self,
-        epoch: Epoch,
-        delegator_info: (Staker, Delegator, Amount),
-    ) -> Result<(), Error>;
+pub trait DelegateSmtStorage {
+    fn insert(&self, epoch: Epoch, delegator_info: (Staker, Delegator)) -> Result<(), Error>;
 
     fn insert_batch(
         &self,
@@ -114,7 +118,7 @@ pub trait DelegateSmtManager {
     fn generate_top_proof(&self, staker: &Staker, epochs: Vec<Epoch>) -> Result<Proof, Error>;
 }
 
-pub trait RewardSmtManager {
+pub trait RewardSmtStorage {
     fn insert(&self, address: &Address, epoch: Epoch) -> Result<(), Error>;
 
     fn get_root(&self) -> Result<Root, Error>;
@@ -122,7 +126,7 @@ pub trait RewardSmtManager {
     fn generate_proof(&self, addresses: Vec<Address>) -> Result<Proof, Error>;
 }
 
-pub trait ExpiredRewardSmtManager {
+pub trait ExpiredRewardSmtStorage {
     fn insert(&self, address: &Address, amount: Amount) -> Result<(), Error>;
 
     fn get_root(&self) -> Result<Root, Error>;

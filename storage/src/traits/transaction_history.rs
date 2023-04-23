@@ -1,7 +1,7 @@
 use ethereum_types::H256;
 use sea_orm::sea_query::error::Error;
 
-use crate::types::smt::{Address, Amount};
+use crate::types::smt::Address;
 
 #[derive(PartialEq, Eq)]
 pub enum TransactionStatus {
@@ -24,7 +24,7 @@ pub struct TransactionRecord {
     timestamp: u8,
     operation: OperationType,
     tx_hash:   H256,
-    amount:    Amount,
+    amount:    u128,
     status:    TransactionStatus,
 }
 
