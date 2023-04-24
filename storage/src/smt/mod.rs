@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc, path::PathBuf, fmt::Display};
 
 use ethereum_types::H160;
 use parking_lot::Mutex;
@@ -6,19 +6,27 @@ use parking_lot::Mutex;
 use sparse_merkle_tree::{blake2b::Blake2bHasher, error::Error, traits::Value, H256};
 
 use crate::{
+    trie_db::RocksTrieDB,
     traits::smt::{SmtMapStorage, SmtStorage, StakeSmtStorage},
-    types::smt::{Amount, Epoch, LeafValue, Proof, Root, SmtType, Staker},
+    types::{smt::{Amount, Epoch, LeafValue, Proof, Root, SmtType, Staker}, rocksdb::ConfigRocksDB},
 };
 
-#[derive(Default)]
+const HEADER_CELL_DB_CACHE_SIZE: usize = 20;
+
 pub struct Smt {
     smt: SmtType,
+    rocks_db:  RocksTrieDB,
 }
 
 impl Smt {
-    pub fn new() -> Self {
+    pub fn new(path: PathBuf, config: ConfigRocksDB) -> Self {
         let smt = SmtType::default();
-        Self { smt }
+        let rocks_db = RocksTrieDB::new(
+            path,
+            config.clone(),
+            HEADER_CELL_DB_CACHE_SIZE,
+        ).unwrap();
+        Self { smt, rocks_db }
     }
 }
 
@@ -85,11 +93,13 @@ pub struct SmtMap<K> {
     smts: HashMap<K, Arc<Mutex<Smt>>>,
 }
 
-impl<K: Eq + Clone + Hash> SmtMap<K> {
-    pub fn new(keys: Vec<K>) -> Self {
+impl<K: Eq + Clone + Hash + Display> SmtMap<K> {
+    pub fn new(keys: Vec<K>, path: PathBuf, config: ConfigRocksDB) -> Self {
         let mut smts = HashMap::new();
         for key in keys {
-            let smt = Smt::new();
+            let mut current_path = path.clone();
+            current_path.push(key.to_string());
+            let smt = Smt::new(current_path, config.clone());
             smts.insert(key, Arc::new(Mutex::new(smt)));
         }
         Self { smts }
@@ -137,19 +147,25 @@ impl<K: Eq + Clone + Hash> SmtMapStorage<K> for SmtMap<K> {
     }
 }
 
-#[derive(Default)]
 pub struct StakerSmtManager {
     sub_smt_map: SmtMap<Epoch>,
     top_smt:     Smt,
+    path: PathBuf,
+    config: ConfigRocksDB
 }
 
 impl StakerSmtManager {
-    fn new(keys: Vec<Epoch>) -> Self {
-        let sub_smt_map = SmtMap::new(keys);
-        let top_smt = Smt::new();
+    fn new(keys: Vec<Epoch>, mut path: PathBuf, config: ConfigRocksDB) -> Self {
+        let mut staker_path = path.clone();
+        let sub_smt_map = SmtMap::new(keys, staker_path.clone(), config.clone());
+
+        staker_path.push("top");
+        let top_smt = Smt::new(staker_path, config.clone());
         Self {
             sub_smt_map,
             top_smt,
+            path,
+            config
         }
     }
 
@@ -188,7 +204,9 @@ impl StakerSmtManager {
 
 impl StakeSmtStorage for StakerSmtManager {
     fn insert(&mut self, epoch: Epoch, staker_infos: Vec<(Staker, Amount)>) -> Result<(), Error> {
-        let mut smt = Smt::new();
+        let mut path = self.path.clone();
+        path.push(epoch.to_string());
+        let mut smt = Smt::new(path, self.config.clone());
         for (staker, amount) in staker_infos {
             smt.insert(
                 Self::compute_sub_smt_key(staker),

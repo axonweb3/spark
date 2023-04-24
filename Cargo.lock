@@ -429,6 +429,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cita_trie"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afe7baab47f510f52ca8dc9c0eb9082020c627c7f22285bea30edc3511f7ee29"
+dependencies = [
+ "hasher",
+ "parking_lot 0.12.1",
+ "rlp",
+]
+
+[[package]]
 name = "ckb-librocksdb-sys"
 version = "7.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1011,6 +1022,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
  "ahash",
+]
+
+[[package]]
+name = "hasher"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbba678b6567f27ce22870d951f4208e1dc2fef64993bd4521b1d497ef8a3aa"
+dependencies = [
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -2632,12 +2652,17 @@ version = "0.1.0"
 dependencies = [
  "blake2b-rs",
  "bytemuck",
+ "cita_trie",
  "ckb-rocksdb",
  "ethereum-types",
  "parking_lot 0.12.1",
+ "rand",
  "rlp",
  "sea-orm",
+ "serde",
  "sparse-merkle-tree",
+ "tempfile",
+ "thiserror",
  "tokio",
 ]
 

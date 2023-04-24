@@ -9,8 +9,13 @@ bytemuck = "1.13"
 blake2b-rs = "0.2"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
 parking_lot = "0.12"
+rand = { version = "0.8", features = [ "small_rng" ] }
 rlp = "0.5"
 rocksdb = { version = "0.19", package = "ckb-rocksdb" }
 sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-all"] }
+serde = { version = "1.0", features = ["derive"] }
 sparse-merkle-tree = { version = "0.6", features = ["trie"] }
+tempfile = "3.5"
+thiserror = "1.0"
 tokio = { version = "1.27", features = ["full"] }
+trie = { package = "cita_trie", version = "4.0" }
