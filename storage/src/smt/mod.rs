@@ -1,172 +1,26 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc, path::PathBuf, fmt::Display};
+use std::{collections::HashMap, path::PathBuf};
 
 use ethereum_types::H160;
-use parking_lot::Mutex;
 
-use sparse_merkle_tree::{blake2b::Blake2bHasher, error::Error, traits::Value, H256};
+use rocksdb::{prelude::*, Direction, IteratorMode, OptimisticTransactionDB};
+use smt_rocksdb_store::default_store::DefaultStoreMultiTree;
+use sparse_merkle_tree::{error::Error, traits::Value, H256};
 
 use crate::{
-    trie_db::RocksTrieDB,
-    traits::smt::{SmtMapStorage, SmtStorage, StakeSmtStorage},
-    types::{smt::{Amount, Epoch, LeafValue, Proof, Root, SmtType, Staker}, rocksdb::ConfigRocksDB},
+    traits::smt::StakeSmtStorage,
+    types::smt::{Amount, DefaultStoreMultiSMT, Epoch, LeafValue, Proof, Root, Staker},
 };
 
-const HEADER_CELL_DB_CACHE_SIZE: usize = 20;
-
-pub struct Smt {
-    smt: SmtType,
-    rocks_db:  RocksTrieDB,
-}
-
-impl Smt {
-    pub fn new(path: PathBuf, config: ConfigRocksDB) -> Self {
-        let smt = SmtType::default();
-        let rocks_db = RocksTrieDB::new(
-            path,
-            config.clone(),
-            HEADER_CELL_DB_CACHE_SIZE,
-        ).unwrap();
-        Self { smt, rocks_db }
-    }
-}
-
-impl SmtStorage for Smt {
-    fn insert(&mut self, key: H256, value: LeafValue) -> Result<(), Error> {
-        self.smt.update(key, value)?;
-        Ok(())
-    }
-
-    fn get(&self, key: H256) -> Result<Option<LeafValue>, Error> {
-        let value = self.smt.get(&key)?;
-        if value == LeafValue::default() {
-            return Ok(None);
-        }
-        Ok(Some(value))
-    }
-
-    fn get_leaves(&self) -> Result<HashMap<H256, LeafValue>, Error> {
-        Ok(self.smt.store().leaves_map().clone())
-    }
-
-    fn remove(&mut self, key: H256) -> Result<(), Error> {
-        self.smt.update(key, LeafValue::default())?;
-        Ok(())
-    }
-
-    fn compute_root(&self, leaves: Vec<(H256, LeafValue)>) -> Result<Root, Error> {
-        let keys = leaves.iter().map(|(k, _)| *k).collect();
-        let converted_leaves = leaves.iter().map(|(k, v)| (*k, v.to_h256())).collect();
-        let root = self
-            .smt
-            .merkle_proof(keys)?
-            .compute_root::<Blake2bHasher>(converted_leaves)?;
-        Ok(root)
-    }
-
-    fn verify_root(&self, root_hash: H256, leaves: Vec<(H256, LeafValue)>) -> Result<bool, Error> {
-        let keys = leaves.iter().map(|(k, _)| *k).collect();
-        let converted_leaves = leaves.iter().map(|(k, v)| (*k, v.to_h256())).collect();
-        self.smt
-            .merkle_proof(keys)?
-            .verify::<Blake2bHasher>(&root_hash, converted_leaves)
-    }
-
-    fn generate_proof(&self, leaves_keys: Vec<H256>) -> Result<Proof, Error> {
-        let compiled_proof = self
-            .smt
-            .merkle_proof(leaves_keys.clone())?
-            .compile(leaves_keys)?;
-        Ok(compiled_proof.into())
-    }
-
-    fn save_db(&self, db: rocksdb::DB) -> Result<(), Error> {
-        todo!()
-    }
-
-    fn root(&self) -> Result<Root, Error> {
-        Ok(*self.smt.root())
-    }
-}
-
-#[derive(Default)]
-pub struct SmtMap<K> {
-    smts: HashMap<K, Arc<Mutex<Smt>>>,
-}
-
-impl<K: Eq + Clone + Hash + Display> SmtMap<K> {
-    pub fn new(keys: Vec<K>, path: PathBuf, config: ConfigRocksDB) -> Self {
-        let mut smts = HashMap::new();
-        for key in keys {
-            let mut current_path = path.clone();
-            current_path.push(key.to_string());
-            let smt = Smt::new(current_path, config.clone());
-            smts.insert(key, Arc::new(Mutex::new(smt)));
-        }
-        Self { smts }
-    }
-}
-
-impl<K: Eq + Clone + Hash> SmtMapStorage<K> for SmtMap<K> {
-    fn get_smt(&self, key: K) -> Option<Arc<Mutex<Smt>>> {
-        self.smts.get(&key).cloned()
-    }
-
-    fn get_root(&self, key: K) -> Result<Option<Root>, Error> {
-        if let Some(smt) = self.smts.get(&key) {
-            return Ok(Some(smt.lock().root()?));
-        }
-        Ok(None)
-    }
-
-    fn get_roots(&self, keys: Vec<K>) -> Result<HashMap<K, Option<Root>>, Error> {
-        let mut hash_map = HashMap::new();
-        for key in keys {
-            if let Some(smt) = self.smts.get(&key) {
-                let root = smt.lock().root()?;
-                hash_map.insert(key, Some(root));
-            } else {
-                hash_map.insert(key, None);
-            }
-        }
-
-        Ok(hash_map)
-    }
-
-    fn insert_smt(&mut self, key: K, smt: Smt) -> Result<(), Error> {
-        self.smts.insert(key, Arc::new(Mutex::new(smt)));
-        Ok(())
-    }
-
-    fn remove_smt(&mut self, key: K) -> Result<(), Error> {
-        self.smts.remove(&key);
-        Ok(())
-    }
-
-    fn load(&self, keys: Vec<K>) -> Result<Smt, Error> {
-        todo!()
-    }
-}
-
 pub struct StakerSmtManager {
-    sub_smt_map: SmtMap<Epoch>,
-    top_smt:     Smt,
-    path: PathBuf,
-    config: ConfigRocksDB
+    db: OptimisticTransactionDB,
 }
 
 impl StakerSmtManager {
-    fn new(keys: Vec<Epoch>, mut path: PathBuf, config: ConfigRocksDB) -> Self {
-        let mut staker_path = path.clone();
-        let sub_smt_map = SmtMap::new(keys, staker_path.clone(), config.clone());
+    const TOP_SMT_PREFIX: &[u8] = "top".as_bytes();
 
-        staker_path.push("top");
-        let top_smt = Smt::new(staker_path, config.clone());
-        Self {
-            sub_smt_map,
-            top_smt,
-            path,
-            config
-        }
+    fn new(path: PathBuf) -> Self {
+        let db = OptimisticTransactionDB::open_default(path).unwrap();
+        Self { db }
     }
 
     fn compute_sub_smt_key(key: H160) -> H256 {
@@ -200,95 +54,166 @@ impl StakerSmtManager {
         buf[..8].copy_from_slice(&key.to_le_bytes());
         buf.into()
     }
+
+    fn update(&self, prefix: &[u8], kvs: Vec<(H256, LeafValue)>) -> Result<(), Error> {
+        let tx = self.db.transaction_default();
+        let mut smt =
+            DefaultStoreMultiSMT::new_with_store(DefaultStoreMultiTree::new(prefix, &tx)).unwrap();
+        smt.update_all(kvs).expect("update_all error");
+        tx.commit().expect("db commit error");
+        Ok(())
+    }
 }
 
 impl StakeSmtStorage for StakerSmtManager {
-    fn insert(&mut self, epoch: Epoch, staker_infos: Vec<(Staker, Amount)>) -> Result<(), Error> {
-        let mut path = self.path.clone();
-        path.push(epoch.to_string());
-        let mut smt = Smt::new(path, self.config.clone());
-        for (staker, amount) in staker_infos {
-            smt.insert(
-                Self::compute_sub_smt_key(staker),
-                Self::compute_sub_smt_value(amount),
-            )?;
-        }
-        self.top_smt.insert(
-            Self::compute_top_smt_key(epoch),
-            LeafValue(smt.root()?.into()),
-        )?;
-        self.sub_smt_map.insert_smt(epoch, smt)
+    fn insert(&self, epoch: Epoch, staker_infos: Vec<(Staker, Amount)>) -> Result<(), Error> {
+        let kvs = staker_infos
+            .into_iter()
+            .map(|(k, v)| (Self::compute_sub_smt_key(k), Self::compute_sub_smt_value(v)))
+            .collect();
+
+        self.update(&epoch.to_le_bytes(), kvs)?;
+
+        let root = self.get_sub_root(epoch)?.unwrap().into();
+        let top_kvs = vec![(Self::compute_top_smt_key(epoch), LeafValue(root))];
+
+        self.update(Self::TOP_SMT_PREFIX, top_kvs)
     }
 
-    fn remove(&mut self, epoch: Epoch, staker: Staker) -> Result<(), Error> {
-        let smt = self.sub_smt_map.get_smt(epoch).unwrap();
-        smt.lock().remove(Self::compute_sub_smt_key(staker))?;
-        Ok(())
+    fn remove(&self, epoch: Epoch, staker: Staker) -> Result<(), Error> {
+        let kvs = vec![(Self::compute_sub_smt_key(staker), LeafValue::zero())];
+
+        self.update(&epoch.to_le_bytes(), kvs)?;
+
+        let root = self.get_sub_root(epoch)?.unwrap().into();
+        let top_kvs = vec![(Self::compute_top_smt_key(epoch), LeafValue(root))];
+
+        self.update(Self::TOP_SMT_PREFIX, top_kvs)
     }
 
-    fn remove_batch(&mut self, epoch: Epoch, stakers: Vec<Staker>) -> Result<(), Error> {
-        let smt = self.sub_smt_map.get_smt(epoch).unwrap();
-        for staker in stakers {
-            smt.lock().remove(Self::compute_sub_smt_key(staker))?;
-        }
+    fn remove_batch(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<(), Error> {
+        let kvs = stakers
+            .into_iter()
+            .map(|k| (Self::compute_sub_smt_key(k), LeafValue::zero()))
+            .collect();
 
-        self.top_smt.insert(
-            Self::compute_top_smt_key(epoch),
-            LeafValue(smt.lock().root()?.into()),
-        )?;
-        Ok(())
+        self.update(&epoch.to_le_bytes(), kvs)?;
+
+        let root = self.get_sub_root(epoch)?.unwrap().into();
+        let top_kvs = vec![(Self::compute_top_smt_key(epoch), LeafValue(root))];
+
+        self.update(Self::TOP_SMT_PREFIX, top_kvs)
     }
 
-    fn get_amount(&self, staker: Staker, epoch: Epoch) -> Result<Option<Amount>, Error> {
-        let smt = self.sub_smt_map.get_smt(epoch).unwrap();
-        if let Some(leaf_value) = smt.lock().get(Self::compute_sub_smt_key(staker))? {
-            return Ok(Some(Self::reconstruct_sub_smt_value(leaf_value)));
+    fn get_amount(&self, epoch: Epoch, staker: Staker) -> Result<Option<Amount>, Error> {
+        let snapshot = self.db.snapshot();
+        let binding = epoch.to_le_bytes();
+        let smt = DefaultStoreMultiSMT::new_with_store(DefaultStoreMultiTree::<_, ()>::new(
+            &binding,
+            &snapshot,
+        ))
+        .unwrap();
+
+        let leaf_value = smt.get(&Self::compute_sub_smt_key(staker))?;
+        if leaf_value == LeafValue::zero() {
+            return Ok(None);
         }
 
-        Ok(None)
+        Ok(Some(Self::reconstruct_sub_smt_value(leaf_value)))
     }
 
     fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Staker, Amount>, Error> {
-        let smt = self.sub_smt_map.get_smt(epoch).unwrap();
-        let leaves = smt.lock().get_leaves()?;
         let mut hash_map = HashMap::new();
-        for (k, v) in leaves {
-            let staker = Self::reconstruct_sub_smt_key(k);
-            let amount = Self::reconstruct_sub_smt_value(v);
-            hash_map.insert(staker, amount);
+
+        let prefix = &epoch.to_le_bytes();
+        let prefix_len = prefix.len();
+        let snapshot = self.db.snapshot();
+        let kvs: Vec<(Staker, Amount)> = snapshot
+            .iterator(IteratorMode::From(prefix, Direction::Forward))
+            .take_while(|(k, _)| k.starts_with(prefix))
+            .filter_map(|(k, v)| {
+                let leaf_key: [u8; 32] = k[prefix_len..].try_into().expect("checked 32 bytes");
+                let leaf_value: [u8; 32] = v[..].try_into().expect("checked 32 bytes");
+                Some((
+                    Self::reconstruct_sub_smt_key(leaf_key.into()),
+                    Self::reconstruct_sub_smt_value(LeafValue(leaf_value)),
+                ))
+            })
+            .collect();
+
+        for (k, v) in kvs.into_iter() {
+            hash_map.insert(k, v);
         }
+
         Ok(hash_map)
     }
 
     fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>, Error> {
-        self.sub_smt_map.get_root(epoch)
+        let snapshot = self.db.snapshot();
+        let binding = epoch.to_le_bytes();
+        let smt = DefaultStoreMultiSMT::new_with_store(DefaultStoreMultiTree::<_, ()>::new(
+            &binding,
+            &snapshot,
+        ))
+        .unwrap();
+
+        Ok(Some(smt.root().clone()))
     }
 
     fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>, Error> {
-        self.sub_smt_map.get_roots(epochs)
+        let mut hash_map = HashMap::new();
+
+        for epoch in epochs {
+            let root = self.get_sub_root(epoch)?;
+            hash_map.insert(epoch, root);
+        }
+
+        Ok(hash_map)
     }
 
-    fn get_top_root(&self) -> Result<Root, Error> {
-        self.top_smt.root()
+    fn get_top_root(&self) -> Result<Option<Root>, Error> {
+        let snapshot = self.db.snapshot();
+        let smt = DefaultStoreMultiSMT::new_with_store(DefaultStoreMultiTree::<_, ()>::new(
+            Self::TOP_SMT_PREFIX,
+            &snapshot,
+        ))
+        .unwrap();
+
+        Ok(Some(smt.root().clone()))
     }
 
     fn generate_sub_proof(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<Proof, Error> {
         let keys = stakers
-            .iter()
-            .map(|s| Self::compute_sub_smt_key(*s))
-            .collect();
-        self.sub_smt_map
-            .get_smt(epoch)
-            .unwrap()
-            .lock()
-            .generate_proof(keys)
+            .into_iter()
+            .map(|k| Self::compute_sub_smt_key(k))
+            .collect::<Vec<H256>>();
+        let snapshot = self.db.snapshot();
+        let binding = epoch.to_le_bytes();
+        let rocksdb_store_smt = DefaultStoreMultiSMT::new_with_store(
+            DefaultStoreMultiTree::<_, ()>::new(&binding, &snapshot),
+        )
+        .unwrap();
+
+        let proof = rocksdb_store_smt
+            .merkle_proof(keys.clone())?
+            .compile(keys)?;
+        Ok(proof.into())
     }
 
     fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof, Error> {
         let keys = epochs
-            .iter()
-            .map(|e| Self::compute_top_smt_key(*e))
-            .collect();
-        self.top_smt.generate_proof(keys)
+            .into_iter()
+            .map(|k| Self::compute_top_smt_key(k))
+            .collect::<Vec<H256>>();
+        let snapshot = self.db.snapshot();
+        let rocksdb_store_smt = DefaultStoreMultiSMT::new_with_store(
+            DefaultStoreMultiTree::<_, ()>::new(Self::TOP_SMT_PREFIX, &snapshot),
+        )
+        .unwrap();
+
+        let proof = rocksdb_store_smt
+            .merkle_proof(keys.clone())?
+            .compile(keys)?;
+        Ok(proof.into())
     }
 }

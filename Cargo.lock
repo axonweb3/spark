@@ -2458,6 +2458,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
+name = "smt-rocksdb-store"
+version = "0.1.0"
+source = "git+https://github.com/axonweb3/smt-rocksdb-store.git?rev=ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab#ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab"
+dependencies = [
+ "ckb-rocksdb",
+ "sparse-merkle-tree",
+]
+
+[[package]]
 name = "socket2"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2660,6 +2669,7 @@ dependencies = [
  "rlp",
  "sea-orm",
  "serde",
+ "smt-rocksdb-store",
  "sparse-merkle-tree",
  "tempfile",
  "thiserror",
