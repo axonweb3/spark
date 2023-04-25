@@ -15,7 +15,6 @@ type BlockNum = u64;
 type StakeRank = u64;
 type TokenAmount = u64;
 
-// 定义 QueryHistory trait
 trait QueryAccountHistory {
     fn get_stake_history(
         &self,
@@ -48,7 +47,6 @@ trait QueryAccountHistory {
         address: &str,
         // ) -> Vec<(TxId, Timestamp, Amount, TransactionStatus)>;
     ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>;
-    // 页面虽然没展示 TxHash 但数据结构是可以返回它的
 }
 
 trait QueryAxonStatus {
@@ -64,7 +62,6 @@ trait QueryAxonStatus {
     ) -> Vec<(Timestamp, Address, Amount, TransactionStatus)>;
 }
 
-// 定义 TransactionStatus 枚举
 #[derive(Debug)]
 enum TransactionStatus {
     Success,

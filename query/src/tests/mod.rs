@@ -1,100 +1,121 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use reqwest::header::CONTENT_TYPE;
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+    use jsonrpsee::types::Params;
+    use reqwest::Client as Cli;
+    use serde_json::{json, Value};
 
+    #[tokio::test]
+    async fn test_eth_estimate_gas() {
+        let url = "http://192.168.0.103:8000";
+        let data = json!({
+            "jsonrpc": "2.0",
+            "method": "eth_estimateGas",
+            "params": [
+                {
+                    "from": "0x2892467CdE7A331D367ce7f5eAe3dD99DFDe5f23",
+                    "to": "0xa990077c3205cbDf861e17Fa532eeB069cE9fF96",
+                    "value": {
+                        "type": "BigNumber",
+                        "hex": "0x011c37937e080000"
+                    },
+                    "accessList": null
+                }
+            ],
+            "id": 1
+        });
 
-// Some 
-#[derive(Serialize, Deserialize, Debug)]
-struct GETAPIResponse {
-    origin: String,
-}
+        let client = Cli::new();
+        let response = client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .body(data.to_string())
+            .send()
+            .await
+            .unwrap();
 
-#[derive(Serialize, Deserialize, Debug)]
-struct JSONResponse {
-    json: HashMap<String, String>,
-}
+        let json = response.text().await.unwrap();
+        let expected_json = "{expected_json}";
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
-    // - Create a new client which is re-used between requests
-    let client = reqwest::Client::new();
-
-
-    // - Doing a GET request
-    // - Parse the response to the "GETAPIResponse" struct
-    let resp200 = client.get("https://httpbin.org/ip")
-        .header(CONTENT_TYPE, "application/json")
-        .send()
-        .await?
-        .json::<GETAPIResponse>()
-        .await?;
-
-    println!("{:#?}", resp200);
-    // Output:
-    /*
-    GETAPIResponse {
-        origin: "182.190.14.159",
+        assert_eq!(json, expected_json);
     }
-    */
 
+    //     use jsonrpsee::{server::ServerBuilder, types::Error, RequestContext,
+    // ServerResult};
 
-    // Create a Map of string key-value pairs 
-    // to represent the body payload
-    let mut map = HashMap::new();
-    map.insert("lang", "rust");
-    map.insert("body", "json");
+    // async fn eth_estimate_gas(_ctx: RequestContext, _params:
+    // Vec<serde_json::Value>) -> ServerResult<serde_json::Value> {     // Replace
+    // this with your actual implementation     println!("hello");
 
+    //     Ok(serde_json::Value::Null)
+    // }
 
-    // - Doing a POST request
-    // - Parse the response to the "JSONResponse" struct
-    let resp_json = client.post("https://httpbin.org/anything")
-        .json(&map)
-        .send()
-        .await?
-        .json::<JSONResponse>()
-        .await?;
+    // #[tokio::test]
+    // async fn test_json_rpc() {
+    //     let mut io = ServerBuilder::default().build("127.0.0.1:8080").unwrap();
 
-    println!("{:#?}", resp_json);
-    // Output:
-    /*
-    JSONResponse {
-        json: {
-            "body": "json",
-            "lang": "rust",
-        },
+    //     io.register_method("eth_estimateGas", eth_estimate_gas.into());
+
+    //     loop {
+    //         if let Err(e) = io.next().await {
+    //             match e {
+    //                 Error::Internal(_) => break,
+    //                 e => eprintln!("Server error: {}", e),
+    //             }
+    //         }
+    //     }
+    // }
+
+    use std::net::SocketAddr;
+
+    use jsonrpsee::client_transport::ws::{Uri, WsTransportClientBuilder};
+    use jsonrpsee::core::client::{Client, ClientBuilder, ClientT};
+    use jsonrpsee::rpc_params;
+    use jsonrpsee::server::{RpcModule, ServerBuilder};
+
+    #[tokio::test]
+    async fn test_history_json_rpc() -> anyhow::Result<()> {
+        tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .try_init()
+            .expect("setting default subscriber failed");
+
+        let addr = run_server().await?;
+        let uri: Uri = format!("ws://{}", addr).parse()?;
+
+        let (tx, rx) = WsTransportClientBuilder::default().build(uri).await?;
+        let client: Client = ClientBuilder::default().build_with_tokio(tx, rx);
+        let response: String = client.request("say_hello", rpc_params![]).await?;
+        tracing::info!("response: {:?}", response);
+
+        Ok(())
     }
-    */
 
+    fn get_reward_history(_a:u128, _b:u128)-> String {
+        println!("history");
+        String::from("3")
+    }
 
-    // - Doing a GET request
-    let resp404 = client.get("https://httpbin.org/status/404")
-        .send()
-        .await?;
+    fn because_you() -> Result<Value, Error> {
+        println!("i am used");
+        Ok("hai".into())
+    }
 
-    // - Matching the HTTP status code of the request
-    match resp404.status() {
-        // - "OK - 200" everything was good
-        reqwest::StatusCode::OK => {
-            println!("Success!");
-            // ...
-        },
-        // - "NOT_FOUND - 404" the resource wasn't found
-        reqwest::StatusCode::NOT_FOUND => {
-            println!("Got 404! Haven't found resource!");
-            // Output: 
-            /*
-            Got 404! Haven't found resource!
-            */
-        },
-        // - Every other status code which doesn't match the above ones
-        _ => {
-            panic!("Okay... this shouldn't happen...");
-        },
-    };
+    async fn run_server() -> anyhow::Result<SocketAddr> {
+        let server = ServerBuilder::default().build("127.0.0.1:0").await?;
+        let mut module = RpcModule::new(());
+        let input = Params::new(Some("1"));
+        module.register_method("say_hello", |_, _| {
+            because_you();
+        })?;
+        let addr = server.local_addr()?;
 
+        let handle = server.start(module)?;
 
-   
+        // In this example we don't care about doing shutdown so let's it run forever.
+        // You may use the `ServerHandle` to shut it down or manage it yourself.
+        tokio::spawn(handle.stopped());
 
-    Ok(())
+        Ok(addr)
+    }
 }
