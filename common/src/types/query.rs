@@ -47,12 +47,8 @@ trait QueryAccountHistory {
         address: &str,
         // ) -> Vec<(TxId, Timestamp, Amount, TransactionStatus)>;
     ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>;
-}
-
-trait QueryAxonStatus {
+        
     fn get_amount_info(&self) -> (TotalStakeAmount, TotalDelegateAmount);
-
-    fn get_chain_state(&self) -> (BlockNum, EpochNum, PeriodNum);
 
     fn get_top_stake_info(&self) -> (StakeRank, Address, Amount);
 
@@ -60,6 +56,11 @@ trait QueryAxonStatus {
         &self,
         stake_type: StakeType,
     ) -> Vec<(Timestamp, Address, Amount, TransactionStatus)>;
+}
+
+trait QueryAxonStatus {
+    fn get_chain_state(&self) -> (BlockNum, EpochNum, PeriodNum);
+
 }
 
 #[derive(Debug)]
