@@ -1,5 +1,6 @@
+pub mod history;
+pub mod smt;
+
 mod error;
-mod history;
-mod smt;
 mod traits;
 mod types;

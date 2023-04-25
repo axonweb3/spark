@@ -7,17 +7,14 @@ edition = "2021"
 [dependencies]
 bytemuck = "1.13"
 blake2b-rs = "0.2"
+dashmap = "5.4"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
 parking_lot = "0.12"
-rand = { version = "0.8", features = [ "small_rng" ] }
-rlp = "0.5"
 rocksdb = { package = "ckb-rocksdb", version = "0.19", default-features = false, features = ["snappy", "march-native"] }
 sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-all"] }
 serde = { version = "1.0", features = ["derive"] }
 sparse-merkle-tree = "0.6"
-tempfile = "3.5"
 thiserror = "1.0"
-tokio = { version = "1.27", features = ["full"] }
 trie = { package = "cita_trie", version = "4.0" }
 
 smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab" }
