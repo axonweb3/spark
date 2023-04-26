@@ -1,4 +1,4 @@
-pub mod history;
+pub mod relation_db;
 pub mod smt;
 
 mod error;

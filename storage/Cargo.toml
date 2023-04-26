@@ -5,17 +5,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytemuck = "1.13"
+async-trait = "0.1"
 blake2b-rs = "0.2"
 dashmap = "5.4"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
 parking_lot = "0.12"
 rocksdb = { package = "ckb-rocksdb", version = "0.19", default-features = false, features = ["snappy", "march-native"] }
-sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-all"] }
+sea-orm = { version = "0.11", features = ["runtime-tokio-rustls", "sqlx-sqlite", "macros"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 sparse-merkle-tree = "0.6"
 thiserror = "1.0"
-trie = { package = "cita_trie", version = "4.0" }
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
+
+transaction-entity = { path = "../entity" }
+migration = { path = "../migration" }
 
 smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab" }
 

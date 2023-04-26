@@ -1,2 +1,2 @@
+pub mod relation_db;
 pub mod smt;
-pub mod transaction_history;
