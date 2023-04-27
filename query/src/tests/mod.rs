@@ -19,13 +19,13 @@ mod tests {
     use crate::QueryError;
 
 
-    async fn run_server_01() -> anyhow::Result<SocketAddr> {
-        let server = ServerBuilder::default().build("127.0.0.1:0".parse::<SocketAddr>()?).await?;
+    async fn run_server_01() -> Result<SocketAddr, QueryError>  {
+        let server = ServerBuilder::default().build("127.0.0.1:0".parse::<SocketAddr>().unwrap()).await.unwrap();
         let mut module = RpcModule::new(());
-        module.register_method("say_hello", |_, _| "lo")?;
+        module.register_method("say_hello", |_, _| "lo").unwrap();
     
-        let addr = server.local_addr()?;
-        let handle = server.start(module)?;
+        let addr = server.local_addr().unwrap();
+        let handle = server.start(module).unwrap();
     
         tokio::spawn(handle.stopped());
     
@@ -33,13 +33,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn run_jsonrpc_server_02() -> anyhow::Result<()> {
+    async fn run_jsonrpc_server_02() -> Result<(), QueryError>{
 
         let server_addr = run_server_01().await?;
         let url = format!("http://{:?}", server_addr);
         println!("addr: {:?}", url);
 
-        let client = HttpClientBuilder::default().build(url)?;
+        let client = HttpClientBuilder::default().build(url).unwrap();
         let params = rpc_params![];
         // curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method": "say_hello", "params": []}' http://localhost:33121/
         let response: Result<String, _> = client.request("say_hello", params).await;
