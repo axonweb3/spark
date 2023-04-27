@@ -1,13 +1,21 @@
 use ethereum_types::H160;
 use rocksdb::DBVector;
-use smt_rocksdb_store::default_store::{DefaultStore, DefaultStoreMultiTree};
+use smt_rocksdb_store::cf_store::{ColumnFamilyStore, ColumnFamilyStoreMultiTree};
 use sparse_merkle_tree::{blake2b::Blake2bHasher, traits::Value, SparseMerkleTree, H256};
 
-pub type DefaultStoreSMT<'a, T, W> =
-    SparseMerkleTree<Blake2bHasher, LeafValue, DefaultStore<'a, T, W>>;
+lazy_static::lazy_static! {
+    pub static ref TOP_SMT_PREFIX: &'static [u8] = b"top_smt".as_slice();
+    pub static ref STAKER_TABLE: &'static str = "staker";
+    pub static ref DELEGATOR_TABLE: &'static str = "delegator";
+    pub static ref REWARD_TABLE: &'static str = "reward";
+    pub static ref PROPOSAL_TABLE: &'static str = "proposal";
+}
 
-pub type DefaultStoreMultiSMT<'a, T, W> =
-    SparseMerkleTree<Blake2bHasher, LeafValue, DefaultStoreMultiTree<'a, T, W>>;
+pub type ColumnFamilyStoreSMT<'a, T, W> =
+    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStore<'a, T, W>>;
+
+pub type ColumnFamilyStoreMultiSMT<'a, T, W> =
+    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStoreMultiTree<'a, T, W>>;
 
 pub type Amount = u128;
 pub type Epoch = u64;
@@ -19,6 +27,78 @@ pub type Address = H160;
 pub type Staker = H160;
 pub type Delegator = H160;
 pub type Validator = H160;
+
+pub enum SmtPrefixType {
+    Top,
+    Epoch(Epoch),
+    Address(Address),
+}
+
+impl SmtPrefixType {
+    pub fn as_prefix(&self) -> Vec<u8> {
+        match self {
+            SmtPrefixType::Top => TOP_SMT_PREFIX.to_vec(),
+            SmtPrefixType::Epoch(epoch) => epoch.to_le_bytes().to_vec(),
+            SmtPrefixType::Address(address) => address.to_fixed_bytes().to_vec(),
+        }
+    }
+}
+
+pub enum SmtKeyEncode {
+    Epoch(Epoch),
+    Address(Address),
+}
+
+impl SmtKeyEncode {
+    pub fn to_h256(&self) -> H256 {
+        match self {
+            SmtKeyEncode::Epoch(epoch) => {
+                let mut buf = [0u8; 32];
+                buf[..8].copy_from_slice(&epoch.to_le_bytes());
+                buf.into()
+            }
+            SmtKeyEncode::Address(address) => {
+                let mut buf = [0u8; 32];
+                buf[..20].copy_from_slice(&address.to_fixed_bytes());
+                buf.into()
+            }
+        }
+    }
+}
+
+pub enum SmtKeyDecode {
+    Address([u8; 32]),
+}
+
+impl SmtKeyDecode {
+    pub fn from_h256(&self) -> Vec<u8> {
+        match self {
+            SmtKeyDecode::Address(h256) => {
+                let mut buf = [0u8; 20];
+                buf.copy_from_slice(&h256[..20]);
+                buf.to_vec()
+            }
+        }
+    }
+}
+
+pub enum SmtValueEncode {
+    Amount(Amount),
+    Epoch(Epoch),
+    ProposalCount(ProposalCount),
+    Root(Root),
+}
+
+impl SmtValueEncode {
+    pub fn to_leaf_value(&self) -> LeafValue {
+        match self {
+            SmtValueEncode::Amount(amount) => (*amount).into(),
+            SmtValueEncode::Epoch(epoch) => (*epoch).into(),
+            SmtValueEncode::ProposalCount(count) => (*count).into(),
+            SmtValueEncode::Root(root) => LeafValue::from(*root),
+        }
+    }
+}
 
 // define SMT value
 #[derive(Default, Clone, PartialEq, Eq)]
@@ -39,6 +119,12 @@ impl From<DBVector> for LeafValue {
     }
 }
 
+impl AsRef<[u8]> for LeafValue {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
 impl From<Amount> for LeafValue {
     fn from(amount: Amount) -> Self {
         let amount_bytes = amount.to_le_bytes();
@@ -56,20 +142,20 @@ impl From<LeafValue> for Amount {
     }
 }
 
-impl From<ProposalCount> for LeafValue {
-    fn from(count: ProposalCount) -> Self {
-        let count_bytes = count.to_le_bytes();
+impl From<u64> for LeafValue {
+    fn from(v: u64) -> Self {
+        let count_bytes = v.to_le_bytes();
         let mut buf = [0u8; 32];
         buf[..8].copy_from_slice(&count_bytes);
         LeafValue(buf)
     }
 }
 
-impl From<LeafValue> for ProposalCount {
+impl From<LeafValue> for u64 {
     fn from(leaf_value: LeafValue) -> Self {
         let mut buf = [0u8; 8];
         buf.copy_from_slice(&leaf_value.0[..8]);
-        ProposalCount::from_le_bytes(buf)
+        u64::from_le_bytes(buf)
     }
 }
 
@@ -82,11 +168,5 @@ impl From<Root> for LeafValue {
 impl From<LeafValue> for Root {
     fn from(leaf_value: LeafValue) -> Self {
         leaf_value.0.into()
-    }
-}
-
-impl AsRef<[u8]> for LeafValue {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
     }
 }

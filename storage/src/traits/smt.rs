@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
 
 use sparse_merkle_tree::error::Error;
@@ -7,99 +8,142 @@ use crate::types::smt::{
 };
 
 // High level business logic SMT APIs
+#[async_trait]
 pub trait StakeSmtStorage {
-    fn insert(&self, epoch: Epoch, amounts: Vec<(Address, Amount)>) -> Result<(), Error>;
+    async fn insert_stake(
+        &self,
+        epoch: Epoch,
+        amounts: Vec<(Address, Amount)>,
+    ) -> Result<(), Error>;
 
-    fn remove(&self, epoch: Epoch, address: Address) -> Result<(), Error>;
+    async fn remove_stake(&self, epoch: Epoch, address: Address) -> Result<(), Error>;
 
-    fn remove_batch(&self, epoch: Epoch, address: Vec<Address>) -> Result<(), Error>;
+    async fn remove_batch_stake(&self, epoch: Epoch, address: Vec<Address>) -> Result<(), Error>;
 
-    fn get_amount(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>, Error>;
+    async fn get_amount_stake(
+        &self,
+        epoch: Epoch,
+        address: Address,
+    ) -> Result<Option<Amount>, Error>;
 
-    fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>, Error>;
+    async fn get_sub_leaves_stake(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>, Error>;
 
-    fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>, Error>;
+    async fn get_sub_root_stake(&self, epoch: Epoch) -> Result<Option<Root>, Error>;
 
-    fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>, Error>;
+    async fn get_sub_roots_stake(
+        &self,
+        epochs: Vec<Epoch>,
+    ) -> Result<HashMap<Epoch, Option<Root>>, Error>;
 
-    fn get_top_root(&self) -> Result<Root, Error>;
+    async fn get_top_root_stake(&self) -> Result<Root, Error>;
 
-    fn generate_sub_proof(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<Proof, Error>;
+    async fn generate_sub_proof_stake(
+        &self,
+        epoch: Epoch,
+        addresses: Vec<Address>,
+    ) -> Result<Proof, Error>;
 
-    fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof, Error>;
+    async fn generate_top_proof_stake(&self, epochs: Vec<Epoch>) -> Result<Proof, Error>;
 }
 
+#[async_trait]
 pub trait DelegateSmtStorage {
-    fn insert(
+    async fn insert_delegate(
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<(Delegator, Amount)>>,
     ) -> Result<(), Error>;
 
-    fn remove(
+    async fn remove_delegate(
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<Delegator>>,
     ) -> Result<(), Error>;
 
-    fn get_amount(
+    async fn get_amount_delegate(
         &self,
         delegator: Delegator,
         staker: Staker,
         epoch: Epoch,
     ) -> Result<Option<Amount>, Error>;
 
-    fn get_sub_leaves(
+    async fn get_sub_leaves_delegate(
         &self,
         staker: Staker,
         epoch: Epoch,
     ) -> Result<HashMap<Delegator, Amount>, Error>;
 
-    fn get_sub_root(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>, Error>;
+    async fn get_sub_root_delegate(
+        &self,
+        staker: Staker,
+        epoch: Epoch,
+    ) -> Result<Option<Root>, Error>;
 
-    fn get_sub_roots(
+    async fn get_sub_roots_delegate(
         &self,
         staker: Staker,
         epochs: Vec<Epoch>,
     ) -> Result<HashMap<Epoch, Option<Root>>, Error>;
 
-    fn get_top_root(&self, staker: Staker) -> Result<Root, Error>;
+    async fn get_top_root_delegate(&self, staker: Staker) -> Result<Root, Error>;
 
-    fn get_top_roots(&self, stakers: Vec<Staker>) -> Result<HashMap<Staker, Root>, Error>;
+    async fn get_top_roots_delegate(
+        &self,
+        stakers: Vec<Staker>,
+    ) -> Result<HashMap<Staker, Root>, Error>;
 
-    fn generate_sub_proof(
+    async fn generate_sub_proof_delegate(
         &self,
         staker: Staker,
         epoch: Epoch,
         delegators: Vec<Delegator>,
     ) -> Result<Proof, Error>;
 
-    fn generate_top_proof(&self, staker: Staker, epochs: Vec<Epoch>) -> Result<Proof, Error>;
+    async fn generate_top_proof_delegate(
+        &self,
+        staker: Staker,
+        epochs: Vec<Epoch>,
+    ) -> Result<Proof, Error>;
 }
 
+#[async_trait]
 pub trait RewardSmtStorage {
-    fn insert(&self, address: Address, epoch: Epoch) -> Result<(), Error>;
+    async fn insert_reward(&self, address: Address, epoch: Epoch) -> Result<(), Error>;
 
-    fn get_root(&self) -> Result<Root, Error>;
+    async fn get_root_reward(&self) -> Result<Root, Error>;
 
-    fn get_latest_reward_epoch(&self, address: Address) -> Result<Option<Epoch>, Error>;
+    async fn get_epoch_reward(&self, address: Address) -> Result<Option<Epoch>, Error>;
 
-    fn generate_proof(&self, addresses: Vec<Address>) -> Result<Proof, Error>;
+    async fn generate_proof_reward(&self, addresses: Vec<Address>) -> Result<Proof, Error>;
 }
 
+#[async_trait]
 pub trait ProposalSmtStorage {
-    fn insert(&self, epoch: Epoch, proposals: Vec<(Validator, ProposalCount)>)
-        -> Result<(), Error>;
+    async fn insert_proposal(
+        &self,
+        epoch: Epoch,
+        proposals: Vec<(Validator, ProposalCount)>,
+    ) -> Result<(), Error>;
 
-    fn get_proposal(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>, Error>;
+    async fn get_count_proposal(
+        &self,
+        epoch: Epoch,
+    ) -> Result<HashMap<Validator, ProposalCount>, Error>;
 
-    fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>, Error>;
+    async fn get_sub_root_proposal(&self, epoch: Epoch) -> Result<Option<Root>, Error>;
 
-    fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>, Error>;
+    async fn get_sub_roots_proposal(
+        &self,
+        epochs: Vec<Epoch>,
+    ) -> Result<HashMap<Epoch, Option<Root>>, Error>;
 
-    fn get_top_root(&self) -> Result<Root, Error>;
+    async fn get_top_root_proposal(&self) -> Result<Root, Error>;
 
-    fn generate_sub_proof(&self, epoch: Epoch, validators: Vec<Validator>) -> Result<Proof, Error>;
+    async fn generate_sub_proof_proposal(
+        &self,
+        epoch: Epoch,
+        validators: Vec<Validator>,
+    ) -> Result<Proof, Error>;
 
-    fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof, Error>;
+    async fn generate_top_proof_proposal(&self, epochs: Vec<Epoch>) -> Result<Proof, Error>;
 }

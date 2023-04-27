@@ -2668,6 +2668,7 @@ dependencies = [
  "ckb-rocksdb",
  "dashmap",
  "ethereum-types",
+ "lazy_static",
  "migration",
  "parking_lot 0.12.1",
  "sea-orm",
