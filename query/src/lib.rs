@@ -2,12 +2,6 @@ mod tests;
 
 use thiserror::Error;
 
-// #[derive(Debug)]
-// pub enum APIError {
-//     #[display(fmt = "http server error {:?}", _0)]
-//     HttpServer(String),
-// }
-
 #[derive(Error, Debug)]
 pub enum QueryError {
     // #[error("data store disconnected")]
