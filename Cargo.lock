@@ -520,6 +520,9 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 [[package]]
 name = "common"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+]
 
 [[package]]
 name = "const-oid"
@@ -2165,14 +2168,12 @@ dependencies = [
 name = "query"
 version = "0.1.0"
 dependencies = [
- "anyhow",
+ "async-trait",
+ "common",
  "ethereum-types",
  "jsonrpsee 0.18.0",
- "serde",
- "serde_json",
  "thiserror",
  "tokio",
- "tracing",
 ]
 
 [[package]]

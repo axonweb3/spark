@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 type TxId = String;
 type Timestamp = u64;
 type Amount = u64;
@@ -15,23 +16,23 @@ type BlockNum = u64;
 type StakeRank = u64;
 type TokenAmount = u64;
 
-trait QueryAccountHistory {
-    fn get_stake_history(
+#[async_trait]
+pub trait QueryInformation {
+    async fn get_stake_history<'a>(
         &self,
-        address: &str,
-    ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>;
+        address: &'a str,
+    ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>where &'a str: 'async_trait;
 
-    fn get_delegate_information(&self, address: &str) -> Vec<(Address, Amount)>;
+    async fn get_delegate_information<'a>(&self, address: String) -> Vec<(Address, Amount)>;
 
-    fn get_reward_information(
+    async fn get_reward_information<'a>(
         &self,
-        address: &str,
+        address: String,
     ) -> Vec<(Address, UnlockAmount, LockAmount, TotalAmount)>;
-    // ) -> (Address, UnlockAmount, LockAmount, TotalAmount);
 
-    fn get_reward_history(
+    async fn get_reward_history<'a>(
         &self,
-        address: &str,
+        address: String,
     ) -> Vec<(
         TxId,
         EpochNum,
@@ -42,17 +43,16 @@ trait QueryAccountHistory {
         Amount,
     )>;
 
-    fn get_withdraw_history(
+    async fn get_withdraw_history(
         &self,
-        address: &str,
-        // ) -> Vec<(TxId, Timestamp, Amount, TransactionStatus)>;
+        address: String,
     ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>;
         
-    fn get_amount_info(&self) -> (TotalStakeAmount, TotalDelegateAmount);
+    async fn get_amount_info(&self) -> (TotalStakeAmount, TotalDelegateAmount);
 
-    fn get_top_stake_info(&self) -> (StakeRank, Address, Amount);
+    async fn get_top_stake_info(&self) -> (StakeRank, Address, Amount);
 
-    fn get_latest_stake_txs(
+    async fn get_latest_stake_txs(
         &self,
         stake_type: StakeType,
     ) -> Vec<(Timestamp, Address, Amount, TransactionStatus)>;
@@ -64,20 +64,20 @@ trait QueryAxonStatus {
 }
 
 #[derive(Debug)]
-enum TransactionStatus {
+pub enum TransactionStatus {
     Success,
     Pending,
     Failed,
 }
 
 #[derive(Debug)]
-enum RewardStatus {
+pub enum RewardStatus {
     Lock,
     Unlock,
 }
 
 #[derive(Debug)]
-enum StakeType {
+pub enum StakeType {
     Stake,
     Delegate,
 }
