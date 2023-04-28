@@ -2171,7 +2171,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "common",
- "ethereum-types",
  "jsonrpsee 0.18.0",
  "thiserror",
  "tokio",

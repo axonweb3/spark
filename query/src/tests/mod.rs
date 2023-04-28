@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ethereum_types::{
-        BigEndianHash, Bloom, Public, Secret, Signature, H128, H160, H256, H512, H520, H64, U128,
-        U256, U512, U64,
-    };
+    use common::types::H256;
     use jsonrpsee::core::client::ClientT;
     use jsonrpsee::http_client::HttpClientBuilder;
     use jsonrpsee::server::ServerBuilder;
