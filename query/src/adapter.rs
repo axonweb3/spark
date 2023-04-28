@@ -1,51 +1,60 @@
 
 use crate::QueryError;
-use common::types::query::QueryInformation;
+use common::traits::query::QueryInformation;
 use async_trait::async_trait;
+use common::types::H256;
 pub struct DefaultQueryAdapter {
 
 }
 
 #[async_trait]
 impl QueryInformation for DefaultQueryAdapter {
-    async fn get_stake_history<'a>(
+    async fn get_stake_history(
         &self,
-        address: &'a str,
-    ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)> where &'a str: 'async_trait{}
+        address: H256,
+    ) -> Vec<(H256)> {
+        vec![H256::default()]
+    }
 
-    async fn get_delegate_information(&self, address: String) -> Vec<(Address, Amount)>{}
+    async fn get_delegate_information(&self, address: H256) -> Vec<(H256)>{
+        vec![H256::default()]
+    }
 
-    async fn get_reward_information(
+    async fn get_reward_information<'a>(
+        &self,
+        address: H256,
+    ) -> Vec<(H256)>{
+        vec![H256::default()]
+    }
+
+    async fn get_reward_history<'a>(
+        &self,
+        address: H256,
+    ) -> Vec<(H256)>{
+        vec![H256::default()]
+    }
+
+    async fn get_withdraw_history(
         &self,
         address: String,
-    ) -> Vec<(Address, UnlockAmount, LockAmount, TotalAmount)>{}
-
-    async fn get_reward_history(
-        &self,
-        address: String,
-    ) -> Vec<(
-        TxId,
-        EpochNum,
-        TotalAmount,
-        RewardStatus,
-        StakeType,
-        Address,
-        Amount,
-    )>{}
-
-    fn get_withdraw_history(
-        &self,
-        address: String,
-    ) -> Vec<(TxId, Timestamp, Amount, TxHash, TransactionStatus)>{}
+    ) -> Vec<(H256)>{
+        vec![H256::default()]
+    }
         
-    async fn get_amount_info(&self) -> (TotalStakeAmount, TotalDelegateAmount){}
+    async fn get_amount_info(&self) -> (H256, H256){
+        (H256::default(), H256::default())
+    }
 
-    async fn get_top_stake_info(&self) -> (StakeRank, Address, Amount){}
+    async fn get_top_stake_info(&self) -> (H256, H256){
+        (H256::default(), H256::default())
+    }
 
     async fn get_latest_stake_txs(
         &self,
-        stake_type: StakeType,
-    ) -> Vec<(Timestamp, Address, Amount, TransactionStatus)>{}
+        stake_type: H256,
+    ) -> Vec<(H256)>{
+        vec![H256::default()]
+    }
 }
 
 #[cfg(test)]

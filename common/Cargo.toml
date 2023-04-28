@@ -6,3 +6,4 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1.68"
+ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
