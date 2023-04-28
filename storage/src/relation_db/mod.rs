@@ -1,15 +1,16 @@
+use crate::types::transaction::{self, Model};
+use anyhow::Result;
 use async_trait::async_trait;
-use migration::{DbErr, Migrator, MigratorTrait};
-use sea_orm::sea_query::error::Error;
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, CursorTrait, Database, DbConn, EntityTrait, QueryFilter,
 };
-use transaction_entity::transaction::{self, Model};
 
+use crate::error::StorageError;
 use crate::traits::relation_db::TransactionStorage;
 use crate::types::smt::Address;
 
-pub async fn establish_connection() -> Result<DbConn, Error> {
+pub async fn establish_connection() -> Result<DbConn> {
     let database_url = std::env::var("DATABASE_URL").unwrap();
     let db = Database::connect(&database_url)
         .await
@@ -26,16 +27,16 @@ pub struct TransactionHistory {
 }
 
 impl TransactionHistory {
-    pub async fn new() -> Result<Self, Error> {
-        let db = establish_connection().await?;
-        Ok(Self { db })
+    pub async fn new() -> Self {
+        let db = establish_connection().await.unwrap();
+        Self { db }
     }
 }
 
 #[async_trait]
 impl TransactionStorage for TransactionHistory {
-    async fn insert(&mut self, tx_record: transaction::ActiveModel) -> Result<(), DbErr> {
-        let tx_record: transaction::Model = tx_record.insert(&self.db).await?;
+    async fn insert(&mut self, tx_record: transaction::ActiveModel) -> Result<()> {
+        let tx_record = tx_record.insert(&self.db).await?;
         println!(
             "Post created with ID: {}, TITLE: {}",
             tx_record.id, tx_record.address
@@ -48,11 +49,14 @@ impl TransactionStorage for TransactionHistory {
         addr: Address,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<Model>, DbErr> {
+    ) -> Result<Vec<Model>> {
         let mut cursor = transaction::Entity::find()
             .filter(transaction::Column::Address.eq(addr.to_string()))
             .cursor_by(transaction::Column::Id);
         cursor.after(offset).before(offset + limit);
-        cursor.all(&self.db).await
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
     }
 }

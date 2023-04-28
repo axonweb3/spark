@@ -1,10 +1,11 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, vec};
 
+use anyhow::Result;
 use async_trait::async_trait;
 
 use rocksdb::{prelude::*, Direction, IteratorMode, OptimisticTransactionDB};
 use smt_rocksdb_store::cf_store::{ColumnFamilyStore, ColumnFamilyStoreMultiTree};
-use sparse_merkle_tree::{error::Error, traits::Value, H256};
+use sparse_merkle_tree::{traits::Value, H256};
 
 use crate::{
     traits::smt::{DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage},
@@ -58,12 +59,31 @@ pub struct SmtManager {
     db: Arc<OptimisticTransactionDB>,
 }
 
+/// SMT storage for stakers
+/// For sub smt, the key is the staker address, the value is the amount of
+/// staking For top smt, the key is the epoch, the value is the root of sub smt
+///                          Staker Root
+///                /                             \
+///          epoch 1 root                   epoch 2 root
+///         /      |      \                /      |      \
+///    staker1  staker2  staker3       staker1  staker3  staker4
+///    amount1  amount2  amount3       amount1  amount3  amount4
 impl SmtManager {
-    async fn get_sub_leaves(
-        &self,
-        prefix: &[u8],
-        table: &str,
-    ) -> Result<HashMap<Address, Amount>, Error> {
+    pub fn new(path: PathBuf) -> Self {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+        let mut db = OptimisticTransactionDB::open(&db_opts, path).unwrap();
+
+        create_table_cfs!(db, STAKER_TABLE);
+        create_table_cfs!(db, DELEGATOR_TABLE);
+        create_table_cfs!(db, REWARD_TABLE);
+        create_table_cfs!(db, PROPOSAL_TABLE);
+
+        Self { db: Arc::new(db) }
+    }
+
+    async fn get_sub_leaves(&self, prefix: &[u8], table: &str) -> Result<HashMap<Address, Amount>> {
         let mut hash_map = HashMap::new();
 
         let prefix_len = prefix.len();
@@ -95,48 +115,19 @@ impl SmtManager {
 
         Ok(hash_map)
     }
-}
 
-/// SMT storage for stakers
-/// For sub smt, the key is the staker address, the value is the amount of
-/// staking For top smt, the key is the epoch, the value is the root of sub smt
-///                          Staker Root
-///                /                             \
-///          epoch 1 root                   epoch 2 root
-///         /      |      \                /      |      \
-///    staker1  staker2  staker3       staker1  staker3  staker4
-///    amount1  amount2  amount3       amount1  amount3  amount4
-impl SmtManager {
-    pub fn new(path: PathBuf) -> Self {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-        let mut db = OptimisticTransactionDB::open(&db_opts, path).unwrap();
-
-        create_table_cfs!(db, STAKER_TABLE);
-        create_table_cfs!(db, DELEGATOR_TABLE);
-        create_table_cfs!(db, REWARD_TABLE);
-        create_table_cfs!(db, PROPOSAL_TABLE);
-
-        Self { db: Arc::new(db) }
-    }
-
-    fn update(&self, cf: &str, prefix: &[u8], kvs: Vec<(H256, LeafValue)>) -> Result<(), Error> {
+    fn update(&self, cf: &str, prefix: &[u8], kvs: Vec<(H256, LeafValue)>) -> Result<()> {
         let inner = self.db.transaction_default();
         let mut smt = get_smt!(self.db, cf, prefix, &inner);
         smt.update_all(kvs).expect("update_all error");
-        inner.commit().expect("db commit error");
+        inner.commit()?;
         Ok(())
     }
 }
 
 #[async_trait]
 impl StakeSmtStorage for SmtManager {
-    async fn insert_stake(
-        &self,
-        epoch: Epoch,
-        amounts: Vec<(Address, Amount)>,
-    ) -> Result<(), Error> {
+    async fn insert_stake(&self, epoch: Epoch, amounts: Vec<(Address, Amount)>) -> Result<()> {
         let kvs = amounts
             .into_iter()
             .map(|(k, v)| {
@@ -158,7 +149,7 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn remove_stake(&self, epoch: Epoch, address: Address) -> Result<(), Error> {
+    async fn remove_stake(&self, epoch: Epoch, address: Address) -> Result<()> {
         let kvs = vec![(SmtKeyEncode::Address(address).to_h256(), LeafValue::zero())];
 
         self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
@@ -172,7 +163,7 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn remove_batch_stake(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<(), Error> {
+    async fn remove_batch_stake(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<()> {
         let kvs = addresses
             .into_iter()
             .map(|k| (SmtKeyEncode::Address(k).to_h256(), LeafValue::zero()))
@@ -189,11 +180,7 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn get_amount_stake(
-        &self,
-        epoch: Epoch,
-        address: Address,
-    ) -> Result<Option<Amount>, Error> {
+    async fn get_amount_stake(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -206,12 +193,12 @@ impl StakeSmtStorage for SmtManager {
         Ok(Some(Amount::from(leaf_value)))
     }
 
-    async fn get_sub_leaves_stake(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>, Error> {
+    async fn get_sub_leaves_stake(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         self.get_sub_leaves(&prefix, &STAKER_TABLE).await
     }
 
-    async fn get_sub_root_stake(&self, epoch: Epoch) -> Result<Option<Root>, Error> {
+    async fn get_sub_root_stake(&self, epoch: Epoch) -> Result<Option<Root>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -222,7 +209,7 @@ impl StakeSmtStorage for SmtManager {
     async fn get_sub_roots_stake(
         &self,
         epochs: Vec<Epoch>,
-    ) -> Result<HashMap<Epoch, Option<Root>>, Error> {
+    ) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
@@ -233,7 +220,7 @@ impl StakeSmtStorage for SmtManager {
         Ok(hash_map)
     }
 
-    async fn get_top_root_stake(&self) -> Result<Root, Error> {
+    async fn get_top_root_stake(&self) -> Result<Root> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -245,7 +232,7 @@ impl StakeSmtStorage for SmtManager {
         &self,
         epoch: Epoch,
         addresses: Vec<Address>,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let keys = addresses
@@ -257,7 +244,7 @@ impl StakeSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof_stake(&self, epochs: Vec<Epoch>) -> Result<Proof, Error> {
+    async fn generate_top_proof_stake(&self, epochs: Vec<Epoch>) -> Result<Proof> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let keys = epochs
@@ -276,7 +263,7 @@ impl DelegateSmtStorage for SmtManager {
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<(Delegator, Amount)>>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         for (staker, amounts) in delegators {
             let mut current_prefix = prefix.clone();
@@ -312,7 +299,7 @@ impl DelegateSmtStorage for SmtManager {
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<Delegator>>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut hash_map = HashMap::new();
         for (staker, addresses) in delegators {
             let kvs = addresses
@@ -330,7 +317,7 @@ impl DelegateSmtStorage for SmtManager {
         delegator: Delegator,
         staker: Staker,
         epoch: Epoch,
-    ) -> Result<Option<Amount>, Error> {
+    ) -> Result<Option<Amount>> {
         let mut prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -349,18 +336,14 @@ impl DelegateSmtStorage for SmtManager {
         &self,
         staker: Staker,
         epoch: Epoch,
-    ) -> Result<HashMap<Delegator, Amount>, Error> {
+    ) -> Result<HashMap<Delegator, Amount>> {
         let mut prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
         self.get_sub_leaves(&prefix, &DELEGATOR_TABLE).await
     }
 
-    async fn get_sub_root_delegate(
-        &self,
-        staker: Staker,
-        epoch: Epoch,
-    ) -> Result<Option<Root>, Error> {
+    async fn get_sub_root_delegate(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>> {
         let mut prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -374,7 +357,7 @@ impl DelegateSmtStorage for SmtManager {
         &self,
         staker: Staker,
         epochs: Vec<Epoch>,
-    ) -> Result<HashMap<Epoch, Option<Root>>, Error> {
+    ) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
@@ -385,7 +368,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(hash_map)
     }
 
-    async fn get_top_root_delegate(&self, staker: Staker) -> Result<Root, Error> {
+    async fn get_top_root_delegate(&self, staker: Staker) -> Result<Root> {
         let mut prefix = SmtPrefixType::Top.as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
         let snapshot = self.db.snapshot();
@@ -394,10 +377,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(smt.root().clone())
     }
 
-    async fn get_top_roots_delegate(
-        &self,
-        stakers: Vec<Staker>,
-    ) -> Result<HashMap<Staker, Root>, Error> {
+    async fn get_top_roots_delegate(&self, stakers: Vec<Staker>) -> Result<HashMap<Staker, Root>> {
         let mut hash_map = HashMap::new();
         for staker in stakers {
             let root = self.get_top_root_delegate(staker).await?;
@@ -412,7 +392,7 @@ impl DelegateSmtStorage for SmtManager {
         staker: Staker,
         epoch: Epoch,
         delegators: Vec<Delegator>,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof> {
         let mut prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -431,7 +411,7 @@ impl DelegateSmtStorage for SmtManager {
         &self,
         staker: Staker,
         epochs: Vec<Epoch>,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof> {
         let mut prefix = SmtPrefixType::Top.as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -449,7 +429,7 @@ impl DelegateSmtStorage for SmtManager {
 
 #[async_trait]
 impl RewardSmtStorage for SmtManager {
-    async fn insert_reward(&self, address: Address, epoch: Epoch) -> Result<(), Error> {
+    async fn insert_reward(&self, address: Address, epoch: Epoch) -> Result<()> {
         let kvs = vec![(
             SmtKeyEncode::Address(address).to_h256(),
             SmtValueEncode::Epoch(epoch).to_leaf_value(),
@@ -462,14 +442,14 @@ impl RewardSmtStorage for SmtManager {
         Ok(())
     }
 
-    async fn get_root_reward(&self) -> Result<Root, Error> {
+    async fn get_root_reward(&self) -> Result<Root> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
         Ok(smt.root().clone())
     }
 
-    async fn get_epoch_reward(&self, address: Address) -> Result<Option<Epoch>, Error> {
+    async fn get_epoch_reward(&self, address: Address) -> Result<Option<Epoch>> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
@@ -481,7 +461,7 @@ impl RewardSmtStorage for SmtManager {
         Ok(Some(Epoch::from(leaf_value)))
     }
 
-    async fn generate_proof_reward(&self, addresses: Vec<Address>) -> Result<Proof, Error> {
+    async fn generate_proof_reward(&self, addresses: Vec<Address>) -> Result<Proof> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
@@ -500,7 +480,7 @@ impl ProposalSmtStorage for SmtManager {
         &self,
         epoch: Epoch,
         proposals: Vec<(Validator, ProposalCount)>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let kvs = proposals
             .into_iter()
             .map(|(k, v)| {
@@ -526,10 +506,7 @@ impl ProposalSmtStorage for SmtManager {
         self.update(&PROPOSAL_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn get_count_proposal(
-        &self,
-        epoch: Epoch,
-    ) -> Result<HashMap<Validator, ProposalCount>, Error> {
+    async fn get_count_proposal(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>> {
         let mut hash_map = HashMap::new();
 
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
@@ -566,7 +543,7 @@ impl ProposalSmtStorage for SmtManager {
         Ok(hash_map)
     }
 
-    async fn get_sub_root_proposal(&self, epoch: Epoch) -> Result<Option<Root>, Error> {
+    async fn get_sub_root_proposal(&self, epoch: Epoch) -> Result<Option<Root>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
@@ -577,7 +554,7 @@ impl ProposalSmtStorage for SmtManager {
     async fn get_sub_roots_proposal(
         &self,
         epochs: Vec<Epoch>,
-    ) -> Result<HashMap<Epoch, Option<Root>>, Error> {
+    ) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
@@ -588,7 +565,7 @@ impl ProposalSmtStorage for SmtManager {
         Ok(hash_map)
     }
 
-    async fn get_top_root_proposal(&self) -> Result<Root, Error> {
+    async fn get_top_root_proposal(&self) -> Result<Root> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
@@ -599,7 +576,7 @@ impl ProposalSmtStorage for SmtManager {
         &self,
         epoch: Epoch,
         validators: Vec<Validator>,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let mut keys = Vec::new();
@@ -612,7 +589,7 @@ impl ProposalSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof_proposal(&self, epochs: Vec<Epoch>) -> Result<Proof, Error> {
+    async fn generate_top_proof_proposal(&self, epochs: Vec<Epoch>) -> Result<Proof> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let mut keys = Vec::new();

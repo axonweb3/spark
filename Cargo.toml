@@ -17,6 +17,4 @@ members = [
     "rpc-client",
     "storage",
     "tx-builder",
-    "entity",
-    "migration",
 ]

@@ -7,6 +7,7 @@ edition = "2021"
 [lib]
 
 [dependencies]
+anyhow = "1.0"
 async-trait = "0.1"
 blake2b-rs = "0.2"
 dashmap = "5.4"
@@ -20,8 +21,7 @@ sparse-merkle-tree = "0.6"
 thiserror = "1.0"
 tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 
-transaction-entity = { path = "../entity" }
-migration = { path = "../migration" }
+migration = { path = "./migration" }
 
 smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab" }
 

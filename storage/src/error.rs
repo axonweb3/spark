@@ -1,9 +1,8 @@
-use std::io;
-
+use migration::DbErr;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum StorageError {
-    #[error("Create DB path {0}")]
-    CreateDB(io::Error),
+    #[error("Sql cursor error {0}")]
+    SqlCursorError(DbErr),
 }
