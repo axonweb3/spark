@@ -1,6 +1,6 @@
 
 use crate::QueryError;
-use common::traits::query::QueryInformation;
+use common::{traits::query::QueryInformation, types::{RpcResult, query::NodeStakeHistory}};
 use async_trait::async_trait;
 use common::types::H256;
 pub struct DefaultQueryAdapter {
@@ -12,8 +12,9 @@ impl QueryInformation for DefaultQueryAdapter {
     async fn get_stake_history(
         &self,
         address: H256,
-    ) -> Vec<(H256)> {
-        vec![H256::default()]
+    ) -> RpcResult<NodeStakeHistory> {
+        let res = NodeStakeHistory::default();
+        Ok(res)
     }
 
     async fn get_delegate_information(&self, address: H256) -> Vec<(H256)>{

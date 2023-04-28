@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::types::H256;
+use crate::types::{H256, RpcResult, query::NodeStakeHistory};
 
 
 #[async_trait]
@@ -7,7 +7,7 @@ pub trait QueryInformation {
     async fn get_stake_history(
         &self,
         address: H256,
-    ) -> Vec<(H256)>;
+    ) -> RpcResult<NodeStakeHistory>;
 
     async fn get_delegate_information(&self, address: H256) -> Vec<(H256)>;
 

@@ -1,24 +1,28 @@
+use crate::types::H256;
 
-// type TxId = String;
-// type Timestamp = u64;
-// type Amount = u64;
-// type TxHash = String;
-// type Address = String;
-// type UnlockAmount = u64;
-// type LockAmount = u64;
-// type TotalAmount = u64;
-// type EpochNum = u64;
-
-// type TotalStakeAmount = u64;
-// type TotalDelegateAmount = u64;
-// type PeriodNum = u64;
-// type BlockNum = u64;
-// type StakeRank = u64;
-// type TokenAmount = u64;
+#[derive(Debug, Default)]
+pub struct NodeStakeHistory {
+    Txs: Vec<TransactionInfo>,
+    Account: u64,
+}
 
 #[derive(Debug)]
-pub struct KickerStatus {
-    
+pub struct NodeDelegateHistory {
+
+}
+
+#[derive(Debug)]
+pub struct AxonStakeHistory {
+
+}
+
+#[derive(Debug, Default)]
+pub struct TransactionInfo {
+    TxId: H256,
+    Timestamp: u64,
+    Amount: u64,
+    TxHash: String,
+    Address: String,
 }
 
 
