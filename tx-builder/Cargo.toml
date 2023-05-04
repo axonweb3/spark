@@ -5,3 +5,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "4f97620" }
+bytes = "1.0"
+ckb-fixed-hash-core = "0.109"
+ckb-hash = "0.109"
+ckb-sdk = "2.4"
+ckb-types = "0.108"
+common = { path = "../common" }
+ethereum-types = "0.14"
+molecule = "0.7"
+thiserror = "1.0"

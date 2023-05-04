@@ -131,7 +131,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             .get_address_state(addr)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
-        let (state_amount, delegate_amount) = res.iter().fold((0, 0), |res, model| {
+        let (state_amount, amount) = res.iter().fold((0, 0), |res, model| {
             if model.operation == OperationType::Stake as u32 {
                 (res.0 + model.amount.parse::<u32>().unwrap(), res.1)
             } else if model.operation == OperationType::Delegate as u32 {
@@ -142,7 +142,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         });
         let res = StakeState {
             state_amount,
-            delegate_amount,
+            amount,
         };
         Ok(res)
     }
