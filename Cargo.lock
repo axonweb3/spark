@@ -521,10 +521,12 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "ethereum-types",
  "hex",
  "jsonrpsee 0.18.0",
+ "thiserror",
 ]
 
 [[package]]
@@ -2171,6 +2173,7 @@ dependencies = [
 name = "query"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "common",
  "jsonrpsee 0.18.0",

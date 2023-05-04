@@ -1,6 +1,7 @@
 use common::types::{H160, H256};
 
-use crate::QueryError;
+// use crate::TempQueryError;
+use common::TempQueryError;
 
 #[derive(Debug)]
 enum TransactionStatus {
@@ -47,7 +48,7 @@ struct Record {
 }
 
 trait SqlDB {
-    fn insert(&mut self, data: Record) -> Result<(), QueryError>;
+    fn insert(&mut self, data: Record) -> Result<(), TempQueryError>;
     fn get_stake_records_by_address(&self, addr: H160) -> Vec<Record>;
     fn get_delegate_records_by_address(&self, addr: H160) -> Vec<Record>;
     fn get_withdraw_records_by_address(&self, addr: H160) -> Vec<Record>;
@@ -57,7 +58,7 @@ trait SqlDB {
 pub struct DbMock {}
 
 impl SqlDB for DbMock {
-    fn insert(&mut self, data: Record) -> Result<(), QueryError> {
+    fn insert(&mut self, data: Record) -> Result<(), TempQueryError> {
         Ok(())
     }
     fn get_stake_records_by_address(&self, addr: H160) -> Vec<Record> {

@@ -9,7 +9,7 @@ mod tests {
 
     use jsonrpsee::rpc_params;
 
-    use crate::QueryError;
+    use common::TempQueryError;
 
     use jsonrpsee::core::async_trait;
 
@@ -85,13 +85,13 @@ mod tests {
             vec![res]
         }
     }
-    async fn run_server() -> Result<SocketAddr, QueryError> {
+    async fn run_server() -> Result<SocketAddr, TempQueryError> {
         let module = RpcModule::new().into_rpc();
         let server = ServerBuilder::new()
             .http_only()
             .build("127.0.0.1:0".parse::<SocketAddr>().unwrap())
             .await
-            .map_err(|e| QueryError::HttpServer(e.to_string()))?;
+            .map_err(|e| TempQueryError::HttpServer(e.to_string()))?;
         println!("addr: {:?}", server.local_addr().unwrap());
         // module.register_method("a_method", |_, _| "lo").unwrap();
 
@@ -104,7 +104,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mock_jsonrpc_server() -> Result<(), QueryError> {
+    async fn mock_jsonrpc_server() -> Result<(), TempQueryError> {
         let server_addr = run_server().await?;
         let url = format!("http://{:?}", server_addr);
         // println!("addr: {:?}", url);
