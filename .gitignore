@@ -6,3 +6,6 @@
 **/*.rs.bk
 
 .vscode
+
+# database
+*.sqlite

@@ -59,15 +59,7 @@ pub struct SmtManager {
     db: Arc<OptimisticTransactionDB>,
 }
 
-/// SMT storage for stakers
-/// For sub smt, the key is the staker address, the value is the amount of
-/// staking For top smt, the key is the epoch, the value is the root of sub smt
-///                          Staker Root
-///                /                             \
-///          epoch 1 root                   epoch 2 root
-///         /      |      \                /      |      \
-///    staker1  staker2  staker3       staker1  staker3  staker4
-///    amount1  amount2  amount3       amount1  amount3  amount4
+/// SMT manager
 impl SmtManager {
     pub fn new(path: PathBuf) -> Self {
         let mut db_opts = Options::default();
@@ -125,9 +117,30 @@ impl SmtManager {
     }
 }
 
+/// Staker SMT
+/// For sub smt, the key is the staker address, the value is the amount of
+/// staking. For top smt, the key is the epoch, the value is the root of the sub
+/// smt.                          
+///                          Staker Root
+///                /                             \
+///          epoch 1 root                   epoch 2 root
+///         /      |       \               /      |        \
+///    staker1  staker2  staker3       staker1  staker3  staker4
+///    amount1  amount2  amount3       amount1  amount3  amount4
+///
+/// Column family prefix in RocksDB: "staker" --> "staker_branch" and
+/// "staker_leaf" Tree prefix in Column family: epoch
+///
+/// Top SMT
+///     key: epoch(u64).to_le_bytes() + [0u8; 24]
+///     value: root(H256)
+///
+/// Sub SMT
+///     key: staker_address(H160).to_fixed_bytes() + [0u8; 12]
+///     value: amount(u128).to_fixed_bytes() + [0u8; 16]
 #[async_trait]
 impl StakeSmtStorage for SmtManager {
-    async fn insert_stake(&self, epoch: Epoch, amounts: Vec<(Address, Amount)>) -> Result<()> {
+    async fn insert(&self, epoch: Epoch, amounts: Vec<(Address, Amount)>) -> Result<()> {
         let kvs = amounts
             .into_iter()
             .map(|(k, v)| {
@@ -140,7 +153,7 @@ impl StakeSmtStorage for SmtManager {
 
         self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
 
-        let root = self.get_sub_root_stake(epoch).await?.unwrap();
+        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
         let top_kvs = vec![(
             SmtKeyEncode::Epoch(epoch).to_h256(),
             SmtValueEncode::Root(root).to_leaf_value(),
@@ -149,12 +162,12 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn remove_stake(&self, epoch: Epoch, address: Address) -> Result<()> {
+    async fn remove(&self, epoch: Epoch, address: Address) -> Result<()> {
         let kvs = vec![(SmtKeyEncode::Address(address).to_h256(), LeafValue::zero())];
 
         self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
 
-        let root = self.get_sub_root_stake(epoch).await?.unwrap();
+        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
         let top_kvs = vec![(
             SmtKeyEncode::Epoch(epoch).to_h256(),
             SmtValueEncode::Root(root).to_leaf_value(),
@@ -163,7 +176,7 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn remove_batch_stake(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<()> {
+    async fn remove_batch(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<()> {
         let kvs = addresses
             .into_iter()
             .map(|k| (SmtKeyEncode::Address(k).to_h256(), LeafValue::zero()))
@@ -171,7 +184,7 @@ impl StakeSmtStorage for SmtManager {
 
         self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
 
-        let root = self.get_sub_root_stake(epoch).await?.unwrap();
+        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
         let top_kvs = vec![(
             SmtKeyEncode::Epoch(epoch).to_h256(),
             SmtValueEncode::Root(root).to_leaf_value(),
@@ -180,7 +193,7 @@ impl StakeSmtStorage for SmtManager {
         self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn get_amount_stake(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>> {
+    async fn get_amount(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -193,12 +206,12 @@ impl StakeSmtStorage for SmtManager {
         Ok(Some(Amount::from(leaf_value)))
     }
 
-    async fn get_sub_leaves_stake(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>> {
+    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         self.get_sub_leaves(&prefix, &STAKER_TABLE).await
     }
 
-    async fn get_sub_root_stake(&self, epoch: Epoch) -> Result<Option<Root>> {
+    async fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -206,21 +219,18 @@ impl StakeSmtStorage for SmtManager {
         Ok(Some(smt.root().clone()))
     }
 
-    async fn get_sub_roots_stake(
-        &self,
-        epochs: Vec<Epoch>,
-    ) -> Result<HashMap<Epoch, Option<Root>>> {
+    async fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
-            let root = self.get_sub_root_stake(epoch).await?;
+            let root = StakeSmtStorage::get_sub_root(self, epoch).await?;
             hash_map.insert(epoch, root);
         }
 
         Ok(hash_map)
     }
 
-    async fn get_top_root_stake(&self) -> Result<Root> {
+    async fn get_top_root(&self) -> Result<Root> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
@@ -228,11 +238,7 @@ impl StakeSmtStorage for SmtManager {
         Ok(smt.root().clone())
     }
 
-    async fn generate_sub_proof_stake(
-        &self,
-        epoch: Epoch,
-        addresses: Vec<Address>,
-    ) -> Result<Proof> {
+    async fn generate_sub_proof(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<Proof> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let keys = addresses
@@ -244,7 +250,7 @@ impl StakeSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof_stake(&self, epochs: Vec<Epoch>) -> Result<Proof> {
+    async fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let keys = epochs
@@ -257,9 +263,41 @@ impl StakeSmtStorage for SmtManager {
     }
 }
 
+/// Delegator SMTs
+/// Each smt stores one staker's delegation information.
+/// For sub smt, the key is the delegator address, the value is the amount of
+/// delegation. For top smt, the key is the epoch, the value is the root of sub
+/// smt.      
+///                               Staker 1 Root
+///                  /                                     \
+///            epoch 1 root       ...                 epoch 2 root
+///      /          |           \               /          |          \
+/// delegator1  delegator2  delegator3      delegator1  delegator2  delegator4
+///  amount1     amount2     amount3        amount1     amount2     amount4
+///                                     .
+///                                     .
+///                                     .
+///                               Staker k Root
+///                  /                                     \
+///            epoch 1 root       ...                 epoch 2 root
+///      /          |            \              /          |          \
+/// delegator1  delegator2  delegator3      delegator1  delegator2  delegator4
+///  amount1     amount2     amount3         amount1     amount2     amount4
+///
+///  Column family prefix in RocksDB: 'delegator' --> "delegator_branch" and
+///  "delegator_leaf" Tree prefix in Column family: epoch.to_le_bytes() +
+///  stake_address.to_fixed_bytes()
+///
+///  Top SMT
+///      key: 'top_smt'.as_slice() + staker_address.to_fixed_bytes()
+///      value: root(H256)
+///
+///  Sub SMT
+///     key: delegator_address(H160).to_fixed_bytes() + [0u8; 12]
+///     value: amount(u128).to_fixed_bytes() + [0u8; 16]
 #[async_trait]
 impl DelegateSmtStorage for SmtManager {
-    async fn insert_delegate(
+    async fn insert(
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<(Delegator, Amount)>>,
@@ -281,7 +319,9 @@ impl DelegateSmtStorage for SmtManager {
 
             self.update(&DELEGATOR_TABLE, &current_prefix, kvs)?;
 
-            let root = self.get_sub_root_delegate(staker, epoch).await?.unwrap();
+            let root = DelegateSmtStorage::get_sub_root(self, staker, epoch)
+                .await?
+                .unwrap();
             let top_kvs = vec![(
                 SmtKeyEncode::Epoch(epoch).to_h256(),
                 SmtValueEncode::Root(root).to_leaf_value(),
@@ -295,7 +335,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(())
     }
 
-    async fn remove_delegate(
+    async fn remove(
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<Delegator>>,
@@ -309,10 +349,10 @@ impl DelegateSmtStorage for SmtManager {
             hash_map.insert(staker, kvs);
         }
 
-        self.insert_delegate(epoch, hash_map).await
+        DelegateSmtStorage::insert(self, epoch, hash_map).await
     }
 
-    async fn get_amount_delegate(
+    async fn get_amount(
         &self,
         delegator: Delegator,
         staker: Staker,
@@ -332,7 +372,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(Some(Amount::from(leaf_value)))
     }
 
-    async fn get_sub_leaves_delegate(
+    async fn get_sub_leaves(
         &self,
         staker: Staker,
         epoch: Epoch,
@@ -343,7 +383,7 @@ impl DelegateSmtStorage for SmtManager {
         self.get_sub_leaves(&prefix, &DELEGATOR_TABLE).await
     }
 
-    async fn get_sub_root_delegate(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>> {
+    async fn get_sub_root(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>> {
         let mut prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -353,7 +393,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(Some(smt.root().clone()))
     }
 
-    async fn get_sub_roots_delegate(
+    async fn get_sub_roots(
         &self,
         staker: Staker,
         epochs: Vec<Epoch>,
@@ -361,14 +401,14 @@ impl DelegateSmtStorage for SmtManager {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
-            let root = self.get_sub_root_delegate(staker, epoch).await?;
+            let root = DelegateSmtStorage::get_sub_root(self, staker, epoch).await?;
             hash_map.insert(epoch, root);
         }
 
         Ok(hash_map)
     }
 
-    async fn get_top_root_delegate(&self, staker: Staker) -> Result<Root> {
+    async fn get_top_root(&self, staker: Staker) -> Result<Root> {
         let mut prefix = SmtPrefixType::Top.as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
         let snapshot = self.db.snapshot();
@@ -377,17 +417,17 @@ impl DelegateSmtStorage for SmtManager {
         Ok(smt.root().clone())
     }
 
-    async fn get_top_roots_delegate(&self, stakers: Vec<Staker>) -> Result<HashMap<Staker, Root>> {
+    async fn get_top_roots(&self, stakers: Vec<Staker>) -> Result<HashMap<Staker, Root>> {
         let mut hash_map = HashMap::new();
         for staker in stakers {
-            let root = self.get_top_root_delegate(staker).await?;
+            let root = DelegateSmtStorage::get_top_root(self, staker).await?;
             hash_map.insert(staker, root);
         }
 
         Ok(hash_map)
     }
 
-    async fn generate_sub_proof_delegate(
+    async fn generate_sub_proof(
         &self,
         staker: Staker,
         epoch: Epoch,
@@ -407,11 +447,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof_delegate(
-        &self,
-        staker: Staker,
-        epochs: Vec<Epoch>,
-    ) -> Result<Proof> {
+    async fn generate_top_proof(&self, staker: Staker, epochs: Vec<Epoch>) -> Result<Proof> {
         let mut prefix = SmtPrefixType::Top.as_prefix();
         prefix.append(&mut SmtPrefixType::Address(staker).as_prefix());
 
@@ -427,9 +463,23 @@ impl DelegateSmtStorage for SmtManager {
     }
 }
 
+/// Reward SMT
+/// For the smt, the key is the address, the value is the last epoch that the
+/// reward has been claimed.
+///               Reward Root
+///        /         |          \
+///    address1   address2   address3
+///     epoch1     epoch2     epoch3
+///
+/// Column family prefix in RocksDB: 'reward' --> "reward_branch" and
+/// "reward_leaf" There is only a single tree in the column family.
+///
+/// SMT
+///    key: address(H160).to_fixed_bytes() + [0u8; 12]
+///    value: epoch(u64).to_le_bytes() + [0u8; 24]
 #[async_trait]
 impl RewardSmtStorage for SmtManager {
-    async fn insert_reward(&self, address: Address, epoch: Epoch) -> Result<()> {
+    async fn insert(&self, address: Address, epoch: Epoch) -> Result<()> {
         let kvs = vec![(
             SmtKeyEncode::Address(address).to_h256(),
             SmtValueEncode::Epoch(epoch).to_leaf_value(),
@@ -442,14 +492,14 @@ impl RewardSmtStorage for SmtManager {
         Ok(())
     }
 
-    async fn get_root_reward(&self) -> Result<Root> {
+    async fn get_root(&self) -> Result<Root> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
         Ok(smt.root().clone())
     }
 
-    async fn get_epoch_reward(&self, address: Address) -> Result<Option<Epoch>> {
+    async fn get_epoch(&self, address: Address) -> Result<Option<Epoch>> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
@@ -461,7 +511,7 @@ impl RewardSmtStorage for SmtManager {
         Ok(Some(Epoch::from(leaf_value)))
     }
 
-    async fn generate_proof_reward(&self, addresses: Vec<Address>) -> Result<Proof> {
+    async fn generate_proof(&self, addresses: Vec<Address>) -> Result<Proof> {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
@@ -474,13 +524,30 @@ impl RewardSmtStorage for SmtManager {
     }
 }
 
+/// Proposal SMT
+/// For sub smt, the key is the validator address, the value is the amount of
+/// proposals. For top smt, the key is the epoch, the value is the root of sub
+/// smt.  
+///                                Proposal Root
+///                   /                                    \
+///             epoch 1 root                           epoch 2 root
+///      /           |           \              /           |            \
+/// validator1   validator2   validator3    validator1   validator2   validator4
+///   count1       count2       count3        count1       count2       count4
+///
+/// Column family prefix in RocksDB: "proposal" --> "proposal_branch" and
+/// "proposal_leaf" Tree prefix in Column family: epoch
+///
+/// Top SMT
+///     key: epoch(u64).to_le_bytes() + [0u8; 24]
+///     value: root(H256)
+///
+/// Sub SMT
+///     key: validator_address(H160).to_fixed_bytes() + [0u8; 12]
+///     value: count(u64).to_fixed_bytes() + [0u8; 24]
 #[async_trait]
 impl ProposalSmtStorage for SmtManager {
-    async fn insert_proposal(
-        &self,
-        epoch: Epoch,
-        proposals: Vec<(Validator, ProposalCount)>,
-    ) -> Result<()> {
+    async fn insert(&self, epoch: Epoch, proposals: Vec<(Validator, ProposalCount)>) -> Result<()> {
         let kvs = proposals
             .into_iter()
             .map(|(k, v)| {
@@ -497,7 +564,9 @@ impl ProposalSmtStorage for SmtManager {
             kvs,
         )?;
 
-        let root = self.get_sub_root_proposal(epoch).await?.unwrap();
+        let root = ProposalSmtStorage::get_sub_root(self, epoch)
+            .await?
+            .unwrap();
         let top_kvs = vec![(
             SmtKeyEncode::Epoch(epoch).to_h256(),
             SmtValueEncode::Root(root).to_leaf_value(),
@@ -506,7 +575,7 @@ impl ProposalSmtStorage for SmtManager {
         self.update(&PROPOSAL_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
     }
 
-    async fn get_count_proposal(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>> {
+    async fn get_count(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>> {
         let mut hash_map = HashMap::new();
 
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
@@ -543,7 +612,7 @@ impl ProposalSmtStorage for SmtManager {
         Ok(hash_map)
     }
 
-    async fn get_sub_root_proposal(&self, epoch: Epoch) -> Result<Option<Root>> {
+    async fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
@@ -551,32 +620,25 @@ impl ProposalSmtStorage for SmtManager {
         Ok(Some(smt.root().clone()))
     }
 
-    async fn get_sub_roots_proposal(
-        &self,
-        epochs: Vec<Epoch>,
-    ) -> Result<HashMap<Epoch, Option<Root>>> {
+    async fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::new();
 
         for epoch in epochs {
-            let root = self.get_sub_root_proposal(epoch).await?;
+            let root = ProposalSmtStorage::get_sub_root(self, epoch).await?;
             hash_map.insert(epoch, root);
         }
 
         Ok(hash_map)
     }
 
-    async fn get_top_root_proposal(&self) -> Result<Root> {
+    async fn get_top_root(&self) -> Result<Root> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
         Ok(smt.root().clone())
     }
 
-    async fn generate_sub_proof_proposal(
-        &self,
-        epoch: Epoch,
-        validators: Vec<Validator>,
-    ) -> Result<Proof> {
+    async fn generate_sub_proof(&self, epoch: Epoch, validators: Vec<Validator>) -> Result<Proof> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let mut keys = Vec::new();
@@ -589,7 +651,7 @@ impl ProposalSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof_proposal(&self, epochs: Vec<Epoch>) -> Result<Proof> {
+    async fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof> {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let mut keys = Vec::new();

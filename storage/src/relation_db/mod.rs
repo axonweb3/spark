@@ -10,9 +10,8 @@ use crate::error::StorageError;
 use crate::traits::relation_db::TransactionStorage;
 use crate::types::smt::Address;
 
-pub async fn establish_connection() -> Result<DbConn> {
-    let database_url = std::env::var("DATABASE_URL").unwrap();
-    let db = Database::connect(&database_url)
+pub async fn establish_connection(database_url: &str) -> Result<DbConn> {
+    let db = Database::connect(database_url)
         .await
         .expect("Failed to setup the database");
     Migrator::up(&db, None)
@@ -27,8 +26,8 @@ pub struct TransactionHistory {
 }
 
 impl TransactionHistory {
-    pub async fn new() -> Self {
-        let db = establish_connection().await.unwrap();
+    pub async fn new(database_url: &str) -> Self {
+        let db = establish_connection(database_url).await.unwrap();
         Self { db }
     }
 }

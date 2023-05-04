@@ -11,9 +11,11 @@ lazy_static::lazy_static! {
     pub static ref PROPOSAL_TABLE: &'static str = "proposal";
 }
 
+/// Single SMT
 pub type ColumnFamilyStoreSMT<'a, T, W> =
     SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStore<'a, T, W>>;
 
+/// Multi SMT
 pub type ColumnFamilyStoreMultiSMT<'a, T, W> =
     SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStoreMultiTree<'a, T, W>>;
 
@@ -36,6 +38,7 @@ pub enum SmtPrefixType {
 
 impl SmtPrefixType {
     pub fn as_prefix(&self) -> Vec<u8> {
+        // Encode different types into SMT prefix type Vec<u8>
         match self {
             SmtPrefixType::Top => TOP_SMT_PREFIX.to_vec(),
             SmtPrefixType::Epoch(epoch) => epoch.to_le_bytes().to_vec(),
@@ -51,6 +54,7 @@ pub enum SmtKeyEncode {
 
 impl SmtKeyEncode {
     pub fn to_h256(&self) -> H256 {
+        // Encode different types into SMT key type H256
         match self {
             SmtKeyEncode::Epoch(epoch) => {
                 let mut buf = [0u8; 32];
@@ -91,6 +95,7 @@ pub enum SmtValueEncode {
 
 impl SmtValueEncode {
     pub fn to_leaf_value(&self) -> LeafValue {
+        // Encode different type to LeafValue
         match self {
             SmtValueEncode::Amount(amount) => (*amount).into(),
             SmtValueEncode::Epoch(epoch) => (*epoch).into(),
@@ -100,7 +105,7 @@ impl SmtValueEncode {
     }
 }
 
-// define SMT value
+// Define SMT value
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct LeafValue(pub [u8; 32]);
 impl Value for LeafValue {
@@ -125,6 +130,7 @@ impl AsRef<[u8]> for LeafValue {
     }
 }
 
+/// LeafValue <-> Amount
 impl From<Amount> for LeafValue {
     fn from(amount: Amount) -> Self {
         let amount_bytes = amount.to_le_bytes();
@@ -142,6 +148,7 @@ impl From<LeafValue> for Amount {
     }
 }
 
+/// LeafValue <-> u64 (Epoch or ProposalCount)
 impl From<u64> for LeafValue {
     fn from(v: u64) -> Self {
         let count_bytes = v.to_le_bytes();
@@ -159,6 +166,7 @@ impl From<LeafValue> for u64 {
     }
 }
 
+/// LeafValue <-> Root
 impl From<Root> for LeafValue {
     fn from(root: Root) -> Self {
         LeafValue(<[u8; 32]>::from(root))
