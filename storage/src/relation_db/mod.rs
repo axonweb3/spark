@@ -1,4 +1,3 @@
-use crate::types::transaction::{self, Model};
 use anyhow::Result;
 use async_trait::async_trait;
 use migration::{Migrator, MigratorTrait};
@@ -7,16 +6,15 @@ use sea_orm::{
 };
 
 use crate::error::StorageError;
-use crate::traits::relation_db::TransactionStorage;
-use crate::types::smt::Address;
+use common::traits::query::TransactionStorage;
+use common::types::{
+    relation_db::transaction::{self, Model},
+    smt::Address,
+};
 
 pub async fn establish_connection(database_url: &str) -> Result<DbConn> {
-    let db = Database::connect(database_url)
-        .await
-        .expect("Failed to setup the database");
-    Migrator::up(&db, None)
-        .await
-        .expect("Failed to run migrations for tests");
+    let db = Database::connect(database_url).await?;
+    Migrator::up(&db, None).await?;
 
     Ok(db)
 }
@@ -36,9 +34,11 @@ impl TransactionHistory {
 impl TransactionStorage for TransactionHistory {
     async fn insert(&mut self, tx_record: transaction::ActiveModel) -> Result<()> {
         let tx_record = tx_record.insert(&self.db).await?;
-        println!(
-            "Post created with ID: {}, TITLE: {}",
-            tx_record.id, tx_record.address
+        log::info!(
+            "Transaction created with address: {}, timestamp: {}, tx_hash: {}",
+            tx_record.address,
+            tx_record.timestamp,
+            tx_record.tx_hash
         );
         Ok(())
     }

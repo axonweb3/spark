@@ -3,14 +3,14 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 use crate::types::smt::{
-    Address, Amount, Delegator, Epoch, Proof, ProposalCount, Root, Staker, Validator,
+    Address, Amount, Delegator, Epoch, Proof, ProposalCount, Root, Staker, UserAmount, Validator,
 };
 
 /// High level business logic SMT APIs for staker, delegator, proposal and
 /// reward
 #[async_trait]
 pub trait StakeSmtStorage {
-    async fn insert(&self, epoch: Epoch, amounts: Vec<(Address, Amount)>) -> Result<()>;
+    async fn insert(&self, epoch: Epoch, amounts: Vec<UserAmount>) -> Result<()>;
 
     async fn remove(&self, epoch: Epoch, address: Address) -> Result<()>;
 
@@ -33,14 +33,9 @@ pub trait StakeSmtStorage {
 
 #[async_trait]
 pub trait DelegateSmtStorage {
-    async fn insert(
-        &self,
-        epoch: Epoch,
-        delegators: HashMap<Staker, Vec<(Delegator, Amount)>>,
-    ) -> Result<()>;
+    async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()>;
 
-    async fn remove(&self, epoch: Epoch, delegators: HashMap<Staker, Vec<Delegator>>)
-        -> Result<()>;
+    async fn remove(&self, epoch: Epoch, delegators: Vec<(Staker, Delegator)>) -> Result<()>;
 
     async fn get_amount(
         &self,
@@ -92,7 +87,9 @@ pub trait RewardSmtStorage {
 pub trait ProposalSmtStorage {
     async fn insert(&self, epoch: Epoch, proposals: Vec<(Validator, ProposalCount)>) -> Result<()>;
 
-    async fn get_count(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>>;
+    async fn get_count(&self, epoch: Epoch, validator: Validator) -> Result<Option<ProposalCount>>;
+
+    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Validator, ProposalCount>>;
 
     async fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>>;
 

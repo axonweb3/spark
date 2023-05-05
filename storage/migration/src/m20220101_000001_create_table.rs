@@ -36,7 +36,7 @@ impl MigrationTrait for Migration {
                             .string_len(66)
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Transaction::Amount).big_integer().not_null())
+                    .col(ColumnDef::new(Transaction::Amount).string().not_null())
                     .col(ColumnDef::new(Transaction::Status).integer().not_null())
                     .to_owned(),
             )

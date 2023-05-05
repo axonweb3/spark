@@ -11,7 +11,7 @@ pub struct Model {
     pub timestamp: i32,
     pub operation: i32,
     pub tx_hash:   String,
-    pub amount:    i32,
+    pub amount:    String,
     pub status:    i32,
 }
 

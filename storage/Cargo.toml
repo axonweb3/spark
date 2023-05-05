@@ -13,17 +13,18 @@ blake2b-rs = "0.2"
 dashmap = "5.4"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
 lazy_static = "1.4"
+log = "0.4"
 parking_lot = "0.12"
-rocksdb = { package = "ckb-rocksdb", version = "0.19", default-features = false, features = ["snappy", "march-native"] }
-sea-orm = { version = "0.11", features = ["runtime-tokio-rustls", "sqlx-sqlite", "macros"], default-features = false }
-serde = { version = "1.0", features = ["derive"] }
+rocksdb = { package = "ckb-rocksdb", version = "0.19", features = ["snappy", "march-native"] }
+sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"] }
 sparse-merkle-tree = "0.6"
 thiserror = "1.0"
 tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 
+common = { path = "../common" }
 migration = { path = "./migration" }
 
-smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "ebd58d4524113eb76b1f4d82ec2c59a0eaba39ab" }
+smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "9047428" }
 
 [features]
 default = []

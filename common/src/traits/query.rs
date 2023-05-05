@@ -2,8 +2,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::types::{
+    relation_db::transaction::{self, Model},
     smt::Address,
-    transaction::{self, Model},
 };
 
 #[async_trait]
