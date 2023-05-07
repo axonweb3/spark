@@ -31,12 +31,14 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(Transaction::Operation).integer().not_null())
+                    .col(ColumnDef::new(Transaction::Event).integer().not_null())
                     .col(
                         ColumnDef::new(Transaction::TxHash)
                             .string_len(66)
                             .not_null(),
                     )
                     .col(ColumnDef::new(Transaction::Amount).string().not_null())
+                    .col(ColumnDef::new(Transaction::Epoch).integer().not_null())
                     .col(ColumnDef::new(Transaction::Status).integer().not_null())
                     .to_owned(),
             )
@@ -59,7 +61,9 @@ enum Transaction {
     Address,
     Timestamp,
     Operation,
+    Event,
     TxHash,
     Amount,
+    Epoch,
     Status,
 }

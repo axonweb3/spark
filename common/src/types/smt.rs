@@ -1,5 +1,5 @@
+use crate::types::H160;
 use derive_more::Display;
-use ethereum_types::H160;
 use rocksdb::DBVector;
 use smt_rocksdb_store::cf_store::{ColumnFamilyStore, ColumnFamilyStoreMultiTree};
 use sparse_merkle_tree::{blake2b::Blake2bHasher, traits::Value, SparseMerkleTree, H256};
