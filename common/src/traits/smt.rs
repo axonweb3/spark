@@ -10,15 +10,15 @@ use crate::types::smt::{
 /// reward
 #[async_trait]
 pub trait StakeSmtStorage {
-    async fn insert(&self, epoch: Epoch, amounts: Vec<UserAmount>) -> Result<()>;
+    async fn new_epoch(&self, epoch: Epoch) -> Result<()>;
 
-    async fn remove(&self, epoch: Epoch, address: Address) -> Result<()>;
+    async fn insert(&self, epoch: Epoch, stakers: Vec<UserAmount>) -> Result<()>;
 
-    async fn remove_batch(&self, epoch: Epoch, address: Vec<Address>) -> Result<()>;
+    async fn remove(&self, epoch: Epoch, staker: Vec<Staker>) -> Result<()>;
 
-    async fn get_amount(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>>;
+    async fn get_amount(&self, epoch: Epoch, staker: Staker) -> Result<Option<Amount>>;
 
-    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>>;
+    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Staker, Amount>>;
 
     async fn get_sub_root(&self, epoch: Epoch) -> Result<Option<Root>>;
 
@@ -26,36 +26,38 @@ pub trait StakeSmtStorage {
 
     async fn get_top_root(&self) -> Result<Root>;
 
-    async fn generate_sub_proof(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<Proof>;
+    async fn generate_sub_proof(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<Proof>;
 
     async fn generate_top_proof(&self, epochs: Vec<Epoch>) -> Result<Proof>;
 }
 
 #[async_trait]
 pub trait DelegateSmtStorage {
+    async fn new_epoch(&self, epoch: Epoch) -> Result<()>;
+
     async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()>;
 
     async fn remove(&self, epoch: Epoch, delegators: Vec<(Staker, Delegator)>) -> Result<()>;
 
     async fn get_amount(
         &self,
-        delegator: Delegator,
-        staker: Staker,
         epoch: Epoch,
+        staker: Staker,
+        delegator: Delegator,
     ) -> Result<Option<Amount>>;
 
     async fn get_sub_leaves(
         &self,
-        staker: Staker,
         epoch: Epoch,
+        staker: Staker,
     ) -> Result<HashMap<Delegator, Amount>>;
 
-    async fn get_sub_root(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>>;
+    async fn get_sub_root(&self, epoch: Epoch, staker: Staker) -> Result<Option<Root>>;
 
     async fn get_sub_roots(
         &self,
-        staker: Staker,
         epochs: Vec<Epoch>,
+        staker: Staker,
     ) -> Result<HashMap<Epoch, Option<Root>>>;
 
     async fn get_top_root(&self, staker: Staker) -> Result<Root>;
@@ -69,12 +71,12 @@ pub trait DelegateSmtStorage {
         delegators: Vec<Delegator>,
     ) -> Result<Proof>;
 
-    async fn generate_top_proof(&self, staker: Staker, epochs: Vec<Epoch>) -> Result<Proof>;
+    async fn generate_top_proof(&self, epochs: Vec<Epoch>, staker: Staker) -> Result<Proof>;
 }
 
 #[async_trait]
 pub trait RewardSmtStorage {
-    async fn insert(&self, address: Address, epoch: Epoch) -> Result<()>;
+    async fn insert(&self, epoch: Epoch, address: Address) -> Result<()>;
 
     async fn get_root(&self) -> Result<Root>;
 

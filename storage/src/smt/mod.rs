@@ -49,7 +49,23 @@ impl SmtManager {
         Self { db: Arc::new(db) }
     }
 
-    async fn insert_full(
+    async fn insert_full_stake(&self, epoch: Epoch, stakers: Vec<(H256, LeafValue)>) -> Result<()> {
+        self.update(
+            &STAKER_TABLE,
+            &SmtPrefixType::Epoch(epoch).as_prefix(),
+            stakers,
+        )?;
+
+        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
+        let top_kvs = vec![(
+            SmtKeyEncode::Epoch(epoch).to_h256(),
+            SmtValueEncode::Root(root).to_leaf_value(),
+        )];
+
+        self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
+    }
+
+    async fn insert_full_delegate(
         &self,
         epoch: Epoch,
         delegators: HashMap<Staker, Vec<(H256, LeafValue)>>,
@@ -58,7 +74,7 @@ impl SmtManager {
             let current_prefix = get_cf_prefix!(Epoch, epoch, Address, staker);
             self.update(&DELEGATOR_TABLE, &current_prefix, amounts)?;
 
-            let root = DelegateSmtStorage::get_sub_root(self, staker, epoch)
+            let root = DelegateSmtStorage::get_sub_root(self, epoch, staker)
                 .await?
                 .unwrap();
             let top_kvs = vec![(
@@ -104,9 +120,28 @@ impl SmtManager {
 ///     value: amount(u128).to_fixed_bytes() + [0u8; 16]
 #[async_trait]
 impl StakeSmtStorage for SmtManager {
-    async fn insert(&self, epoch: Epoch, amounts: Vec<UserAmount>) -> Result<()> {
+    async fn new_epoch(&self, epoch: Epoch) -> Result<()> {
+        if epoch == 0 {
+            return Ok(());
+        }
+
+        let stakers = StakeSmtStorage::get_sub_leaves(self, epoch - 1)
+            .await?
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    SmtKeyEncode::Address(k).to_h256(),
+                    SmtValueEncode::Amount(v).to_leaf_value(),
+                )
+            })
+            .collect();
+
+        self.insert_full_stake(epoch, stakers).await
+    }
+
+    async fn insert(&self, epoch: Epoch, stakers: Vec<UserAmount>) -> Result<()> {
         // aggregate staking records
-        let hash_map = amounts
+        let hash_map = stakers
             .into_iter()
             .fold(HashMap::new(), |mut hash_map, record| {
                 let UserAmount {
@@ -121,7 +156,7 @@ impl StakeSmtStorage for SmtManager {
                 hash_map
             });
 
-        let mut kvs = vec![];
+        let mut updated_stakers = vec![];
         for (addr, amounts) in hash_map {
             let mut stored_amount = StakeSmtStorage::get_amount(self, epoch, addr)
                 .await?
@@ -136,60 +171,30 @@ impl StakeSmtStorage for SmtManager {
                     };
                 })
                 .collect::<()>();
-            kvs.push((
+            updated_stakers.push((
                 SmtKeyEncode::Address(addr).to_h256(),
                 SmtValueEncode::Amount(stored_amount).to_leaf_value(),
             ));
         }
 
-        self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
-
-        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
-        let top_kvs = vec![(
-            SmtKeyEncode::Epoch(epoch).to_h256(),
-            SmtValueEncode::Root(root).to_leaf_value(),
-        )];
-
-        self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
+        self.insert_full_stake(epoch, updated_stakers).await
     }
 
-    async fn remove(&self, epoch: Epoch, address: Address) -> Result<()> {
-        let kvs = vec![(SmtKeyEncode::Address(address).to_h256(), LeafValue::zero())];
-
-        self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
-
-        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
-        let top_kvs = vec![(
-            SmtKeyEncode::Epoch(epoch).to_h256(),
-            SmtValueEncode::Root(root).to_leaf_value(),
-        )];
-
-        self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
-    }
-
-    async fn remove_batch(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<()> {
-        let kvs = addresses
+    async fn remove(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<()> {
+        let removed_stakers = stakers
             .into_iter()
             .map(|k| (SmtKeyEncode::Address(k).to_h256(), LeafValue::zero()))
             .collect();
 
-        self.update(&STAKER_TABLE, &SmtPrefixType::Epoch(epoch).as_prefix(), kvs)?;
-
-        let root = StakeSmtStorage::get_sub_root(self, epoch).await?.unwrap();
-        let top_kvs = vec![(
-            SmtKeyEncode::Epoch(epoch).to_h256(),
-            SmtValueEncode::Root(root).to_leaf_value(),
-        )];
-
-        self.update(&STAKER_TABLE, &SmtPrefixType::Top.as_prefix(), top_kvs)
+        self.insert_full_stake(epoch, removed_stakers).await
     }
 
-    async fn get_amount(&self, epoch: Epoch, address: Address) -> Result<Option<Amount>> {
+    async fn get_amount(&self, epoch: Epoch, staker: Staker) -> Result<Option<Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
 
-        let leaf_value = smt.get(&SmtKeyEncode::Address(address).to_h256())?;
+        let leaf_value = smt.get(&SmtKeyEncode::Address(staker).to_h256())?;
         if leaf_value == LeafValue::zero() {
             return Ok(None);
         }
@@ -197,7 +202,7 @@ impl StakeSmtStorage for SmtManager {
         Ok(Some(Amount::from(leaf_value)))
     }
 
-    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Address, Amount>> {
+    async fn get_sub_leaves(&self, epoch: Epoch) -> Result<HashMap<Staker, Amount>> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
 
         Ok(get_sub_leaves!(
@@ -235,10 +240,10 @@ impl StakeSmtStorage for SmtManager {
         Ok(smt.root().clone())
     }
 
-    async fn generate_sub_proof(&self, epoch: Epoch, addresses: Vec<Address>) -> Result<Proof> {
+    async fn generate_sub_proof(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<Proof> {
         let prefix = SmtPrefixType::Epoch(epoch).as_prefix();
         let snapshot = self.db.snapshot();
-        let keys = keys_to_h256!(addresses, Address);
+        let keys = keys_to_h256!(stakers, Address);
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
 
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
@@ -288,6 +293,35 @@ impl StakeSmtStorage for SmtManager {
 ///     value: amount(u128).to_fixed_bytes() + [0u8; 16]
 #[async_trait]
 impl DelegateSmtStorage for SmtManager {
+    async fn new_epoch(&self, epoch: Epoch) -> Result<()> {
+        if epoch == 0 {
+            return Ok(());
+        }
+
+        let stakers = StakeSmtStorage::get_sub_leaves(self, epoch - 1)
+            .await?
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut delegators = HashMap::with_capacity(stakers.len());
+
+        for staker in stakers {
+            let kvs = DelegateSmtStorage::get_sub_leaves(self, epoch - 1, staker)
+                .await?
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        SmtKeyEncode::Address(k).to_h256(),
+                        SmtValueEncode::Amount(v).to_leaf_value(),
+                    )
+                })
+                .collect();
+            delegators.insert(staker, kvs);
+        }
+
+        self.insert_full_delegate(epoch, delegators).await
+    }
+
     async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()> {
         // aggregate records by staker
         let staker_hash_map =
@@ -320,7 +354,7 @@ impl DelegateSmtStorage for SmtManager {
             let mut kvs = vec![];
             for (delegator, amounts) in delegator_hash_map {
                 let mut stored_amount =
-                    DelegateSmtStorage::get_amount(self, delegator, staker, epoch)
+                    DelegateSmtStorage::get_amount(self, epoch, staker, delegator)
                         .await?
                         .unwrap_or_default();
                 let _ = amounts
@@ -341,7 +375,7 @@ impl DelegateSmtStorage for SmtManager {
             updated_delegators.insert(staker, kvs);
         }
 
-        self.insert_full(epoch, updated_delegators).await
+        self.insert_full_delegate(epoch, updated_delegators).await
     }
 
     async fn remove(&self, epoch: Epoch, delegators: Vec<(Staker, Delegator)>) -> Result<()> {
@@ -357,14 +391,14 @@ impl DelegateSmtStorage for SmtManager {
                     hash_map
                 });
 
-        self.insert_full(epoch, removed_dalegators).await
+        self.insert_full_delegate(epoch, removed_dalegators).await
     }
 
     async fn get_amount(
         &self,
-        delegator: Delegator,
-        staker: Staker,
         epoch: Epoch,
+        staker: Staker,
+        delegator: Delegator,
     ) -> Result<Option<Amount>> {
         let prefix = get_cf_prefix!(Epoch, epoch, Address, staker);
 
@@ -381,8 +415,8 @@ impl DelegateSmtStorage for SmtManager {
 
     async fn get_sub_leaves(
         &self,
-        staker: Staker,
         epoch: Epoch,
+        staker: Staker,
     ) -> Result<HashMap<Delegator, Amount>> {
         let prefix = get_cf_prefix!(Epoch, epoch, Address, staker);
 
@@ -394,7 +428,7 @@ impl DelegateSmtStorage for SmtManager {
         ))
     }
 
-    async fn get_sub_root(&self, staker: Staker, epoch: Epoch) -> Result<Option<Root>> {
+    async fn get_sub_root(&self, epoch: Epoch, staker: Staker) -> Result<Option<Root>> {
         let prefix = get_cf_prefix!(Epoch, epoch, Address, staker);
 
         let snapshot = self.db.snapshot();
@@ -405,13 +439,13 @@ impl DelegateSmtStorage for SmtManager {
 
     async fn get_sub_roots(
         &self,
-        staker: Staker,
         epochs: Vec<Epoch>,
+        staker: Staker,
     ) -> Result<HashMap<Epoch, Option<Root>>> {
         let mut hash_map = HashMap::with_capacity(epochs.len());
 
         for epoch in epochs {
-            let root = DelegateSmtStorage::get_sub_root(self, staker, epoch).await?;
+            let root = DelegateSmtStorage::get_sub_root(self, epoch, staker).await?;
             hash_map.insert(epoch, root);
         }
 
@@ -452,7 +486,7 @@ impl DelegateSmtStorage for SmtManager {
         Ok(smt.merkle_proof(keys.clone())?.compile(keys)?.into())
     }
 
-    async fn generate_top_proof(&self, staker: Staker, epochs: Vec<Epoch>) -> Result<Proof> {
+    async fn generate_top_proof(&self, epochs: Vec<Epoch>, staker: Staker) -> Result<Proof> {
         let prefix = get_cf_prefix!(Address, staker);
 
         let snapshot = self.db.snapshot();
@@ -479,7 +513,7 @@ impl DelegateSmtStorage for SmtManager {
 ///    value: epoch(u64).to_le_bytes() + [0u8; 24]
 #[async_trait]
 impl RewardSmtStorage for SmtManager {
-    async fn insert(&self, address: Address, epoch: Epoch) -> Result<()> {
+    async fn insert(&self, epoch: Epoch, address: Address) -> Result<()> {
         let kvs = vec![(
             SmtKeyEncode::Address(address).to_h256(),
             SmtValueEncode::Epoch(epoch).to_leaf_value(),

@@ -23,8 +23,9 @@ async fn test_stake_functions() {
         amount,
         is_increase: true,
     }];
-    // insert
-    StakeSmtStorage::insert(&smt_manager, epoch, amounts)
+
+    // insert & get
+    StakeSmtStorage::insert(&smt_manager, epoch, amounts.clone())
         .await
         .unwrap();
     let result = StakeSmtStorage::get_amount(&smt_manager, epoch, staker)
@@ -32,19 +33,37 @@ async fn test_stake_functions() {
         .unwrap()
         .unwrap();
 
-    // remove
-    StakeSmtStorage::remove(&smt_manager, epoch, staker)
-        .await
-        .unwrap();
     assert_eq!(result, amount);
 
-    // get_sub_leaves
+    // update
+    StakeSmtStorage::insert(&smt_manager, epoch, amounts)
+        .await
+        .unwrap();
+    let result = StakeSmtStorage::get_amount(&smt_manager, epoch, staker)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result, amount * 2);
 
-    // get sub roots
+    // new epoch
+    StakeSmtStorage::new_epoch(&smt_manager, epoch + 1)
+        .await
+        .unwrap();
+    let result = StakeSmtStorage::get_amount(&smt_manager, epoch + 1, staker)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result, amount * 2);
 
-    // get sub root
+    // remove
+    StakeSmtStorage::remove(&smt_manager, epoch, vec![staker])
+        .await
+        .unwrap();
 
-    // get top root
+    let result = StakeSmtStorage::get_amount(&smt_manager, epoch, staker)
+        .await
+        .unwrap();
+    assert_eq!(result, None);
 }
 
 #[tokio::test]
@@ -64,15 +83,35 @@ async fn test_delegate_functions() {
         is_increase: true,
     })];
 
-    // insert
-    DelegateSmtStorage::insert(&smt_manager, epoch, delegators)
+    // insert & get
+    DelegateSmtStorage::insert(&smt_manager, epoch, delegators.clone())
         .await
         .unwrap();
-    let result = DelegateSmtStorage::get_amount(&smt_manager, delegator, staker, epoch)
+    let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(result, amount);
+
+    // update
+    DelegateSmtStorage::insert(&smt_manager, epoch, delegators)
+        .await
+        .unwrap();
+    let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result, amount * 2);
+
+    // new epoch
+    DelegateSmtStorage::new_epoch(&smt_manager, epoch + 1)
+        .await
+        .unwrap();
+    let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result, amount * 2);
 
     // remove
     let delegators = vec![(staker, delegator)];
@@ -80,7 +119,7 @@ async fn test_delegate_functions() {
         .await
         .unwrap();
 
-    let result = DelegateSmtStorage::get_amount(&smt_manager, delegator, staker, epoch)
+    let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
         .await
         .unwrap();
     assert_eq!(result, None);
@@ -95,7 +134,7 @@ async fn test_reward_functions() {
     let epoch = 1;
 
     // insert
-    RewardSmtStorage::insert(&smt_manager, address, epoch)
+    RewardSmtStorage::insert(&smt_manager, epoch, address)
         .await
         .unwrap();
     let result = RewardSmtStorage::get_epoch(&smt_manager, address)
@@ -116,7 +155,7 @@ async fn test_proposal_functions() {
 
     let proposals = vec![(validator, proposal_count)];
 
-    // insert
+    // insert & get
     ProposalSmtStorage::insert(&smt_manager, epoch, proposals)
         .await
         .unwrap();
