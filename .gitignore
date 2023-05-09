@@ -6,3 +6,8 @@
 **/*.rs.bk
 
 .vscode
+
+# database
+*.sqlite
+
+free-space

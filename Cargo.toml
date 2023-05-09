@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 clap = "4.2"
+storage = { path = "./storage" }
 
 [workspace]
 members = [
