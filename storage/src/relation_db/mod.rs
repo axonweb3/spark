@@ -1,15 +1,15 @@
+use crate::error::StorageError;
 use anyhow::Result;
 use async_trait::async_trait;
-use migration::{Migrator, MigratorTrait};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, CursorTrait, Database, DbConn, EntityTrait, QueryFilter,
-};
-
-use crate::error::StorageError;
 use common::traits::query::TransactionStorage;
 use common::types::{
     relation_db::transaction::{self, Model},
     smt::Address,
+};
+use migration::{Migrator, MigratorTrait};
+pub use sea_orm::Set;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, CursorTrait, Database, DbConn, EntityTrait, QueryFilter,
 };
 
 pub async fn establish_connection(database_url: &str) -> Result<DbConn> {
@@ -20,7 +20,7 @@ pub async fn establish_connection(database_url: &str) -> Result<DbConn> {
 }
 
 pub struct TransactionHistory {
-    db: DbConn,
+    pub db: DbConn,
 }
 
 impl TransactionHistory {
@@ -53,6 +53,60 @@ impl TransactionStorage for TransactionHistory {
             .filter(transaction::Column::Address.eq(addr.to_string()))
             .cursor_by(transaction::Column::Id);
         cursor.after(offset).before(offset + limit);
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_operation_history(
+        &self,
+        addr: Address,
+        operation: u32,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<Model>> {
+        let mut cursor = transaction::Entity::find()
+            .filter(transaction::Column::Address.eq(addr.to_string()))
+            .filter(transaction::Column::Operation.eq(operation))
+            .cursor_by(transaction::Column::Id);
+        cursor.after(offset).before(offset + limit);
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_stake_amount_by_epoch(
+        &self,
+        operation: u32,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<Model>> {
+        let mut cursor = transaction::Entity::find()
+            .filter(transaction::Column::Operation.eq(operation))
+            .cursor_by(transaction::Column::Id);
+        cursor.after(offset).before(offset + limit);
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_top_stake_address(&self, operation: u32) -> Result<Vec<Model>> {
+        let mut cursor = transaction::Entity::find()
+            .filter(transaction::Column::Operation.eq(operation))
+            .cursor_by(transaction::Column::Amount);
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_address_state(&self, addr: Address) -> Result<Vec<Model>> {
+        let mut cursor = transaction::Entity::find()
+            .filter(transaction::Column::Address.eq(addr.to_string()))
+            .cursor_by(transaction::Column::Id);
         match cursor.all(&self.db).await {
             Ok(records) => Ok(records),
             Err(e) => Err(StorageError::SqlCursorError(e).into()),

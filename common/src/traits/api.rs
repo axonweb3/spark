@@ -1,15 +1,10 @@
 use crate::Result;
 use async_trait::async_trait;
 
-use crate::types::{
-    relation_db::transaction::{self, Model},
-    smt::Address,
-};
+use crate::types::{relation_db::transaction::Model, smt::Address};
 
 #[async_trait]
-pub trait TransactionStorage {
-    async fn insert(&mut self, tx_record: transaction::ActiveModel) -> Result<()>;
-
+pub trait APIAdapter: Send + Sync {
     async fn get_records_by_address(
         &self,
         addr: Address,
