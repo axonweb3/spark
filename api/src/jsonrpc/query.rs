@@ -39,13 +39,13 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         history_type: OperationType,
     ) -> RpcResult<Vec<Model>> {
         let offset = (page_number - 1) * page_size;
-        let history_type = history_type as i32;
+        let history_type = history_type as u32;
         let res = self
             .adapter
             .get_operation_history(addr, history_type, offset, page_size)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
-        let event_type = enent as i32;
+        let event_type = enent as u32;
         let adds: Vec<Model> = res
             .iter()
             .filter(|m| m.event == event_type)
@@ -62,13 +62,13 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         lock_type: LockStatusType,
     ) -> RpcResult<Vec<Model>> {
         let offset = (page_number - 1) * page_size;
-        let reward_type = OperationType::Reward as i32;
+        let reward_type = OperationType::Reward as u32;
         let res = self
             .adapter
             .get_operation_history(addr, reward_type, offset, page_size)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
-        let lock_type = lock_type as i32;
+        let lock_type = lock_type as u32;
         let adds: Vec<Model> = res
             .iter()
             .filter(|m| m.status == lock_type)
@@ -86,7 +86,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         let offset = (page_number - 1) * page_size;
         let res = self
             .adapter
-            .get_stake_amount_by_epoch(operation_type as i32, offset, page_size)
+            .get_stake_amount_by_epoch(operation_type as u32, offset, page_size)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
         let res: Vec<StakeAmount> = res
@@ -111,7 +111,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
     async fn get_top_stake_address(&self, page_size: u64) -> RpcResult<Vec<AddressAmount>> {
         let res = self
             .adapter
-            .get_top_stake_address(OperationType::Stake as i32)
+            .get_top_stake_address(OperationType::Stake as u32)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
         let res: Vec<AddressAmount> = res
@@ -132,10 +132,10 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
         let (state_amount, delegate_amount) = res.iter().fold((0, 0), |res, model| {
-            if model.operation == OperationType::Stake as i32 {
-                (res.0 + model.amount.parse::<i32>().unwrap(), res.1)
-            } else if model.operation == OperationType::Delegate as i32 {
-                (res.0, res.1 + model.amount.parse::<i32>().unwrap())
+            if model.operation == OperationType::Stake as u32 {
+                (res.0 + model.amount.parse::<u32>().unwrap(), res.1)
+            } else if model.operation == OperationType::Delegate as u32 {
+                (res.0, res.1 + model.amount.parse::<u32>().unwrap())
             } else {
                 res
             }
@@ -154,9 +154,9 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
         let (lock_reward_amount, unlock_reward_amount) = res.iter().fold((0, 0), |res, model| {
-            if model.operation == OperationType::Stake as i32 {
+            if model.operation == OperationType::Stake as u32 {
                 (res.0 + model.epoch, res.1)
-            } else if model.operation == OperationType::Delegate as i32 {
+            } else if model.operation == OperationType::Delegate as u32 {
                 (res.0, res.1 + model.epoch)
             } else {
                 res

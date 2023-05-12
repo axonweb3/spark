@@ -29,13 +29,13 @@ normalize_comments = true
 #         None
 #     }
 #
-#     type Item = i32;
+#     type Item = u32;
 # }
 # true
 # struct Dummy;
 #
 # impl Iterator for Dummy {
-#     type Item = i32;
+#     type Item = u32;
 #
 #     fn next(&mut self) -> Option<Self::Item> {
 #         None

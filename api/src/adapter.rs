@@ -47,7 +47,7 @@ where
     async fn get_operation_history(
         &self,
         addr: Address,
-        operation: i32,
+        operation: u32,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Model>> {
@@ -58,7 +58,7 @@ where
 
     async fn get_stake_amount_by_epoch(
         &self,
-        operation: i32,
+        operation: u32,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Model>> {
@@ -67,7 +67,7 @@ where
             .await
     }
 
-    async fn get_top_stake_address(&self, operation: i32) -> Result<Vec<Model>> {
+    async fn get_top_stake_address(&self, operation: u32) -> Result<Vec<Model>> {
         self.relation_storage.get_top_stake_address(operation).await
     }
 

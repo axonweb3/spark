@@ -64,16 +64,16 @@ pub trait AxonStatusRpc {
 #[rpc(server)]
 pub trait OperationRpc {
     #[method(name = "addStake")]
-    async fn add_stake(&self, address: H256, amount: i64) -> RpcResult<String>;
+    async fn add_stake(&self, address: H256, amount: u64) -> RpcResult<String>;
 
     #[method(name = "redeemStake")]
-    async fn redeem_stake(&self, address: H256, amount: i64) -> RpcResult<String>;
+    async fn redeem_stake(&self, address: H256, amount: u64) -> RpcResult<String>;
 
     #[method(name = "addDelegate")]
-    async fn add_delegate(&self, address: H256, amount: i64) -> RpcResult<String>;
+    async fn add_delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
 
     #[method(name = "redeemDelegate")]
-    async fn redeem_delegate(&self, address: H256, amount: i64) -> RpcResult<String>;
+    async fn redeem_delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
 
     #[method(name = "withdraw")]
     async fn withdraw(&self) -> RpcResult<Vec<H256>>;

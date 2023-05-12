@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ChainState {
-    block_number: i64,
-    epoch:        i64,
-    period:       i64,
+    block_number: u64,
+    epoch:        u64,
+    period:       u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -28,7 +28,7 @@ pub enum LockStatusType {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeAmount {
-    pub epoch:        i32,
+    pub epoch:        u32,
     pub amount:       String,
     pub operate_type: OperationType,
 }
@@ -41,12 +41,12 @@ pub struct AddressAmount {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeState {
-    pub state_amount:    i32,
-    pub delegate_amount: i32,
+    pub state_amount:    u32,
+    pub delegate_amount: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RewardState {
-    pub lock_reward_amount:   i32,
-    pub unlock_reward_amount: i32,
+    pub lock_reward_amount:   u32,
+    pub unlock_reward_amount: u32,
 }

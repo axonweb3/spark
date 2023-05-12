@@ -16,20 +16,20 @@ impl<Adapter: APIAdapter> OperationRpc<Adapter> {
 
 #[async_trait]
 impl<Adapter: APIAdapter + 'static> OperationRpcServer for OperationRpc<Adapter> {
-    async fn add_stake(&self, _address: H256, _amount: i64) -> RpcResult<String> {
+    async fn add_stake(&self, _address: H256, _amount: u64) -> RpcResult<String> {
         let _ = self.adapter;
         unimplemented!()
     }
 
-    async fn redeem_stake(&self, _address: H256, _amount: i64) -> RpcResult<String> {
+    async fn redeem_stake(&self, _address: H256, _amount: u64) -> RpcResult<String> {
         unimplemented!()
     }
 
-    async fn add_delegate(&self, _address: H256, _amount: i64) -> RpcResult<String> {
+    async fn add_delegate(&self, _address: H256, _amount: u64) -> RpcResult<String> {
         unimplemented!()
     }
 
-    async fn redeem_delegate(&self, _address: H256, _amount: i64) -> RpcResult<String> {
+    async fn redeem_delegate(&self, _address: H256, _amount: u64) -> RpcResult<String> {
         unimplemented!()
     }
 
