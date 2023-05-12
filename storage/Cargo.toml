@@ -17,14 +17,14 @@ log = "0.4"
 parking_lot = "0.12"
 rocksdb = { package = "ckb-rocksdb", version = "0.19", features = ["snappy", "march-native"] }
 sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"] }
-sparse-merkle-tree = "0.6"
+sparse-merkle-tree = { version = "0.6", feautres = ["trie"] }
 thiserror = "1.0"
 tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 
 common = { path = "../common" }
 migration = { path = "./migration" }
 
-smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "9047428" }
+smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "9047428", features = ["trie"] }
 
 [features]
 default = []

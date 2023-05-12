@@ -35,7 +35,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         addr: Address,
         page_number: u64,
         page_size: u64,
-        enent: HistoryEvent,
+        event: HistoryEvent,
         history_type: OperationType,
     ) -> RpcResult<Vec<Model>> {
         let offset = (page_number - 1) * page_size;
@@ -45,7 +45,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             .get_operation_history(addr, history_type, offset, page_size)
             .await
             .map_err(|e| ApiError::Adapter(e.to_string()))?;
-        let event_type = enent as u32;
+        let event_type = event as u32;
         let adds: Vec<Model> = res
             .iter()
             .filter(|m| m.event == event_type)
@@ -92,7 +92,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         let res: Vec<StakeAmount> = res
             .into_iter()
             .map(|model| {
-                let operation_type = match model.operation {
+                let op_type = match model.operation {
                     1 => OperationType::Stake,
                     2 => OperationType::Delegate,
                     3 => OperationType::Reward,
@@ -101,7 +101,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
                 StakeAmount {
                     epoch:        model.epoch,
                     amount:       model.amount,
-                    operate_type: OperationType::from(operation_type),
+                    operate_type: op_type,
                 }
             })
             .collect();

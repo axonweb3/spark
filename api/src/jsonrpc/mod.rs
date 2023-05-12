@@ -89,8 +89,8 @@ pub trait OperationRpc {
 pub async fn mock_server<Adapter: APIAdapter + 'static>(
     adapter: Arc<Adapter>,
 ) -> Result<SocketAddr, ApiError> {
-    let mut module = StatusRpcModule::new(adapter.clone()).into_rpc();
-    let axon_rpc = AxonStatusRpc::new(adapter.clone()).into_rpc();
+    let mut module = StatusRpcModule::new(Arc::clone(&adapter)).into_rpc();
+    let axon_rpc = AxonStatusRpc::new(Arc::clone(&adapter)).into_rpc();
     let op_rpc = OperationRpc::new(adapter).into_rpc();
     module.merge(axon_rpc).unwrap();
     module.merge(op_rpc).unwrap();
