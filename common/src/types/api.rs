@@ -41,8 +41,8 @@ pub struct AddressAmount {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeState {
-    pub state_amount:    u32,
-    pub delegate_amount: u32,
+    pub state_amount: u32,
+    pub amount:       u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
