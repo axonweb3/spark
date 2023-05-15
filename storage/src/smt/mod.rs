@@ -100,7 +100,7 @@ impl SmtManager {
 /// Staker SMT
 /// For sub smt, the key is the staker address, the value is the amount of
 /// staking. For top smt, the key is the epoch, the value is the root of the sub
-/// smt.                          
+/// smt.
 ///                          Staker Root
 ///                /                             \
 ///          epoch 1 root                   epoch 2 root
@@ -218,7 +218,7 @@ impl StakeSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
 
-        Ok(Some(smt.root().clone()))
+        Ok(Some(*smt.root()))
     }
 
     async fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>> {
@@ -237,7 +237,7 @@ impl StakeSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &STAKER_TABLE, &prefix, &snapshot);
 
-        Ok(smt.root().clone())
+        Ok(*smt.root())
     }
 
     async fn generate_sub_proof(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<Proof> {
@@ -263,7 +263,7 @@ impl StakeSmtStorage for SmtManager {
 /// Each smt stores one staker's delegation information.
 /// For sub smt, the key is the delegator address, the value is the amount of
 /// delegation. For top smt, the key is the epoch, the value is the root of sub
-/// smt.      
+/// smt.
 ///                               Staker 1 Root
 ///                  /                                     \
 ///            epoch 1 root       ...                 epoch 2 root
@@ -434,7 +434,7 @@ impl DelegateSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &DELEGATOR_TABLE, &prefix, &snapshot);
 
-        Ok(Some(smt.root().clone()))
+        Ok(Some(*smt.root()))
     }
 
     async fn get_sub_roots(
@@ -457,7 +457,7 @@ impl DelegateSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &DELEGATOR_TABLE, &prefix, &snapshot);
 
-        Ok(smt.root().clone())
+        Ok(*smt.root())
     }
 
     async fn get_top_roots(&self, stakers: Vec<Staker>) -> Result<HashMap<Staker, Root>> {
@@ -530,7 +530,7 @@ impl RewardSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &REWARD_TABLE, &snapshot);
 
-        Ok(smt.root().clone())
+        Ok(*smt.root())
     }
 
     async fn get_epoch(&self, address: Address) -> Result<Option<Epoch>> {
@@ -561,7 +561,7 @@ impl RewardSmtStorage for SmtManager {
 /// Proposal SMT
 /// For sub smt, the key is the validator address, the value is the amount of
 /// proposals. For top smt, the key is the epoch, the value is the root of sub
-/// smt.  
+/// smt.
 ///                                Proposal Root
 ///                   /                                    \
 ///             epoch 1 root                           epoch 2 root
@@ -638,7 +638,7 @@ impl ProposalSmtStorage for SmtManager {
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
 
-        Ok(Some(smt.root().clone()))
+        Ok(Some(*smt.root()))
     }
 
     async fn get_sub_roots(&self, epochs: Vec<Epoch>) -> Result<HashMap<Epoch, Option<Root>>> {
@@ -656,7 +656,7 @@ impl ProposalSmtStorage for SmtManager {
         let prefix = SmtPrefixType::Top.as_prefix();
         let snapshot = self.db.snapshot();
         let smt = get_smt!(self.db, &PROPOSAL_TABLE, &prefix, &snapshot);
-        Ok(smt.root().clone())
+        Ok(*smt.root())
     }
 
     async fn generate_sub_proof(&self, epoch: Epoch, validators: Vec<Validator>) -> Result<Proof> {
