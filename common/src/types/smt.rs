@@ -1,8 +1,8 @@
 use crate::types::H160;
+
 use derive_more::Display;
 use rocksdb::DBVector;
-use smt_rocksdb_store::cf_store::{ColumnFamilyStore, ColumnFamilyStoreMultiTree};
-use sparse_merkle_tree::{blake2b::Blake2bHasher, traits::Value, SparseMerkleTree, H256};
+use sparse_merkle_tree::{traits::Value, H256};
 
 lazy_static::lazy_static! {
     pub static ref TOP_SMT_PREFIX: &'static str = "top_smt";
@@ -11,14 +11,6 @@ lazy_static::lazy_static! {
     pub static ref REWARD_TABLE: &'static str = "reward";
     pub static ref PROPOSAL_TABLE: &'static str = "proposal";
 }
-
-/// Single SMT
-pub type ColumnFamilyStoreSMT<'a, T, W> =
-    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStore<'a, T, W>>;
-
-/// Multi SMT
-pub type ColumnFamilyStoreMultiSMT<'a, T, W> =
-    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStoreMultiTree<'a, T, W>>;
 
 pub type Amount = u128;
 pub type Epoch = u64;
