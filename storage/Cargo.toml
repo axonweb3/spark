@@ -15,7 +15,7 @@ ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "s
 lazy_static = "1.4"
 log = "0.4"
 parking_lot = "0.12"
-rocksdb = { package = "ckb-rocksdb", version = "0.19", features = ["snappy", "march-native"] }
+rocksdb = { package = "ckb-rocksdb", version = "0.20", features = ["snappy", "march-native"] }
 sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"] }
 sparse-merkle-tree = { version = "0.6", feautres = ["trie"] }
 thiserror = "1.0"
@@ -24,7 +24,7 @@ tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 common = { path = "../common" }
 migration = { path = "./migration" }
 
-smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "9047428", features = ["trie"] }
+smt-rocksdb-store = { git = "https://github.com/axonweb3/smt-rocksdb-store.git", rev = "4d4ea31", features = ["trie"] }
 
 [features]
 default = []

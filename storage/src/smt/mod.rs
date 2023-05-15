@@ -7,19 +7,27 @@ use async_trait::async_trait;
 
 use rocksdb::{prelude::*, Direction, IteratorMode, OptimisticTransactionDB};
 use smt_rocksdb_store::cf_store::{ColumnFamilyStore, ColumnFamilyStoreMultiTree};
-use sparse_merkle_tree::{traits::Value, H256};
+use sparse_merkle_tree::{blake2b::Blake2bHasher, traits::Value, SparseMerkleTree, H256};
 
 use common::{
     traits::smt::{DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage},
     types::smt::{
-        Address, Amount, CFSuffixType, ColumnFamilyStoreMultiSMT, ColumnFamilyStoreSMT, Delegator,
-        Epoch, LeafValue, Proof, ProposalCount, Root, SmtKeyEncode, SmtPrefixType, SmtValueEncode,
-        Staker, UserAmount, Validator, DELEGATOR_TABLE, PROPOSAL_TABLE, REWARD_TABLE, STAKER_TABLE,
+        Address, Amount, CFSuffixType, Delegator, Epoch, LeafValue, Proof, ProposalCount, Root,
+        SmtKeyEncode, SmtPrefixType, SmtValueEncode, Staker, UserAmount, Validator,
+        DELEGATOR_TABLE, PROPOSAL_TABLE, REWARD_TABLE, STAKER_TABLE,
     },
 };
 
 use crate::error::StorageError;
 use crate::{create_table_cfs, get_cf_prefix, get_smt, get_sub_leaves, keys_to_h256};
+
+/// Single SMT
+pub type ColumnFamilyStoreSMT<'a, T, W> =
+    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStore<'a, T, W>>;
+
+/// Multi SMT
+pub type ColumnFamilyStoreMultiSMT<'a, T, W> =
+    SparseMerkleTree<Blake2bHasher, LeafValue, ColumnFamilyStoreMultiTree<'a, T, W>>;
 
 pub struct SmtManager {
     db: Arc<OptimisticTransactionDB>,

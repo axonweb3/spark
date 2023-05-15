@@ -767,9 +767,9 @@ dependencies = [
 
 [[package]]
 name = "ckb-librocksdb-sys"
-version = "7.7.3"
+version = "8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb64bb11f8d53b9abb526b7e9d3c5fb437a8101e4210d540d2bcee0d18055313"
+checksum = "5d9bc1ea9ab886ecbf48bc4ade6d383ba56cf3da198b6a51620736daf74b683c"
 dependencies = [
  "bindgen",
  "cc",
@@ -868,9 +868,9 @@ dependencies = [
 
 [[package]]
 name = "ckb-rocksdb"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e9d412caf8a7fe9080bf2c66209e1b6d9aab336c417b336adde47e184c78c41"
+checksum = "c2331a8580072e2991e77277d2c3e999c8df0d00b16188a77e561e45a4597769"
 dependencies = [
  "ckb-librocksdb-sys",
  "libc",
@@ -1113,7 +1113,6 @@ dependencies = [
  "parking_lot 0.12.1",
  "sea-orm",
  "serde",
- "smt-rocksdb-store",
  "sparse-merkle-tree",
  "thiserror",
  "tokio",
@@ -3695,7 +3694,7 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 [[package]]
 name = "smt-rocksdb-store"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/smt-rocksdb-store.git?rev=9047428#90474282c9a435faeba7c78c8ac392f58f1968d8"
+source = "git+https://github.com/axonweb3/smt-rocksdb-store.git?rev=4d4ea31#4d4ea315ee84c5e5f1e6c41df2ea918b5226b24e"
 dependencies = [
  "ckb-rocksdb",
  "sparse-merkle-tree",
