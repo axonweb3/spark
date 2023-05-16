@@ -15,5 +15,6 @@ ckb-sdk = "2.4"
 ckb-types = "0.108"
 common = { path = "../common" }
 ethereum-types = "0.14"
+hex-literal = "0.4"
 molecule = "0.7"
 thiserror = "1.0"
