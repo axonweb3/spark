@@ -1,142 +1,162 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{basic::Byte32, checkpoint::CheckpointCellData};
+use axon_types::checkpoint::CheckpointCellData;
+use ckb_sdk::unlock::ScriptSigner;
+use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellOutput, Script},
+    packed::CellOutput,
     prelude::{Entity, Pack},
 };
 
+use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IInitTxBuilder;
 use common::types::tx_builder::*;
 
-use crate::ckb::utils::cell_data::*;
+use crate::ckb::utils::cell_dep::*;
+use crate::ckb::utils::omni::*;
+use crate::ckb::utils::script::*;
+use crate::ckb::utils::tx::balance_tx;
 
-pub struct InitTxBuilder {
-    _kicker:    PrivateKey,
-    checkpoint: Checkpoint,
+pub struct InitTxBuilder<C: CkbRpc> {
+    ckb_client:   C,
+    network_type: NetworkType,
+    kicker_key:   PrivateKey,
+    _scripts:     Scripts,
+    checkpoint:   Checkpoint,
+    _metadata:    Metadata,
 }
 
 #[async_trait]
-impl IInitTxBuilder for InitTxBuilder {
-    fn new(_kicker: PrivateKey, checkpoint: Checkpoint) -> Self {
+impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
+    fn new(
+        ckb_client: C,
+        network_type: NetworkType,
+        kicker_key: PrivateKey,
+        _scripts: Scripts,
+        checkpoint: Checkpoint,
+        _metadata: Metadata,
+    ) -> Self {
         Self {
-            _kicker,
+            ckb_client,
+            network_type,
+            kicker_key,
+            _scripts,
             checkpoint,
+            _metadata,
         }
     }
 
     async fn build_tx(&self) -> Result<TransactionView> {
-        // todo: get ckb cell
-        let inputs = vec![];
+        let kicker = omni_eth_address(self.kicker_key.clone())?;
+        let kicker_lock = omni_eth_lock(&self.network_type, &kicker);
 
-        // todo
         let outputs_data = self.build_data();
 
-        // todo: fill lock, type
-        let fake_lock = Script::default();
-        let fake_type = Script::default();
         let outputs = vec![
+            // todo:
             // selection cell
+            // CellOutput::new_builder()
+            //     // todo: metadata_type_id | reward_smt_type_id
+            //     .lock(selection_lock(
+            //          &self.scripts.selection_lock_code_hash, H256::default(), H256::default()))
+            //     .type_(None.pack())
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
+            // // issue cell
+            // CellOutput::new_builder()
+            //     .lock(fake_lock.clone()) // omni lock
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
+            // // checkpoint cell
+            // CellOutput::new_builder()
+            //     .lock(cannot_destroy_lock(&self.network_type))
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
+            // // metadata cell
+            // CellOutput::new_builder()
+            //     .lock(cannot_destroy_lock(&self.network_type))
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[3].len())?)?,
+            // // stake smt cell
+            // CellOutput::new_builder()
+            //     .lock(cannot_destroy_lock(&self.network_type))
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[4].len())?)?,
+            // // delegate smt cell
+            // CellOutput::new_builder()
+            //     .lock(cannot_destroy_lock(&self.network_type))
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[5].len())?)?,
+            // // reward smt cell
+            // CellOutput::new_builder()
+            //     .lock(cannot_destroy_lock(&self.network_type))
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[6].len())?)?,
+            // // AT cell
+            // CellOutput::new_builder()
+            //     .lock(fake_lock.clone())
+            //     .type_(Some(fake_type.clone()).pack())
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[8].len())?)?,
+            // Ckb cell
             CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
-            // issue cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
-            // checkpoint cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
-            // metadata cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[3].len())?)?,
-            // stake smt cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[4].len())?)?,
-            // delegate smt cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[5].len())?)?,
-            // reward smt cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[6].len())?)?,
-            // AT cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[8].len())?)?,
-            // CKB cell
-            CellOutput::new_builder()
-                .lock(fake_lock)
-                .type_(Some(fake_type).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[8].len())?)?,
+                .lock(kicker_lock.clone())
+                .build_exact_capacity(Capacity::zero())
+                .unwrap(),
         ];
 
-        // todo
         let cell_deps = vec![
-            // TypeID Type Deploy Cell
-            // xUDT Type Deploy Cell
-            // Selection Lock Deploy Cell
-            // Omni Lock Group Cell
-            // Secp Lock Group Cell
+            omni_lock_dep(&self.network_type),
+            secp256k1_lock_dep(&self.network_type),
+            // xudt_dep(&self.network_type),
         ];
 
-        // todo: balance tx, fill placeholder witnesses,
+        let witnesses = vec![omni_eth_witness_placeholder().as_bytes()];
+
         let tx = TransactionBuilder::default()
-            .inputs(inputs)
+            .inputs(vec![])
             .outputs(outputs)
             .outputs_data(outputs_data.pack())
             .cell_deps(cell_deps)
+            .witnesses(witnesses.pack())
             .build();
 
-        // todo: sign tx
+        let tx = balance_tx(&self.ckb_client, kicker_lock.clone(), tx).await?;
+
+        let signer = omni_eth_signer(self.kicker_key.clone())?;
+        let tx = signer.sign_tx(&tx, &ScriptGroup {
+            script:         kicker_lock,
+            group_type:     ScriptGroupType::Lock,
+            input_indices:  vec![0],
+            output_indices: vec![0],
+        })?;
 
         Ok(tx)
     }
 }
 
-impl InitTxBuilder {
+impl<C: CkbRpc> InitTxBuilder<C> {
     fn build_data(&self) -> Vec<Bytes> {
-        let checkpoint: CheckpointCellData = (&self.checkpoint).into();
-
-        let stake_smt_root = Byte32::default(); // todo: create stake smt
-
-        let delegate_smt_roots = vec![(Staker::default(), Byte32::default())]; // todo: create stake smt
-
-        let reward_smt_root = Byte32::default(); // todo: create reward smt
-
-        let proposal_smt_root = Byte32::default(); // todo: create proposal smt
-
+        let _checkpoint: CheckpointCellData = (&self.checkpoint).into();
         vec![
             // selection cell data
-            Bytes::new(),
-            // issue cell data
-            Bytes::new(),
-            // checkpoint cell data
-            checkpoint.as_bytes(),
-            // metadata cell data
-            // stake smt cell data
-            stake_smt_cell_data(stake_smt_root).as_bytes(),
-            // delegate smt cell data
-            delegate_smt_cell_data(delegate_smt_roots).as_bytes(),
-            // reward smt cell data
-            reward_smt_cell_data(reward_smt_root).as_bytes(),
-            // proposal smt cell data
-            proposal_smt_root.as_bytes(),
-            // AT cell data
+            // Bytes::default(),
+            // todo:
+            // // issue cell data
+            // Bytes::new(), // todo
+            // // checkpoint cell data
+            // checkpoint.as_bytes(),
+            // // metadata cell data
+            // metadata_cell_data(
+            //     START_EPOCH,
+            //     self.type_ids.clone(),
+            //     &vec![self.metadata.clone()],
+            //     Byte32::default(),
+            // ).as_bytes(),
+            // // stake smt cell data
+            // stake_smt_cell_data(Byte32::default()).as_bytes(),
+            // // delegate smt cell data
+            // delegate_smt_cell_data(vec![]).as_bytes(),
+            // // reward smt cell data
+            // reward_smt_cell_data(Byte32::default()).as_bytes(),
+            // // AT cell data
+            // Bytes::default(), // todo
+            // Ckb cell data
+            Bytes::default(),
         ]
     }
 }

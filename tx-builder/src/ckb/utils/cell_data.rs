@@ -7,7 +7,9 @@ use ckb_types::{
 };
 use molecule::prelude::Byte;
 
-use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
+use common::types::tx_builder::{
+    Amount, DelegateItem, Epoch, Metadata as TMetadata, StakeItem, TypeIds,
+};
 use common::utils::convert::*;
 
 use crate::ckb::define::config::TOKEN_BYTES;
@@ -156,7 +158,7 @@ pub fn update_withdraw_data(
     token_cell_data(total_withdraw_amount, new_withdraw_infos.build().as_bytes())
 }
 
-pub fn reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
+pub fn _reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
     RewardSmtCellData::new_builder()
         .version(Byte::default())
         .metadata_type_id(Byte32::default()) // todo
@@ -164,14 +166,25 @@ pub fn reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
         .build()
 }
 
-// todo
-pub fn _metadata_cell_data() -> MetadataCellData {
+pub fn _metadata_cell_data(
+    epoch: Epoch,
+    type_ids: TypeIds,
+    metadata: &[TMetadata],
+    proposal_smt_root: Byte32,
+) -> MetadataCellData {
     MetadataCellData::new_builder()
         .version(Byte::default())
+        .epoch(to_uint64(epoch))
+        .type_ids(type_ids.into())
+        .metadata(_gen_metadatas(metadata))
+        .propose_count_smt_root(proposal_smt_root)
         .build()
-    // .epoch()
-    // .type_ids()
-    // .metadata()
-    // .propose_count_smt_root(v)
-    // .build()
+}
+
+fn _gen_metadatas(metadatas: &[TMetadata]) -> MetadataList {
+    let mut metadata_list = MetadataList::new_builder();
+    for metadata in metadatas.iter() {
+        metadata_list = metadata_list.push(metadata.into());
+    }
+    metadata_list.build()
 }

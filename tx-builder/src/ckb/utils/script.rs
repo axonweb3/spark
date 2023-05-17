@@ -1,33 +1,49 @@
 use ckb_sdk::unlock::OmniLockConfig;
-
 use ckb_types::core::ScriptHashType;
 use ckb_types::packed::Script;
 use ckb_types::prelude::{Builder, Entity, Pack};
-use ckb_types::{h256, H160, H256};
+use ckb_types::{H160, H256};
 
-// reference : https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0042-omnilock/0042-omnilock.md#notes
-static OMNILOCK_CODE_HASH_MIRANA: H256 =
-    h256!("0x9b819793a64463aed77c615d6cb226eea5487ccfc0783043a587254cda2b6f26");
-static OMNILOCK_CODE_HASH_PUDGE: H256 =
-    h256!("0xf329effd1c475a2978453c8600e1eaf0bc2087ee093c3ee64cc96ec6847752cb");
+use common::types::tx_builder::NetworkType;
 
-#[allow(unused)]
-pub enum Chain {
-    Mirana,
-    Pudge,
+use crate::ckb::define::script::*;
+
+macro_rules! script {
+    ($code_hash: expr, $hash_type: expr, $args: expr) => {
+        Script::new_builder()
+            .code_hash($code_hash.pack())
+            .hash_type($hash_type.into())
+            .args($args.pack())
+            .build()
+    };
 }
 
-#[allow(unused)]
-pub fn build_omnilock_script(addr: &H160, chain: Chain) -> Script {
+pub fn omni_eth_lock(network_type: &NetworkType, addr: &H160) -> Script {
     let cfg = OmniLockConfig::new_ethereum(addr.clone());
-    let omnilock_code_hash = match chain {
-        Chain::Mirana => OMNILOCK_CODE_HASH_MIRANA.clone(),
-        Chain::Pudge => OMNILOCK_CODE_HASH_PUDGE.clone(),
+    let omni_lock_code_hash = match network_type {
+        NetworkType::Mainnet => OMNI_LOCK_MAINNET.code_hash.clone(),
+        NetworkType::Testnet => OMNI_LOCK_TESTNET.code_hash.clone(),
     };
+    script!(omni_lock_code_hash, ScriptHashType::Type, cfg.build_args())
+}
 
-    Script::new_builder()
-        .code_hash(omnilock_code_hash.pack())
-        .hash_type(ScriptHashType::Type.into())
-        .args(cfg.build_args().pack())
-        .build()
+pub fn _cannot_destroy_lock(network_type: &NetworkType) -> Script {
+    match network_type {
+        NetworkType::Mainnet => script!(
+            CANNOT_DESTROY_MAINNET.code_hash.clone(),
+            CANNOT_DESTROY_MAINNET.hash_type,
+            bytes::Bytes::default()
+        ),
+        NetworkType::Testnet => script!(
+            CANNOT_DESTROY_TESTNET.code_hash.clone(),
+            CANNOT_DESTROY_TESTNET.hash_type,
+            bytes::Bytes::default()
+        ),
+    }
+}
+
+pub fn selection_lock(lock_hash: &H256, issue_type_id: H256, reward_smt_type_id: H256) -> Script {
+    let mut args = issue_type_id.as_bytes().to_vec();
+    args.extend(reward_smt_type_id.as_bytes());
+    script!(lock_hash, ScriptHashType::Data, args) // todo: ScriptHashType::Type
 }

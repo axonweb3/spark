@@ -625,7 +625,7 @@ dependencies = [
  "ckb-crypto",
  "ckb-dao-utils",
  "ckb-error",
- "ckb-hash",
+ "ckb-hash 0.108.0",
  "ckb-jsonrpc-types",
  "ckb-pow",
  "ckb-rational",
@@ -695,7 +695,7 @@ version = "0.108.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00cbbc455b23748b32e06d16628a03e30d56ffa057f17093fdf5b42d4fb6c879"
 dependencies = [
- "ckb-fixed-hash-core",
+ "ckb-fixed-hash-core 0.108.0",
  "ckb-fixed-hash-macros",
 ]
 
@@ -711,12 +711,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ckb-fixed-hash-core"
+version = "0.109.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c64c34f01b84f79753fff2cb4c0e2b45b9c71cf788eee32ec30aaf6e09e153e"
+dependencies = [
+ "faster-hex",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "ckb-fixed-hash-macros"
 version = "0.108.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1cfc980ef88c217825172eb46df269f47890f5e78a38214416f13b3bd17a4b4"
 dependencies = [
- "ckb-fixed-hash-core",
+ "ckb-fixed-hash-core 0.108.0",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -727,6 +738,16 @@ name = "ckb-hash"
 version = "0.108.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53d9b683e89ae4ffdd5aaf4172eab00b6bbe7ea24e2abf77d3eb850ba36e8983"
+dependencies = [
+ "blake2b-ref",
+ "blake2b-rs",
+]
+
+[[package]]
+name = "ckb-hash"
+version = "0.109.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e82f135970de1fe6728b243c11866f81cde1bc4610ea82d6673dabfaa211296"
 dependencies = [
  "blake2b-ref",
  "blake2b-rs",
@@ -813,7 +834,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9167b427f42874e68e20e6946d5211709979ff1d86c0061a71c2f6a6aa17659"
 dependencies = [
  "byteorder",
- "ckb-hash",
+ "ckb-hash 0.108.0",
  "ckb-types",
  "eaglesong",
  "log",
@@ -865,7 +886,7 @@ dependencies = [
  "byteorder",
  "ckb-chain-spec",
  "ckb-error",
- "ckb-hash",
+ "ckb-hash 0.108.0",
  "ckb-logger",
  "ckb-traits",
  "ckb-types",
@@ -886,7 +907,7 @@ dependencies = [
  "bytes",
  "ckb-crypto",
  "ckb-dao-utils",
- "ckb-hash",
+ "ckb-hash 0.108.0",
  "ckb-jsonrpc-types",
  "ckb-resource",
  "ckb-script",
@@ -945,7 +966,7 @@ dependencies = [
  "ckb-channel",
  "ckb-error",
  "ckb-fixed-hash",
- "ckb-hash",
+ "ckb-hash 0.108.0",
  "ckb-merkle-mountain-range",
  "ckb-occupied-capacity",
  "ckb-rational",
@@ -3726,7 +3747,10 @@ name = "spark"
 version = "0.1.0"
 dependencies = [
  "clap 4.2.7",
+ "common",
+ "rpc-client",
  "storage",
+ "tx-builder",
 ]
 
 [[package]]
@@ -4217,13 +4241,21 @@ dependencies = [
  "async-trait",
  "axon-types",
  "bytes",
- "ckb-hash",
+ "ckb-crypto",
+ "ckb-fixed-hash-core 0.109.0",
+ "ckb-hash 0.109.0",
+ "ckb-jsonrpc-types",
  "ckb-sdk",
  "ckb-types",
  "common",
  "ethereum-types",
+ "lazy_static",
  "molecule",
+ "reqwest",
+ "rpc-client",
+ "secp256k1",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

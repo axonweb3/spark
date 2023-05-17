@@ -3,13 +3,21 @@ use async_trait::async_trait;
 use ckb_sdk::rpc::ckb_indexer::Cell;
 use ckb_types::core::TransactionView;
 
+use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::types::tx_builder::*;
 
 // todo: the parameters of the new method have not stabilized yet
 
 #[async_trait]
-pub trait IInitTxBuilder {
-    fn new(kicker: PrivateKey, checkpoint: Checkpoint) -> Self;
+pub trait IInitTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb_client: C,
+        network_type: NetworkType,
+        kicker: PrivateKey,
+        scripts: Scripts,
+        checkpoint: Checkpoint,
+        metadata: Metadata,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }

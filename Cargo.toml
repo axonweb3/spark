@@ -6,7 +6,10 @@ edition = "2021"
 
 [dependencies]
 clap = "4.2"
+common = { path = "./common" }
+rpc-client = { path = "./rpc-client" }
 storage = { path = "./storage" }
+tx-builder = { path = "./tx-builder" }
 
 [workspace]
 members = [
