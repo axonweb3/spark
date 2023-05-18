@@ -7,7 +7,7 @@ use std::{
 
 use common::types::ckb_rpc_client::RpcSearchKey;
 
-use crate::ckb_client::{cell_process::CellProcess, ckb_rpc_client::CkbClient, types::State};
+use crate::ckb_client::{cell_process::CellProcess, ckb_rpc_client::CkbRpcClient, types::State};
 
 use crate::axon_client::RpcSubmit;
 
@@ -61,7 +61,7 @@ impl GlobalState {
 
     pub fn spawn_cells(
         &self,
-        client: CkbClient,
+        client: CkbRpcClient,
     ) -> Arc<dashmap::DashMap<RpcSearchKey, tokio::task::JoinHandle<()>>> {
         if !self.state.cell_states.is_empty() {
             for kv in self.state.cell_states.iter() {

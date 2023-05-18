@@ -8,10 +8,6 @@ use crate::types::ckb_rpc_client::{Cell, IndexerTip, Order, Pagination, RpcSearc
 
 #[async_trait]
 pub trait CkbRpc {
-    async fn register(&self, search_key: RpcSearchKey, start: BlockNumber) -> Result<bool>;
-
-    async fn delete(&self, search_key: RpcSearchKey) -> Result<bool>;
-
     async fn get_cells(
         &self,
         search_key: SearchKey,
@@ -22,4 +18,11 @@ pub trait CkbRpc {
 
     // ckb indexer `get_indexer_tip`
     async fn get_indexer_tip(&self) -> Result<IndexerTip>;
+}
+
+#[async_trait]
+pub trait CkbSubscriptionRpc {
+    async fn register(&self, search_key: RpcSearchKey, start: BlockNumber) -> Result<bool>;
+
+    async fn delete(&self, search_key: RpcSearchKey) -> Result<bool>;
 }

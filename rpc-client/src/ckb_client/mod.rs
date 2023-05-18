@@ -12,5 +12,6 @@ macro_rules! rpc_get {
 pub mod cell_process;
 #[cfg(feature = "client")]
 pub mod ckb_rpc_client;
+pub mod ckb_subscription_client;
 mod state_handle;
 pub mod types;
