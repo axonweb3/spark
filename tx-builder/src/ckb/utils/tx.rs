@@ -46,6 +46,9 @@ pub async fn balance_tx(
 
     let tx = tx.as_advanced_builder().set_inputs(inputs).build();
 
+    let tx_size = tx.data().as_reader().serialized_size_in_block();
+    let outputs_capacity = outputs_capacity + fee(tx_size).as_u64();
+
     if inputs_capacity < outputs_capacity {
         return Err(CkbTxErr::InsufficientCapacity {
             inputs_capacity,
@@ -54,8 +57,7 @@ pub async fn balance_tx(
         .into());
     }
 
-    let tx_size = tx.data().as_reader().serialized_size_in_block();
-    let change = inputs_capacity - outputs_capacity - fee(tx_size).as_u64();
+    let change = inputs_capacity - outputs_capacity;
 
     let mut outputs = tx.outputs().into_iter().collect::<Vec<_>>();
     let idx = outputs.len() - 1;
@@ -69,6 +71,7 @@ pub async fn balance_tx(
         .as_builder()
         .capacity(new_capacity.pack())
         .build();
+
     let tx = tx.as_advanced_builder().set_outputs(outputs).build();
 
     Ok(tx)
