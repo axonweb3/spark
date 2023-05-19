@@ -25,15 +25,7 @@ pub async fn balance_tx(
     let inputs_capacity = calc_inputs_capacity(ckb_rpc, &inputs).await?;
 
     let outputs = tx.outputs().into_iter().collect::<Vec<_>>();
-    let mut outputs_capacity = outputs
-        .iter()
-        .map(|output| output.capacity().unpack())
-        .collect::<Vec<u64>>()
-        .iter()
-        .sum::<u64>();
-
-    let tx_size = tx.data().as_reader().serialized_size_in_block();
-    outputs_capacity += fee(tx_size).as_u64();
+    let outputs_capacity = calc_outputs_capacity(&outputs);
 
     let search = SearchKey {
         script:               capacity_provider.into(),
@@ -43,8 +35,13 @@ pub async fn balance_tx(
         with_data:            Some(false),
         group_by_transaction: None,
     };
-    let (mut extra_inputs, inputs_capacity) =
-        fetch_live_cells(ckb_rpc, search, inputs_capacity, outputs_capacity).await?;
+    let (mut extra_inputs, inputs_capacity) = fetch_live_cells(
+        ckb_rpc,
+        search,
+        inputs_capacity,
+        outputs_capacity + Capacity::bytes(1)?.as_u64(),
+    )
+    .await?;
     inputs.append(&mut extra_inputs);
 
     let tx = tx.as_advanced_builder().set_inputs(inputs).build();
@@ -56,15 +53,21 @@ pub async fn balance_tx(
         }
         .into());
     }
-    let change = inputs_capacity - outputs_capacity;
+
+    let tx_size = tx.data().as_reader().serialized_size_in_block();
+    let change = inputs_capacity - outputs_capacity - fee(tx_size).as_u64();
 
     let mut outputs = tx.outputs().into_iter().collect::<Vec<_>>();
     let idx = outputs.len() - 1;
+    let old_capacity: u64 = outputs[idx].capacity().unpack();
+    let new_capacity = old_capacity
+        .checked_add(change)
+        .expect("change cell capacity add overflow");
     outputs[idx] = tx
         .output(idx)
         .expect("last output")
         .as_builder()
-        .capacity(change.pack())
+        .capacity(new_capacity.pack())
         .build();
     let tx = tx.as_advanced_builder().set_outputs(outputs).build();
 
@@ -91,6 +94,15 @@ async fn calc_inputs_capacity(ckb_rpc: &impl CkbRpc, inputs: &[CellInput]) -> Re
         inputs_capacity += input_capacity;
     }
     Ok(inputs_capacity)
+}
+
+fn calc_outputs_capacity(outputs: &[CellOutput]) -> u64 {
+    outputs
+        .iter()
+        .map(|output| output.capacity().unpack())
+        .collect::<Vec<u64>>()
+        .iter()
+        .sum::<u64>()
 }
 
 async fn fetch_live_cells(
