@@ -9,7 +9,7 @@ mod tests {
     use crate::ckb::init::InitTxBuilder;
     use crate::ckb::utils::tx::send_tx;
 
-    #[tokio::test]
+    // #[tokio::test]
     async fn _send_init_tx() {
         let test_key = h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60");
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
