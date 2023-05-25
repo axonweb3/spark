@@ -256,14 +256,14 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             .build();
 
         let type_ids = TypeIds {
-            issue_type_args,
-            selection_type_args,
-            checkpoint_type_args: H256::default(),
-            metadata_type_args: H256::default(),
-            reward_type_args: H256::default(),
-            stake_smt_type_args: H256::default(),
-            delegate_smt_type_args: H256::default(),
-            xudt_lock_args: to_h256(&selection_lock_hash),
+            issue_type_id:        issue_type_args,
+            selection_type_id:    selection_type_args,
+            checkpoint_type_id:   H256::default(),
+            metadata_type_id:     H256::default(),
+            reward_type_id:       H256::default(),
+            stake_smt_type_id:    H256::default(),
+            delegate_smt_type_id: H256::default(),
+            xudt_lock_id:         to_h256(&selection_lock_hash),
         };
 
         Ok((tx, type_ids))

@@ -9,7 +9,7 @@ mod tests {
     use crate::ckb::init::InitTxBuilder;
     use crate::ckb::utils::tx::send_tx;
 
-    #[tokio::test]
+    // #[tokio::test]
     async fn _send_init_tx() {
         let test_seeder_key =
             h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e61");
@@ -35,9 +35,9 @@ mod tests {
                 println!("tx hash: 0x{}", tx_hash);
                 println!(
                     "selection type id args: 0x{}",
-                    type_id_args.selection_type_args,
+                    type_id_args.selection_type_id,
                 );
-                println!("issue type id args: 0x{}", type_id_args.issue_type_args);
+                println!("issue type id args: 0x{}", type_id_args.issue_type_id);
             }
             Err(e) => println!("{}", e),
         }
