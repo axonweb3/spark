@@ -9,7 +9,6 @@ mod tests {
 
     #[test]
     fn omni() {
-        // address generator: https://ckb.tools/generator
         // faucet: https://faucet.nervos.org/
 
         let test_key = h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60");
@@ -23,5 +22,11 @@ mod tests {
 
         let lock = omni_eth_lock(&NetworkType::Testnet, &addr);
         println!("lock: {}", lock);
+
+        let test_key = h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e61");
+        println!(
+            "ckb address: {}",
+            omni_eth_ckb_address(&NetworkType::Testnet, test_key).unwrap()
+        );
     }
 }

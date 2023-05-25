@@ -87,9 +87,9 @@ impl WithdrawTxBuilder {
         let mut unlock_amount = 0;
 
         for withdraw_info in cell_withdraws.withdraw_infos() {
-            let epoch = to_u64(withdraw_info.epoch());
+            let epoch = to_u64(&withdraw_info.epoch());
             if epoch <= self.current_epoch - INAUGURATION {
-                unlock_amount += to_u128(withdraw_info.amount());
+                unlock_amount += to_u128(&withdraw_info.amount());
             } else {
                 output_withdraw_infos = output_withdraw_infos.push(withdraw_info);
             }

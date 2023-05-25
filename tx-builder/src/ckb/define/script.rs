@@ -10,18 +10,18 @@ pub struct Script {
 }
 
 lazy_static::lazy_static! {
-    // https://github.com/nervosnetwork/light-godwoken/blob/f9153b64bdee22acb4ee20b4827dc0927c284ae6/src/light-godwoken/constants/lightGodwokenConfig.ts
+    // https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0042-omnilock/0042-omnilock.md#notes
     pub static ref OMNI_LOCK_MAINNET: Script = Script {
-        code_hash: h256!("0x9f3aeaf2fc439549cbc870c653374943af96a0658bd6b51be8d8983183e6f52f"),
+        code_hash: h256!("0x9b819793a64463aed77c615d6cb226eea5487ccfc0783043a587254cda2b6f26"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xaa8ab7e97ed6a268be5d7e26d63d115fa77230e51ae437fc532988dd0c3ce10a"),
-        index: 1,
+        tx_hash: h256!("0xdfdb40f5d229536915f2d5403c66047e162e25dedd70a79ef5164356e1facdc8"),
+        index: 0,
         dep_type: DepType::Code,
     };
     pub static ref OMNI_LOCK_TESTNET: Script = Script {
-        code_hash: h256!("0x79f90bb5e892d80dd213439eeab551120eb417678824f282b4ffb5f21bad2e1e"),
+        code_hash: h256!("0xf329effd1c475a2978453c8600e1eaf0bc2087ee093c3ee64cc96ec6847752cb"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x9154df4f7336402114d04495175b37390ce86a4906d2d4001cf02c3e6d97f39c"),
+        tx_hash: h256!("0x27b62d8be8ed80b9f56ee0fe41355becdb6f6a40aeba82d3900434f43b1c8b60"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -42,34 +42,98 @@ lazy_static::lazy_static! {
         dep_type: DepType::DepGroup,
     };
 
-    // todo
-    pub static ref XUDT_MAINNET: Script = Script {
-        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+    // https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0025-simple-udt/0025-simple-udt.md
+    pub static ref SUDT_MAINNET: Script = Script {
+        code_hash: h256!("0x5e7a36a77e68eecc013dfa2fe6a23f3b6c344b04005808694ae6dd45eea4cfd5"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        tx_hash: h256!("0xc7813f6a415144643970c2e88e0bb6ca6a8edc5dd7c1022746f628284a9936d5"),
         index: 0,
-        dep_type: DepType::DepGroup,
+        dep_type: DepType::Code,
     };
-    pub static ref XUDT_TESTNET: Script = Script {
-        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+    pub static ref SUDT_TESTNET: Script = Script {
+        code_hash: h256!("0xc5e5dcf215925f7ef4dfaf5f4b4f105bc321c02776d6e7d52a1db3fcd9d011a4"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37"),
+        tx_hash: h256!("0xe12877ebd2c3c364dc46c5c992bcfaf4fee33fa13eebdf82c591fc9825aab769"),
         index: 0,
-        dep_type: DepType::DepGroup,
+        dep_type: DepType::Code,
     };
 
-    // todo
-    pub static ref CANNOT_DESTROY_MAINNET: Script = Script {
+    // todo: mainnet
+    pub static ref XUDT_MAINNET: Script = Script {
+        code_hash: h256!("0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0xbf6fb538763efec2a70a6a3dcb7242787087e1030c4e7d86585bc63a9d337f5f"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref XUDT_TESTNET: Script = Script {
+        code_hash: h256!("0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0xbf6fb538763efec2a70a6a3dcb7242787087e1030c4e7d86585bc63a9d337f5f"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+
+    // todo: main net
+    pub static ref ALWAYS_SUCCESS_MAINNET: Script = Script {
         code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
         hash_type: ScriptHashType::Type,
         tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
         index: 0,
         dep_type: DepType::Code,
     };
-    pub static ref CANNOT_DESTROY_TESTNET: Script = Script {
+    pub static ref ALWAYS_SUCCESS_TESTNET: Script = Script {
         code_hash: h256!("0x00000000000000000000000000000000000000000000000000545950455f4944"),
         hash_type: ScriptHashType::Type,
         tx_hash: h256!("0x842380984bff8b2c7bbb8fd8886bd6784795f2f8ad140e4e2b41d771fa27314d"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+
+    // todo: main net
+    pub static ref SELECTION_LOCK_MAINNET: Script = Script {
+        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref SELECTION_LOCK_TESTNET: Script = Script {
+        code_hash: h256!("0x11a44037fd9164a6d20a37b00e90a9ba9dc06e79dd45d243f25cd5d405f9e3e8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0xa4ee63a2c8694b2c4ab97e0ac6dbdd8929ece7f5a59b2d194006973c4dc2bd08"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+
+    // todo: main net
+    pub static ref CHECKPOINT_TYPE_MAINNET: Script = Script {
+        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref CHECKPOINT_TYPE_TESTNET: Script = Script {
+        code_hash: h256!("0x7c80a24fa3540cd4bc10a905580fb1907c87c5b62aaeb375e05577b4f8232a72"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x6bb9f0a101a24c1298aafb7ae1b4afa978631a07fa9dc15cd5dd9a5e10a400ed"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+
+    // todo: main net
+    pub static ref METADATA_TYPE_MAINNET: Script = Script {
+        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref METADATA_TYPE_TESTNET: Script = Script {
+        code_hash: h256!("0x30bdedc605cdb0b80f7f328c803d6059f0ad7bdeb0ccb8f44019502ac03b68a2"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x880c537b0be8b497f2cc01bb6d906da8d722857595f3ee3ada565c911ad11256"),
         index: 0,
         dep_type: DepType::Code,
     };

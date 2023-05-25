@@ -18,6 +18,7 @@ pub type PrivateKey = ckb_types::H256;
 pub type Address = H160;
 pub type Staker = H160;
 pub type Delegator = H160;
+pub type StakerEthAddr = H160;
 
 pub type InStakeSmt = bool;
 pub type InDelegateSmt = bool;
@@ -28,10 +29,6 @@ pub type NonTopDelegators = HashMap<Delegator, HashMap<Staker, InDelegateSmt>>;
 pub enum NetworkType {
     Mainnet,
     Testnet,
-}
-
-pub struct Scripts {
-    pub selection_lock_code_hash: H256,
 }
 
 pub struct StakeDelegate {
@@ -167,25 +164,27 @@ impl From<&Validator> for AValidator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct TypeIds {
-    pub metadata_type_id:     H256,
-    pub checkpoint_type_id:   H256,
-    pub stake_smt_type_id:    H256,
-    pub delegate_smt_type_id: H256,
-    pub reward_type_id:       H256,
-    pub xudt_type_id:         H256,
+    pub issue_type_args:        H256,
+    pub selection_type_args:    H256,
+    pub metadata_type_args:     H256,
+    pub checkpoint_type_args:   H256,
+    pub stake_smt_type_args:    H256,
+    pub delegate_smt_type_args: H256,
+    pub reward_type_args:       H256,
+    pub xudt_lock_args:         H256,
 }
 
 impl From<TypeIds> for MetaTypeIds {
     fn from(type_ids: TypeIds) -> Self {
         MetaTypeIds::new_builder()
-            .metadata_type_id(to_byte32(type_ids.metadata_type_id))
-            .checkpoint_type_id(to_byte32(type_ids.checkpoint_type_id))
-            .stake_smt_type_id(to_byte32(type_ids.stake_smt_type_id))
-            .delegate_smt_type_id(to_byte32(type_ids.delegate_smt_type_id))
-            .reward_type_id(to_byte32(type_ids.reward_type_id))
-            .xudt_type_id(to_byte32(type_ids.xudt_type_id))
+            .metadata_type_id(to_byte32(&type_ids.metadata_type_args))
+            .checkpoint_type_id(to_byte32(&type_ids.checkpoint_type_args))
+            .stake_smt_type_id(to_byte32(&type_ids.stake_smt_type_args))
+            .delegate_smt_type_id(to_byte32(&type_ids.delegate_smt_type_args))
+            .reward_type_id(to_byte32(&type_ids.reward_type_args))
+            .xudt_type_id(to_byte32(&type_ids.xudt_lock_args))
             .build()
     }
 }

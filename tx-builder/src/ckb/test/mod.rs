@@ -1,2 +1,3 @@
-pub mod init;
+mod init;
+mod mint;
 mod omni;

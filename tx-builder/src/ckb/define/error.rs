@@ -32,4 +32,12 @@ pub enum CkbTxErr {
         inputs_capacity:  u64,
         outputs_capacity: u64,
     },
+
+    #[error(
+        "The minted amount is too large, minted amount: {total_mint:?}, max supply: {max_supply:?}"
+    )]
+    ExceedMaxSupply {
+        max_supply: Amount,
+        total_mint: Amount,
+    },
 }

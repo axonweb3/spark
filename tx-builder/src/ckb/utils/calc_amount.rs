@@ -71,17 +71,17 @@ impl<'a> ElectAmountCaculator<'a> {
 
     pub fn last_stake_info(stake: &StakeInfoDelta, current_epoch: Epoch) -> LastElectItem {
         LastElectItem {
-            amount:      to_u128(stake.amount()),
-            is_increase: to_bool(stake.is_increase()),
-            has_expired: to_u64(stake.inauguration_epoch()) < current_epoch + INAUGURATION,
+            amount:      to_u128(&stake.amount()),
+            is_increase: to_bool(&stake.is_increase()),
+            has_expired: to_u64(&stake.inauguration_epoch()) < current_epoch + INAUGURATION,
         }
     }
 
     pub fn last_delegate_info(delegate: &DelegateInfoDelta, current_epoch: Epoch) -> LastElectItem {
         LastElectItem {
-            amount:      to_u128(delegate.amount()),
-            is_increase: to_bool(delegate.is_increase()),
-            has_expired: to_u64(delegate.inauguration_epoch()) < current_epoch + INAUGURATION,
+            amount:      to_u128(&delegate.amount()),
+            is_increase: to_bool(&delegate.is_increase()),
+            has_expired: to_u64(&delegate.inauguration_epoch()) < current_epoch + INAUGURATION,
         }
     }
 

@@ -55,7 +55,7 @@ pub fn secp256k1_lock_dep(network_type: &NetworkType) -> CellDep {
     }
 }
 
-pub fn _xudt_dep(network_type: &NetworkType) -> CellDep {
+pub fn xudt_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
             XUDT_MAINNET.tx_hash.clone(),
@@ -66,6 +66,51 @@ pub fn _xudt_dep(network_type: &NetworkType) -> CellDep {
             XUDT_TESTNET.tx_hash.clone(),
             XUDT_TESTNET.index,
             XUDT_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn selection_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            SELECTION_LOCK_MAINNET.tx_hash.clone(),
+            SELECTION_LOCK_MAINNET.index,
+            SELECTION_LOCK_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            SELECTION_LOCK_TESTNET.tx_hash.clone(),
+            SELECTION_LOCK_TESTNET.index,
+            SELECTION_LOCK_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn checkpoint_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            CHECKPOINT_TYPE_MAINNET.tx_hash.clone(),
+            CHECKPOINT_TYPE_MAINNET.index,
+            CHECKPOINT_TYPE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            CHECKPOINT_TYPE_TESTNET.tx_hash.clone(),
+            CHECKPOINT_TYPE_TESTNET.index,
+            CHECKPOINT_TYPE_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn metadata_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            METADATA_TYPE_MAINNET.tx_hash.clone(),
+            METADATA_TYPE_MAINNET.index,
+            METADATA_TYPE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            METADATA_TYPE_TESTNET.tx_hash.clone(),
+            METADATA_TYPE_TESTNET.index,
+            METADATA_TYPE_TESTNET.dep_type
         ),
     }
 }
