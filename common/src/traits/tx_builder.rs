@@ -87,7 +87,13 @@ pub trait ICheckpointTxBuilder {
 
 #[async_trait]
 pub trait IMetadataTxBuilder<PSmt> {
-    fn new(kicker: PrivateKey, quorum: u16, last_checkpoint: Checkpoint, smt: PSmt) -> Self;
+    fn new(
+        kicker: PrivateKey,
+        quorum: u16,
+        last_metadata: Metadata,
+        last_checkpoint: Checkpoint,
+        smt: PSmt,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers, NonTopDelegators)>;
 }

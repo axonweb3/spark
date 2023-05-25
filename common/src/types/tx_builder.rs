@@ -4,7 +4,10 @@ use axon_types::{
     basic::{Byte20, Byte32, Byte65, Byte97, Identity},
     checkpoint::{CheckpointCellData, ProposeCount as AProposeCount, ProposeCounts},
     delegate::DelegateInfoDelta,
-    metadata::{MetaTypeIds, Metadata as AMetadata, Validator as AValidator, ValidatorList},
+    metadata::{
+        MetaTypeIds, Metadata as AMetadata, MetadataCellData as AMetadataCellData, MetadataList,
+        Validator as AValidator, ValidatorList,
+    },
 };
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
@@ -133,30 +136,30 @@ impl From<&ProposeCount> for AProposeCount {
 
 #[derive(Clone, Default)]
 pub struct Metadata {
-    epoch_len:       u32,
-    period_len:      u32,
-    quorum:          u16,
-    gas_limit:       u64,
-    gas_price:       u64,
-    interval:        u32,
-    validators:      Vec<Validator>,
-    propose_ratio:   u32,
-    prevote_ratio:   u32,
-    precommit_ratio: u32,
-    brake_ratio:     u32,
-    tx_num_limit:    u32,
-    max_tx_size:     u32,
-    block_height:    u64,
+    pub epoch_len:       u32,
+    pub period_len:      u32,
+    pub quorum:          u16,
+    pub gas_limit:       u64,
+    pub gas_price:       u64,
+    pub interval:        u32,
+    pub validators:      Vec<Validator>,
+    pub propose_ratio:   u32,
+    pub prevote_ratio:   u32,
+    pub precommit_ratio: u32,
+    pub brake_ratio:     u32,
+    pub tx_num_limit:    u32,
+    pub max_tx_size:     u32,
+    pub block_height:    u64,
 }
 
 #[derive(Clone)]
 pub struct Validator {
-    bls_pub_key:    bytes::Bytes,
-    pub_key:        bytes::Bytes,
-    address:        H160,
-    propose_weight: u32,
-    vote_weight:    u32,
-    propose_count:  u64,
+    pub bls_pub_key:    bytes::Bytes,
+    pub pub_key:        bytes::Bytes,
+    pub address:        H160,
+    pub propose_weight: u32,
+    pub vote_weight:    u32,
+    pub propose_count:  u64,
 }
 
 impl From<&Validator> for AValidator {
@@ -172,7 +175,7 @@ impl From<&Validator> for AValidator {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 pub struct TypeIds {
     pub issue_type_id:        H256,
     pub selection_type_id:    H256,
@@ -216,6 +219,76 @@ impl From<&Metadata> for AMetadata {
             .block_height(to_uint64(metadata.block_height))
             .build()
     }
+}
+
+#[derive(Clone, Default)]
+pub struct MetadataCellData {
+    pub version:                u8,
+    pub epoch:                  u64,
+    pub propose_count_smt_root: H256,
+    pub type_ids:               TypeIds,
+    pub metadata:               Vec<Metadata>,
+}
+
+impl From<MetadataCellData> for AMetadataCellData {
+    fn from(v: MetadataCellData) -> Self {
+        AMetadataCellData::new_builder()
+            .version(v.version.into())
+            .epoch(to_uint64(v.epoch))
+            .propose_count_smt_root(to_byte32(&v.propose_count_smt_root))
+            .type_ids((v.type_ids).into())
+            .metadata({
+                let mut list = MetadataList::new_builder();
+                for m in v.metadata.iter() {
+                    list = list.push(m.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+#[derive(Clone, Default)]
+pub struct StakeGroupInfo {
+    pub staker:                   H160,
+    pub delegate_infos:           Vec<DelegateInfo>,
+    pub delegate_old_epoch_proof: Vec<u8>,
+    pub delegate_new_epoch_proof: Vec<u8>,
+}
+#[derive(Clone, Default)]
+pub struct DelegateInfo {
+    pub delegator_addr: H160,
+    pub amount:         u128,
+}
+#[derive(Clone, Default)]
+pub struct StakerSmtRoot {
+    pub staker: H160,
+    pub root:   H256,
+}
+#[derive(Clone, Default)]
+pub struct DelegateSmtCellData {
+    pub version:          u8,
+    pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
+    pub metadata_type_id: H256,
+}
+
+#[derive(Clone, Default)]
+pub struct StakeInfo {
+    pub addr:   H160,
+    pub amount: u128,
+}
+
+#[derive(Clone, Default)]
+pub struct StakeSmtUpdateInfo {
+    pub all_stake_infos: Vec<StakeInfo>,
+    pub old_epoch_proof: Vec<u8>,
+    pub new_epoch_proof: Vec<u8>,
+}
+
+#[derive(Clone, Default)]
+pub struct StakeSmtCellData {
+    pub smt_root:         H256,
+    pub version:          u8,
+    pub metadata_type_id: H256,
 }
 
 fn gen_validators(validators: &[Validator]) -> ValidatorList {
