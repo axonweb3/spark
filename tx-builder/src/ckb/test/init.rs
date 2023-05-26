@@ -3,7 +3,7 @@ mod tests {
     use ckb_types::h256;
 
     use common::traits::tx_builder::IInitTxBuilder;
-    use common::types::tx_builder::{Checkpoint, Metadata, NetworkType, TypeIds};
+    use common::types::tx_builder::{Checkpoint, CkbNetwork, Metadata, NetworkType, TypeIds};
     use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
     use crate::ckb::init::InitTxBuilder;
@@ -16,8 +16,10 @@ mod tests {
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
         let (tx, type_id_args) = InitTxBuilder::new(
-            ckb_client.clone(),
-            NetworkType::Testnet,
+            CkbNetwork {
+                network_type: NetworkType::Testnet,
+                client:       ckb_client.clone(),
+            },
             test_seeder_key,
             10000,
             Checkpoint::default(),

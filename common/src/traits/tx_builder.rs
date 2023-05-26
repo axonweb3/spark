@@ -12,8 +12,7 @@ use crate::types::tx_builder::*;
 #[async_trait]
 pub trait IInitTxBuilder<C: CkbRpc> {
     fn new(
-        ckb_client: C,
-        network_type: NetworkType,
+        ckb: CkbNetwork<C>,
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
@@ -27,8 +26,7 @@ pub trait IInitTxBuilder<C: CkbRpc> {
 #[async_trait]
 pub trait IMintTxBuilder<C: CkbRpc> {
     fn new(
-        ckb_client: C,
-        network_type: NetworkType,
+        ckb: CkbNetwork<C>,
         seeder_key: PrivateKey,
         stakers: Vec<(StakerEthAddr, Amount)>,
         selection_type_id: H256,
@@ -39,9 +37,12 @@ pub trait IMintTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IStakeTxBuilder {
+pub trait IStakeTxBuilder<C: CkbRpc> {
     fn new(
-        staker: Address,
+        ckb: CkbNetwork<C>,
+        metadata_type_id: H256,
+        xudt_args: H256,
+        staker: EthAddress,
         current_epoch: Epoch,
         stake: StakeItem,
         delegate: Option<StakeDelegate>,
@@ -52,14 +53,14 @@ pub trait IStakeTxBuilder {
 
 #[async_trait]
 pub trait IDelegateTxBuilder {
-    fn new(delegator: Address, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self;
+    fn new(delegator: EthAddress, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }
 
 #[async_trait]
 pub trait IWithdrawTxBuilder {
-    fn new(user: Address, current_epoch: Epoch) -> Self;
+    fn new(user: EthAddress, current_epoch: Epoch) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }
@@ -67,7 +68,7 @@ pub trait IWithdrawTxBuilder {
 #[async_trait]
 pub trait IRewardTxBuilder {
     fn new(
-        user: Address,
+        user: EthAddress,
         current_epoch: Epoch,
         base_reward: u128,
         half_reward_cycle: Epoch,

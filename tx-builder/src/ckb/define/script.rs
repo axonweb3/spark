@@ -137,4 +137,20 @@ lazy_static::lazy_static! {
         index: 0,
         dep_type: DepType::Code,
     };
+
+    // todo: main net
+    pub static ref STAKE_LOCK_MAINNET: Script = Script {
+        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref STAKE_LOCK_TESTNET: Script = Script {
+        code_hash: h256!("0x30bdedc605cdb0b80f7f328c803d6059f0ad7bdeb0ccb8f44019502ac03b68a2"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x880c537b0be8b497f2cc01bb6d906da8d722857595f3ee3ada565c911ad11256"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
 }

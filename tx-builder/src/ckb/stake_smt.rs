@@ -121,7 +121,7 @@ impl StakeSmtTxBuilder {
                 (
                     token_cell_data(
                         total_stake_amount - withdraw_amount,
-                        stake_token_cell_data(false, 0, 0).as_bytes(),
+                        stake_cell_data(false, 0, 0).as_bytes(),
                     ),
                     Some(update_withdraw_data(
                         old_withdraw_data,
@@ -133,7 +133,7 @@ impl StakeSmtTxBuilder {
                 (
                     token_cell_data(
                         total_stake_amount.to_owned(),
-                        stake_token_cell_data(false, 0, 0).as_bytes(),
+                        stake_cell_data(false, 0, 0).as_bytes(),
                     ),
                     None,
                 )

@@ -26,20 +26,18 @@ use crate::ckb::utils::script::*;
 use crate::ckb::utils::tx::balance_tx;
 
 pub struct InitTxBuilder<C: CkbRpc> {
-    ckb_client:   C,
-    network_type: NetworkType,
-    seeder_key:   PrivateKey,
-    max_supply:   Amount,
-    checkpoint:   Checkpoint,
-    _metadata:    Metadata,
-    _type_ids:    TypeIds,
+    ckb:        CkbNetwork<C>,
+    seeder_key: PrivateKey,
+    max_supply: Amount,
+    checkpoint: Checkpoint,
+    _metadata:  Metadata,
+    _type_ids:  TypeIds,
 }
 
 #[async_trait]
 impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
     fn new(
-        ckb_client: C,
-        network_type: NetworkType,
+        ckb: CkbNetwork<C>,
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
@@ -47,8 +45,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
         _type_ids: TypeIds,
     ) -> Self {
         Self {
-            ckb_client,
-            network_type,
+            ckb,
             seeder_key,
             max_supply,
             checkpoint,
@@ -59,7 +56,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
 
     async fn build_tx(&self) -> Result<(TransactionView, TypeIds)> {
         let seeder_addr = omni_eth_address(self.seeder_key.clone())?;
-        let seeder_lock = omni_eth_lock(&self.network_type, &seeder_addr);
+        let seeder_lock = omni_eth_lock(&self.ckb.network_type, &seeder_addr);
 
         let outputs_data = self.build_data();
 
@@ -67,7 +64,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             // issue cell
             CellOutput::new_builder()
                 .lock(omni_eth_supply_lock(
-                    &self.network_type,
+                    &self.ckb.network_type,
                     H160::default(),
                     Byte32::default(),
                 )?)
@@ -76,7 +73,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             // selection cell
             CellOutput::new_builder()
                 .lock(selection_lock(
-                    &self.network_type,
+                    &self.ckb.network_type,
                     &Byte32::default(),
                     &Byte32::default(),
                 ))
@@ -84,38 +81,33 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // // checkpoint cell
             // CellOutput::new_builder()
-            //     .lock(always_success_lock(&self.network_type))
-            //     .type_(Some(checkpoint_type(&self.network_type, &H256::default())).pack())
+            //     .lock(always_success_lock(&self.ckb.network_type))
+            //     .type_(Some(checkpoint_type(&self.ckb.network_type, &H256::default())).pack())
             //     .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
             // // metadata cell
             // CellOutput::new_builder()
-            //     .lock(always_success_lock(&self.network_type))
-            //     .type_(Some(metadata_type(&self.network_type, &H256::default())).pack())
+            //     .lock(always_success_lock(&self.ckb.network_type))
+            //     .type_(Some(metadata_type(&self.ckb.network_type, &H256::default())).pack())
             //     .build_exact_capacity(Capacity::bytes(outputs_data[3].len())?)?,
             // // stake smt cell
             // CellOutput::new_builder()
-            //     .lock(always_success_lock(&self.network_type))
+            //     .lock(always_success_lock(&self.ckb.network_type))
             //     .build_exact_capacity(Capacity::bytes(outputs_data[4].len())?)?,
             // // delegate smt cell
             // CellOutput::new_builder()
-            //     .lock(always_success_lock(&self.network_type))
+            //     .lock(always_success_lock(&self.ckb.network_type))
             //     .build_exact_capacity(Capacity::bytes(outputs_data[5].len())?)?,
             // // reward smt cell
             // CellOutput::new_builder()
-            //     .lock(always_success_lock(&self.network_type))
+            //     .lock(always_success_lock(&self.ckb.network_type))
             //     .build_exact_capacity(Capacity::bytes(outputs_data[6].len())?)?,
-            // ckb cell
-            CellOutput::new_builder()
-                .lock(seeder_lock.clone())
-                .build_exact_capacity(Capacity::zero())
-                .unwrap(),
         ];
 
         let cell_deps = vec![
-            omni_lock_dep(&self.network_type),
-            secp256k1_lock_dep(&self.network_type),
-            // checkpoint_dep(&self.network_type),
-            // metadata_dep(&self.network_type),
+            omni_lock_dep(&self.ckb.network_type),
+            secp256k1_lock_dep(&self.ckb.network_type),
+            // checkpoint_dep(&self.ckb.network_type),
+            // metadata_dep(&self.ckb.network_type),
         ];
 
         let witnesses = vec![
@@ -130,7 +122,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb_client, seeder_lock.clone(), tx).await?;
+        let tx = balance_tx(&self.ckb.client, seeder_lock.clone(), tx).await?;
 
         let (tx, type_id_args) = self.modify_outputs(tx, seeder_addr)?;
 
@@ -170,8 +162,6 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             // delegate_smt_cell_data(vec![]).as_bytes(),
             // // reward smt cell data
             // reward_smt_cell_data(Byte32::default()).as_bytes(),
-            // Ckb cell data
-            Bytes::default(),
         ]
     }
 
@@ -189,7 +179,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
         let issue_type_args = type_id(&first_input, 0);
         let issue_type_id = type_id_script(&issue_type_args);
         let issue_lock = omni_eth_supply_lock(
-            &self.network_type,
+            &self.ckb.network_type,
             seeder_addr,
             issue_type_id.calc_script_hash(),
         )?;
@@ -206,7 +196,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
         let selection_type_args = type_id(&first_input, 1);
         let selection_type_id = type_id_script(&selection_type_args);
         let selection_lock = selection_lock(
-            &self.network_type,
+            &self.ckb.network_type,
             &issue_lock_hash,
             &Byte32::default(), // todo: reward smt type id
         );
@@ -223,7 +213,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
         outputs_data[0] = InfoCellData::new_simple(
             0,
             self.max_supply,
-            to_h256(&xudt_type(&self.network_type, &selection_lock_hash).calc_script_hash()),
+            to_h256(&xudt_type(&self.ckb.network_type, &selection_lock_hash).calc_script_hash()),
         )
         .pack()
         .pack();
@@ -231,7 +221,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
         // // checkpoint cell
         // let checkpoint_type_args = type_id(&first_input, 2);
         // let checkpoint_type =
-        //      checkpoint_type(&self.network_type, &checkpoint_type_args);
+        //      checkpoint_type(&self.ckb.network_type, &checkpoint_type_args);
         // outputs[2] = tx
         //     .output(2)
         //     .unwrap()
@@ -241,7 +231,8 @@ impl<C: CkbRpc> InitTxBuilder<C> {
 
         // // metadata cell
         // let metadata_type_args = type_id(&first_input, 3);
-        // let metadata_type = metadata_type(&self.network_type, &metadata_type_args);
+        // let metadata_type =
+        //     metadata_type(&self.ckb.network_type, &metadata_type_args);
         // outputs[3] = tx
         //     .output(3)
         //     .unwrap()

@@ -18,17 +18,15 @@ use common::types::ckb_rpc_client::{Cell, ScriptType, SearchKey};
 use common::types::tx_builder::*;
 use common::utils::convert::{to_u128, to_uint128};
 
+use crate::ckb::define::error::CkbTxErr;
+use crate::ckb::utils::cell_collector::collect_cells;
 use crate::ckb::utils::cell_dep::*;
 use crate::ckb::utils::omni::*;
 use crate::ckb::utils::script::*;
 use crate::ckb::utils::tx::balance_tx;
 
-use super::define::error::CkbTxErr;
-use super::utils::cell_collector::collect_cells;
-
 pub struct MintTxBuilder<C: CkbRpc> {
-    ckb_client:        C,
-    network_type:      NetworkType,
+    ckb:               CkbNetwork<C>,
     seeder_key:        PrivateKey,
     stakers:           Vec<(StakerEthAddr, Amount)>,
     selection_type_id: H256,
@@ -38,16 +36,14 @@ pub struct MintTxBuilder<C: CkbRpc> {
 #[async_trait]
 impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
     fn new(
-        ckb_client: C,
-        network_type: NetworkType,
+        ckb: CkbNetwork<C>,
         seeder_key: PrivateKey,
         stakers: Vec<(StakerEthAddr, Amount)>,
         selection_type_id: H256,
         issue_type_id: H256,
     ) -> Self {
         Self {
-            ckb_client,
-            network_type,
+            ckb,
             seeder_key,
             stakers,
             selection_type_id,
@@ -57,9 +53,9 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
 
     async fn build_tx(&self) -> Result<TransactionView> {
         let seeder = omni_eth_address(self.seeder_key.clone())?;
-        let seeder_lock = omni_eth_lock(&self.network_type, &seeder);
+        let seeder_lock = omni_eth_lock(&self.ckb.network_type, &seeder);
 
-        let selection_cell = collect_cells(&self.ckb_client, SearchKey {
+        let selection_cell = collect_cells(&self.ckb.client, 1, SearchKey {
             script:               type_id_script(&self.selection_type_id).into(),
             script_type:          ScriptType::Type,
             filter:               None,
@@ -70,7 +66,7 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
         .await?[0]
             .clone();
 
-        let issue_cell = collect_cells(&self.ckb_client, SearchKey {
+        let issue_cell = collect_cells(&self.ckb.client, 1, SearchKey {
             script:               type_id_script(&self.issue_type_id).into(),
             script_type:          ScriptType::Type,
             filter:               None,
@@ -95,10 +91,10 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
         let (outputs, outputs_data) = self.fill_outputs(selection_cell, issue_cell)?;
 
         let cell_deps = vec![
-            omni_lock_dep(&self.network_type),
-            secp256k1_lock_dep(&self.network_type),
-            xudt_dep(&self.network_type),
-            selection_dep(&self.network_type),
+            omni_lock_dep(&self.ckb.network_type),
+            secp256k1_lock_dep(&self.ckb.network_type),
+            xudt_type_dep(&self.ckb.network_type),
+            selection_dep(&self.ckb.network_type),
         ];
 
         let witnesses = vec![
@@ -115,7 +111,7 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb_client, seeder_lock.clone(), tx).await?;
+        let tx = balance_tx(&self.ckb.client, seeder_lock.clone(), tx).await?;
 
         let signer = omni_eth_signer(self.seeder_key.clone())?;
         let tx = signer.sign_tx(&tx, &ScriptGroup {
@@ -141,14 +137,11 @@ impl<C: CkbRpc> MintTxBuilder<C> {
         selection_cell: Cell,
         issue_cell: Cell,
     ) -> Result<(Vec<CellOutput>, Vec<Bytes>)> {
-        let seeder = omni_eth_address(self.seeder_key.clone())?;
-        let seeder_lock = omni_eth_lock(&self.network_type, &seeder);
-
         let mut outputs_data = vec![];
         let mut outputs = vec![];
 
         let selection_lock: Script = selection_cell.output.lock.clone().into();
-        let xudt = xudt_type(&self.network_type, &selection_lock.calc_script_hash());
+        let xudt = xudt_type(&self.ckb.network_type, &selection_lock.calc_script_hash());
 
         let issue_data = IssueCellData::new_unchecked(issue_cell.output_data.unwrap().into_bytes());
 
@@ -161,7 +154,7 @@ impl<C: CkbRpc> MintTxBuilder<C> {
             outputs_data.push(amount.pack().as_bytes());
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(omni_eth_lock(&self.network_type, staker))
+                    .lock(omni_eth_lock(&self.ckb.network_type, staker))
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(16)?)?,
             );
@@ -198,14 +191,6 @@ impl<C: CkbRpc> MintTxBuilder<C> {
                 .lock(issue_cell.output.lock.into())
                 .type_(Some(issue_cell.output.type_.unwrap().into()).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data.last().unwrap().len())?)?,
-        );
-
-        // ckb cell
-        outputs_data.push(Bytes::default());
-        outputs.push(
-            CellOutput::new_builder()
-                .lock(seeder_lock)
-                .build_exact_capacity(Capacity::zero())?,
         );
 
         Ok((outputs, outputs_data))

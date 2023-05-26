@@ -1,8 +1,10 @@
 use axon_types::{
     basic::*, delegate::*, metadata::*, reward::RewardSmtCellData, stake::*, withdraw::*,
 };
+use bytes::{BufMut, Bytes};
 use ckb_types::{
-    prelude::{Builder, Entity, Pack},
+    bytes::BytesMut,
+    prelude::{Builder, Entity},
     H160,
 };
 use molecule::prelude::Byte;
@@ -14,7 +16,7 @@ use common::utils::convert::*;
 
 use crate::ckb::define::config::TOKEN_BYTES;
 
-pub fn stake_token_cell_data(
+pub fn stake_cell_data(
     is_increase: bool,
     amount: Amount,
     inauguration_epoch: Epoch,
@@ -33,7 +35,7 @@ pub fn stake_token_cell_data(
         .build()
 }
 
-pub fn delegate_cell_data(
+pub fn stake_delegate_cell_data(
     threshold: u128,
     max_delegator_size: u32,
     dividend_ratio: u8,
@@ -52,7 +54,7 @@ pub fn delegate_cell_data(
         .build()
 }
 
-pub fn delegate_token_cell_data(delegates: &[DelegateItem]) -> DelegateAtCellData {
+pub fn delegate_cell_data(delegates: &[DelegateItem]) -> DelegateAtCellData {
     let mut delegator_infos = DelegateInfoDeltas::new_builder();
     for item in delegates.iter() {
         delegator_infos = delegator_infos.push(item.into())
@@ -66,7 +68,7 @@ pub fn delegate_token_cell_data(delegates: &[DelegateItem]) -> DelegateAtCellDat
         .build()
 }
 
-pub fn withdraw_token_cell_data(withdraw_infos: Option<WithdrawInfos>) -> WithdrawAtCellData {
+pub fn withdraw_cell_data(withdraw_infos: Option<WithdrawInfos>) -> WithdrawAtCellData {
     WithdrawAtCellData::new_builder()
         .version(Byte::default())
         .metadata_type_id(Byte32::default())  // todo
@@ -98,11 +100,11 @@ pub fn stake_item(stake: &StakeInfoDelta) -> StakeItem {
     }
 }
 
-pub fn token_cell_data(amount: u128, other: molecule::bytes::Bytes) -> molecule::bytes::Bytes {
-    let total_stake_amount = amount.pack();
-    let cell_data = total_stake_amount.as_bytes();
-    cell_data.to_vec().extend(other);
-    cell_data
+pub fn token_cell_data(amount: u128, extra_args: Bytes) -> Bytes {
+    let mut data = BytesMut::with_capacity(16 + extra_args.len());
+    data.put(&amount.to_le_bytes()[..]);
+    data.put(extra_args.as_ref());
+    data.freeze()
 }
 
 pub fn stake_smt_cell_data(root: Byte32) -> StakeSmtCellData {
