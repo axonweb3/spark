@@ -1,6 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_jsonrpc_types::{JsonBytes, Uint32};
+use ckb_jsonrpc_types::{
+    CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction, Uint32,
+};
+use ckb_types::H256;
 use common::{
     traits::ckb_rpc_client::CkbRpc,
     types::ckb_rpc_client::{Cell, IndexerTip, Order, Pagination, SearchKey},
@@ -94,12 +97,28 @@ impl CkbRpcClient {
             search_key,
             order,
             limit,
-            after
+            after,
         )
+    }
+
+    pub fn get_live_cell(
+        &self,
+        out_point: OutPoint,
+        with_data: bool,
+    ) -> impl Future<Output = Result<CellWithStatus>> {
+        jsonrpc!("get_live_cell", self, CellWithStatus, out_point, with_data)
     }
 
     pub fn get_indexer_tip(&self) -> impl Future<Output = Result<IndexerTip>> {
         jsonrpc!("get_indexer_tip", self, IndexerTip)
+    }
+
+    pub fn send_transaction(
+        &self,
+        tx: &Transaction,
+        outputs_validator: Option<OutputsValidator>,
+    ) -> impl Future<Output = Result<H256>> {
+        jsonrpc!("send_transaction", self, H256, tx, outputs_validator)
     }
 }
 
@@ -115,7 +134,19 @@ impl CkbRpc for CkbRpcClient {
         self.get_cells(search_key, order, limit, after).await
     }
 
+    async fn get_live_cell(&self, out_point: OutPoint, with_data: bool) -> Result<CellWithStatus> {
+        self.get_live_cell(out_point, with_data).await
+    }
+
     async fn get_indexer_tip(&self) -> Result<IndexerTip> {
         self.get_indexer_tip().await
+    }
+
+    async fn send_transaction(
+        &self,
+        tx: &Transaction,
+        outputs_validator: Option<OutputsValidator>,
+    ) -> Result<H256> {
+        self.send_transaction(tx, outputs_validator).await
     }
 }

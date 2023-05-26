@@ -7,7 +7,9 @@ use ckb_types::{
 };
 use molecule::prelude::Byte;
 
-use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
+use common::types::tx_builder::{
+    Amount, DelegateItem, Epoch, Metadata as TMetadata, StakeItem, TypeIds,
+};
 use common::utils::convert::*;
 
 use crate::ckb::define::config::TOKEN_BYTES;
@@ -81,18 +83,18 @@ pub fn withdraw_info(epoch: Epoch, amount: Amount) -> WithdrawInfo {
 
 pub fn delegate_item(delegate: &DelegateInfoDelta) -> DelegateItem {
     DelegateItem {
-        staker:             to_h160(delegate.staker()),
-        is_increase:        to_bool(delegate.is_increase()),
-        amount:             to_u128(delegate.amount()),
-        inauguration_epoch: to_u64(delegate.inauguration_epoch()),
+        staker:             to_h160(&delegate.staker()),
+        is_increase:        to_bool(&delegate.is_increase()),
+        amount:             to_u128(&delegate.amount()),
+        inauguration_epoch: to_u64(&delegate.inauguration_epoch()),
     }
 }
 
 pub fn stake_item(stake: &StakeInfoDelta) -> StakeItem {
     StakeItem {
-        is_increase:        to_bool(stake.is_increase()),
-        amount:             to_u128(stake.amount()),
-        inauguration_epoch: to_u64(stake.inauguration_epoch()),
+        is_increase:        to_bool(&stake.is_increase()),
+        amount:             to_u128(&stake.amount()),
+        inauguration_epoch: to_u64(&stake.inauguration_epoch()),
     }
 }
 
@@ -144,10 +146,10 @@ pub fn update_withdraw_data(
     let mut new_withdraw_infos = WithdrawInfos::new_builder();
 
     for item in cell_withdraws.withdraw_infos() {
-        let epoch = to_u64(item.epoch());
+        let epoch = to_u64(&item.epoch());
         new_withdraw_infos = new_withdraw_infos.push(if epoch == current_epoch {
             total_withdraw_amount += new_amount;
-            withdraw_info(current_epoch, to_u128(item.amount()) + new_amount)
+            withdraw_info(current_epoch, to_u128(&item.amount()) + new_amount)
         } else {
             item
         });
@@ -156,7 +158,7 @@ pub fn update_withdraw_data(
     token_cell_data(total_withdraw_amount, new_withdraw_infos.build().as_bytes())
 }
 
-pub fn reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
+pub fn _reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
     RewardSmtCellData::new_builder()
         .version(Byte::default())
         .metadata_type_id(Byte32::default()) // todo
@@ -164,14 +166,25 @@ pub fn reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
         .build()
 }
 
-// todo
-pub fn _metadata_cell_data() -> MetadataCellData {
+pub fn metadata_cell_data(
+    epoch: Epoch,
+    type_ids: TypeIds,
+    metadata: &[TMetadata],
+    proposal_smt_root: Byte32,
+) -> MetadataCellData {
     MetadataCellData::new_builder()
         .version(Byte::default())
+        .epoch(to_uint64(epoch))
+        .type_ids(type_ids.into())
+        .metadata(_gen_metadatas(metadata))
+        .propose_count_smt_root(proposal_smt_root)
         .build()
-    // .epoch()
-    // .type_ids()
-    // .metadata()
-    // .propose_count_smt_root(v)
-    // .build()
+}
+
+fn _gen_metadatas(metadatas: &[TMetadata]) -> MetadataList {
+    let mut metadata_list = MetadataList::new_builder();
+    for metadata in metadatas.iter() {
+        metadata_list = metadata_list.push(metadata.into());
+    }
+    metadata_list.build()
 }

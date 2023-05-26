@@ -26,4 +26,18 @@ pub enum CkbTxErr {
 
     #[error("Invalid is_increase: {0}")]
     Increase(bool),
+
+    #[error("Lack of capacity: {inputs_capacity:?} < {outputs_capacity:?}")]
+    InsufficientCapacity {
+        inputs_capacity:  u64,
+        outputs_capacity: u64,
+    },
+
+    #[error(
+        "The minted amount is too large, minted amount: {total_mint:?}, max supply: {max_supply:?}"
+    )]
+    ExceedMaxSupply {
+        max_supply: Amount,
+        total_mint: Amount,
+    },
 }

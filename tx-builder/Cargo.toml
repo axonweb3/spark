@@ -7,12 +7,20 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "4f97620" }
+axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "8c2338a" }
 bytes = "1.0"
-ckb-hash = "0.108"
+ckb-crypto = "0.108"
+ckb-fixed-hash-core = "0.109"
+ckb-hash = "0.109"
+ckb-jsonrpc-types = "0.108"
 ckb-sdk = "2.4"
 ckb-types = "0.108"
 common = { path = "../common" }
 ethereum-types = "0.14"
+lazy_static = "1.4"
 molecule = "0.7"
+reqwest = { version = "0.11", features = ["json"] }
+rpc-client = { path = "../rpc-client" }
+secp256k1 = { version = "0.24", features = ["recovery"] }
 thiserror = "1.0"
+tokio = "1.28"

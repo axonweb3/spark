@@ -213,7 +213,7 @@ impl DelegateTxBuilder {
         let mut last_delegates = HashMap::new();
         for delegate in cell_delegates.delegator_infos() {
             let last_staker = delegate.staker();
-            last_delegates.insert(to_h160(last_staker), delegate);
+            last_delegates.insert(to_h160(&last_staker), delegate);
         }
 
         let mut stakers = HashSet::new();
@@ -225,7 +225,7 @@ impl DelegateTxBuilder {
             if last_delegates.contains_key(&delegate.staker) {
                 let last_delegate_info = last_delegates.get(&delegate.staker).unwrap();
 
-                if to_u128(last_delegate_info.amount()) == 0 {
+                if to_u128(&last_delegate_info.amount()) == 0 {
                     continue;
                 }
 
@@ -269,7 +269,7 @@ impl DelegateTxBuilder {
         for delegate in cell_delegates.delegator_infos() {
             let last_staker = delegate.staker();
 
-            if !new_stakers.contains(&to_h160(last_staker)) && to_u128(delegate.amount()) != 0 {
+            if !new_stakers.contains(&to_h160(&last_staker)) && to_u128(&delegate.amount()) != 0 {
                 let delegate_item = delegate_item(&delegate);
 
                 if delegate_item.inauguration_epoch < self.current_epoch + INAUGURATION {

@@ -1,8 +1,13 @@
+use std::future::Future;
+
+use anyhow::Result;
 use ckb_jsonrpc_types::{
     BlockNumber, Capacity, CellOutput, JsonBytes, OutPoint, Script, Uint32, Uint64,
 };
 use ckb_types::H256;
 use serde::{Deserialize, Serialize};
+
+pub type RPC<T> = dyn Future<Output = Result<T>>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct IndexerTip {
