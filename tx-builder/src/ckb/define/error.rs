@@ -40,4 +40,7 @@ pub enum CkbTxErr {
         max_supply: Amount,
         total_mint: Amount,
     },
+
+    #[error("Cell not found: {0}")]
+    CellNotFound(String),
 }

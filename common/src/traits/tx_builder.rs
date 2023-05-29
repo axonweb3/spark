@@ -17,7 +17,6 @@ pub trait IInitTxBuilder<C: CkbRpc> {
         max_supply: Amount,
         checkpoint: Checkpoint,
         metadata: Metadata,
-        type_ids: TypeIds,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, TypeIds)>;
@@ -40,12 +39,11 @@ pub trait IMintTxBuilder<C: CkbRpc> {
 pub trait IStakeTxBuilder<C: CkbRpc> {
     fn new(
         ckb: CkbNetwork<C>,
-        metadata_type_id: H256,
-        xudt_args: H256,
+        type_ids: StakeTypeIds,
         staker: EthAddress,
         current_epoch: Epoch,
         stake: StakeItem,
-        delegate: Option<StakeDelegate>,
+        delegate: Option<DelegateRequirement>,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;

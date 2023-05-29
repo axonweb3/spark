@@ -11,6 +11,7 @@ use common::types::tx_builder::Amount;
 use common::utils::convert::new_u128;
 
 use crate::ckb::define::config::TOKEN_BYTES;
+use crate::ckb::define::error::*;
 
 pub async fn fetch_live_cells(
     ckb_rpc: &impl CkbRpc,
@@ -126,4 +127,22 @@ pub async fn collect_xudt(
     }
 
     Ok((cells, total))
+}
+
+pub async fn get_unique_cell(ckb_rpc: &impl CkbRpc, type_id_script: Script) -> Result<Cell> {
+    let cells = collect_cells(ckb_rpc, 1, SearchKey {
+        script:               type_id_script.into(),
+        script_type:          ScriptType::Type,
+        filter:               None,
+        script_search_mode:   None,
+        with_data:            None,
+        group_by_transaction: None,
+    })
+    .await?;
+
+    if cells.is_empty() {
+        return Err(CkbTxErr::CellNotFound("Checkpoint".to_owned()).into());
+    }
+
+    Ok(cells[0].clone())
 }

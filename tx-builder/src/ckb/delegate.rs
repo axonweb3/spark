@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use async_trait::async_trait;
 use axon_types::delegate::*;
+use axon_types::withdraw::WithdrawAtCellData;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -168,7 +169,7 @@ impl DelegateTxBuilder {
                 delegate_cell_data(&self.delegators).as_bytes(),
             ),
             // withdraw AT cell data
-            token_cell_data(0, withdraw_cell_data(None).as_bytes()),
+            token_cell_data(0, WithdrawAtCellData::default().as_bytes()),
         ])
     }
 

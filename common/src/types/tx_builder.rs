@@ -3,15 +3,11 @@ use std::collections::HashMap;
 use axon_types::{
     basic::{Byte20, Byte32, Byte65, Byte97, Identity},
     checkpoint::{CheckpointCellData, ProposeCount as AProposeCount, ProposeCounts},
-    delegate::{DelegateAtCellData as ADelegateAtCellData, DelegateInfoDelta, DelegateInfoDeltas},
+    delegate::{DelegateInfoDelta, DelegateRequirement as ADelegateRequirement},
     metadata::{
-        MetaTypeIds, Metadata as AMetadata, MetadataCellData as AMetadataCellData, MetadataList,
-        Validator as AValidator, ValidatorList,
+        Metadata as AMetadata, TypeIds as ATypeIds, Validator as AValidator, ValidatorList,
     },
-    withdraw::{
-        WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
-        WithdrawInfos as AWithdrawInfos,
-    },
+    stake::StakeInfoDelta,
 };
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
@@ -39,17 +35,44 @@ pub struct CkbNetwork<C: CkbRpc> {
     pub client:       C,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum NetworkType {
     Mainnet,
     Testnet,
 }
 
 #[derive(Default)]
-pub struct StakeDelegate {
-    pub dividend_ratio:     u8,
+pub struct DelegateRequirement {
+    pub commission_rate:    u8,
     pub maximum_delegators: u32,
     pub threshold:          u128,
+}
+
+impl From<DelegateRequirement> for ADelegateRequirement {
+    fn from(v: DelegateRequirement) -> Self {
+        ADelegateRequirement::new_builder()
+            .threshold(to_uint128(v.threshold))
+            .max_delegator_size(to_uint32(v.maximum_delegators))
+            .commission_rate(v.commission_rate.into())
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct StakeItem {
+    pub is_increase:        bool,
+    pub amount:             Amount,
+    pub inauguration_epoch: Epoch,
+}
+
+impl From<&StakeItem> for StakeInfoDelta {
+    fn from(stake: &StakeItem) -> Self {
+        StakeInfoDelta::new_builder()
+            .is_increase(Byte::new(stake.is_increase.into()))
+            .amount(to_uint128(stake.amount))
+            .inauguration_epoch(to_uint64(stake.inauguration_epoch))
+            .build()
+    }
 }
 
 #[derive(Clone)]
@@ -72,13 +95,6 @@ impl From<&DelegateItem> for DelegateInfoDelta {
             .inauguration_epoch(to_uint64(delegate.inauguration_epoch))
             .build()
     }
-}
-
-#[derive(Clone)]
-pub struct StakeItem {
-    pub is_increase:        bool,
-    pub amount:             Amount,
-    pub inauguration_epoch: Epoch,
 }
 
 #[derive(Default)]
@@ -180,27 +196,50 @@ impl From<&Validator> for AValidator {
     }
 }
 
+#[derive(Clone, Default, Debug)]
+pub struct StakeTypeIds {
+    pub metadata_type_id:   H256,
+    pub checkpoint_type_id: H256,
+    pub xudt_owner:         H256,
+}
+
 #[derive(Clone, Default)]
 pub struct TypeIds {
     pub issue_type_id:        H256,
     pub selection_type_id:    H256,
+    pub metadata_code_hash:   H256,
     pub metadata_type_id:     H256,
+    pub checkpoint_code_hash: H256,
     pub checkpoint_type_id:   H256,
+    pub stake_code_hash:      H256,
     pub stake_smt_type_id:    H256,
+    pub delegate_code_hash:   H256,
     pub delegate_smt_type_id: H256,
-    pub reward_type_id:       H256,
-    pub xudt_lock_id:         H256,
+    pub reward_code_hash:     H256,
+    pub reward_smt_type_id:   H256,
+    pub withdraw_code_hash:   H256,
+    pub xudt_type_hash:       H256,
+    pub xudt_owner:           H256,
 }
 
-impl From<TypeIds> for MetaTypeIds {
+impl From<TypeIds> for ATypeIds {
     fn from(type_ids: TypeIds) -> Self {
-        MetaTypeIds::new_builder()
+        ATypeIds::new_builder()
+            .issue_type_id(to_byte32(&type_ids.issue_type_id))
+            .selection_type_id(to_byte32(&type_ids.selection_type_id))
+            .metadata_code_hash(to_byte32(&type_ids.metadata_code_hash))
             .metadata_type_id(to_byte32(&type_ids.metadata_type_id))
+            .checkpoint_code_hash(to_byte32(&type_ids.checkpoint_code_hash))
             .checkpoint_type_id(to_byte32(&type_ids.checkpoint_type_id))
+            .stake_smt_code_hash(to_byte32(&type_ids.stake_code_hash))
             .stake_smt_type_id(to_byte32(&type_ids.stake_smt_type_id))
+            .delegate_smt_code_hash(to_byte32(&type_ids.delegate_code_hash))
             .delegate_smt_type_id(to_byte32(&type_ids.delegate_smt_type_id))
-            .reward_type_id(to_byte32(&type_ids.reward_type_id))
-            .xudt_type_id(to_byte32(&type_ids.xudt_lock_id))
+            .reward_code_hash(to_byte32(&type_ids.reward_code_hash))
+            .reward_type_id(to_byte32(&type_ids.reward_smt_type_id))
+            .withdraw_code_hash(to_byte32(&type_ids.withdraw_code_hash))
+            .xudt_type_hash(to_byte32(&type_ids.xudt_type_hash))
+            .xudt_owner_lock_hash(to_byte32(&type_ids.xudt_owner))
             .build()
     }
 }
@@ -222,149 +261,6 @@ impl From<&Metadata> for AMetadata {
             .tx_num_limit(to_uint32(metadata.tx_num_limit))
             .max_tx_size(to_uint32(metadata.max_tx_size))
             .block_height(to_uint64(metadata.block_height))
-            .build()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct MetadataCellData {
-    pub version:                u8,
-    pub epoch:                  u64,
-    pub propose_count_smt_root: H256,
-    pub type_ids:               TypeIds,
-    pub metadata:               Vec<Metadata>,
-}
-
-impl From<MetadataCellData> for AMetadataCellData {
-    fn from(v: MetadataCellData) -> Self {
-        AMetadataCellData::new_builder()
-            .version(v.version.into())
-            .epoch(to_uint64(v.epoch))
-            .propose_count_smt_root(to_byte32(&v.propose_count_smt_root))
-            .type_ids((v.type_ids).into())
-            .metadata({
-                let mut list = MetadataList::new_builder();
-                for m in v.metadata.iter() {
-                    list = list.push(m.into());
-                }
-                list.build()
-            })
-            .build()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct StakeGroupInfo {
-    pub staker:                   H160,
-    pub delegate_infos:           Vec<DelegateInfo>,
-    pub delegate_old_epoch_proof: Vec<u8>,
-    pub delegate_new_epoch_proof: Vec<u8>,
-}
-#[derive(Clone, Default)]
-pub struct DelegateInfo {
-    pub delegator_addr: H160,
-    pub amount:         u128,
-}
-#[derive(Clone, Default)]
-pub struct StakerSmtRoot {
-    pub staker: H160,
-    pub root:   H256,
-}
-#[derive(Clone, Default)]
-pub struct DelegateSmtCellData {
-    pub version:          u8,
-    pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
-    pub metadata_type_id: H256,
-}
-
-#[derive(Clone, Default)]
-pub struct StakeInfo {
-    pub addr:   H160,
-    pub amount: u128,
-}
-
-#[derive(Clone, Default)]
-pub struct StakeSmtUpdateInfo {
-    pub all_stake_infos: Vec<StakeInfo>,
-    pub old_epoch_proof: Vec<u8>,
-    pub new_epoch_proof: Vec<u8>,
-}
-
-#[derive(Clone, Default)]
-pub struct StakeSmtCellData {
-    pub smt_root:         H256,
-    pub version:          u8,
-    pub metadata_type_id: H256,
-}
-
-#[derive(Clone, Default)]
-pub struct StakeAtCellData {
-    pub version:          u8,
-    pub l1_address:       H160,
-    pub l2_address:       H160,
-    pub stake_info:       StakeInfoDelta,
-    pub metadata_type_id: H256,
-}
-
-#[derive(Clone, Default)]
-pub struct StakeInfoDelta {
-    pub is_increase:        u8,
-    pub amount:             u128,
-    pub inauguration_epoch: u64,
-}
-
-#[derive(Clone, Default)]
-pub struct DelegateAtCellData {
-    pub version:          u8,
-    pub l1_address:       H160,
-    pub metadata_type_id: H256,
-    pub delegator_infos:  Vec<DelegateItem>,
-}
-
-impl From<DelegateAtCellData> for ADelegateAtCellData {
-    fn from(value: DelegateAtCellData) -> Self {
-        let infos = DelegateInfoDeltas::new_builder()
-            .extend(value.delegator_infos.iter().map(Into::into))
-            .build();
-        ADelegateAtCellData::new_builder()
-            .version(value.version.into())
-            .l1_address(Identity::from_slice(value.l1_address.as_bytes()).unwrap())
-            .metadata_type_id(to_byte32(&value.metadata_type_id))
-            .delegator_infos(infos)
-            .build()
-    }
-}
-#[derive(Clone, Default)]
-pub struct WithdrawAtCellData {
-    pub version:          u8,
-    pub metadata_type_id: H256,
-    pub withdraw_infos:   Vec<WithdrawInfo>,
-}
-
-impl From<WithdrawAtCellData> for AWithdrawAtCellData {
-    fn from(value: WithdrawAtCellData) -> Self {
-        let infos: AWithdrawInfos = AWithdrawInfos::new_builder()
-            .extend(value.withdraw_infos.into_iter().map(Into::into))
-            .build();
-        AWithdrawAtCellData::new_builder()
-            .version(value.version.into())
-            .metadata_type_id(to_byte32(&value.metadata_type_id))
-            .withdraw_infos(infos)
-            .build()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct WithdrawInfo {
-    pub amount: u128,
-    pub epoch:  u64,
-}
-
-impl From<WithdrawInfo> for AWithdrawInfo {
-    fn from(value: WithdrawInfo) -> Self {
-        AWithdrawInfo::new_builder()
-            .amount(to_uint128(value.amount))
-            .epoch(to_uint64(value.epoch))
             .build()
     }
 }

@@ -104,7 +104,10 @@ impl WithdrawTxBuilder {
             // withdraw AT cell data
             token_cell_data(
                 total_withdraw_amount,
-                withdraw_cell_data(Some(output_withdraw_infos.build())).as_bytes(),
+                WithdrawAtCellData::new_builder()
+                    .withdraw_infos(output_withdraw_infos.build())
+                    .build()
+                    .as_bytes(),
             ),
         ])
     }

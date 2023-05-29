@@ -316,7 +316,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=8c2338a#8c2338ad5a3b32f260b5da234536f2681bf7712b"
+source = "git+https://github.com/axonweb3/axon-contract?rev=d99d50f#d99d50f1a1c3323ec85f7fb717b3beec3b79bde2"
 dependencies = [
  "molecule",
  "molecule2",
@@ -2414,7 +2414,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=8c2338a#8c2338ad5a3b32f260b5da234536f2681bf7712b"
+source = "git+https://github.com/axonweb3/axon-contract?rev=d99d50f#d99d50f1a1c3323ec85f7fb717b3beec3b79bde2"
 
 [[package]]
 name = "native-tls"
