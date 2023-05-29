@@ -11,7 +11,7 @@ use ckb_types::{
 };
 
 use common::traits::tx_builder::IDelegateTxBuilder;
-use common::types::tx_builder::{Address, DelegateItem, Epoch};
+use common::types::tx_builder::{DelegateItem, Epoch, EthAddress};
 use common::utils::convert::*;
 
 use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
@@ -19,14 +19,14 @@ use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
 use crate::ckb::utils::{calc_amount::*, cell_data::*};
 
 pub struct DelegateTxBuilder {
-    _delegator:    Address,
+    _delegator:    EthAddress,
     current_epoch: Epoch,
     delegators:    Vec<DelegateItem>,
 }
 
 #[async_trait]
 impl IDelegateTxBuilder for DelegateTxBuilder {
-    fn new(_delegator: Address, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self {
+    fn new(_delegator: EthAddress, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self {
         Self {
             _delegator,
             current_epoch,
@@ -165,10 +165,10 @@ impl DelegateTxBuilder {
             // delegate AT cell data
             token_cell_data(
                 total_amount,
-                delegate_token_cell_data(&self.delegators).as_bytes(),
+                delegate_cell_data(&self.delegators).as_bytes(),
             ),
             // withdraw AT cell data
-            token_cell_data(0, withdraw_token_cell_data(None).as_bytes()),
+            token_cell_data(0, withdraw_cell_data(None).as_bytes()),
         ])
     }
 
@@ -209,7 +209,7 @@ impl DelegateTxBuilder {
         cell_delegates: &DelegateAtCellData,
         wallet_amount: &mut u128,
         total_amount: &mut u128,
-    ) -> CkbTxResult<(DelegateInfoDeltasBuilder, HashSet<Address>)> {
+    ) -> CkbTxResult<(DelegateInfoDeltasBuilder, HashSet<EthAddress>)> {
         let mut last_delegates = HashMap::new();
         for delegate in cell_delegates.delegator_infos() {
             let last_staker = delegate.staker();
@@ -259,7 +259,7 @@ impl DelegateTxBuilder {
     fn process_rest_delegates(
         &self,
         cell_delegates: &DelegateAtCellData,
-        new_stakers: &HashSet<Address>,
+        new_stakers: &HashSet<EthAddress>,
         wallet_amount: &mut u128,
         total_amount: &mut u128,
         updated_delegates: DelegateInfoDeltasBuilder,

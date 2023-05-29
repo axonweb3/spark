@@ -12,14 +12,14 @@ use ckb_types::{
 };
 
 use common::traits::tx_builder::IRewardTxBuilder;
-use common::types::tx_builder::{Address, Amount, Epoch};
+use common::types::tx_builder::{Amount, Epoch, EthAddress};
 use common::utils::convert::new_u128;
 
 use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::CkbTxResult;
 
 pub struct RewardTxBuilder {
-    user:                      Address,
+    user:                      EthAddress,
     current_epoch:             Epoch,
     base_reward:               Amount,
     half_reward_cycle:         Epoch,
@@ -29,7 +29,7 @@ pub struct RewardTxBuilder {
 #[async_trait]
 impl IRewardTxBuilder for RewardTxBuilder {
     fn new(
-        user: Address,
+        user: EthAddress,
         current_epoch: Epoch,
         base_reward: u128,
         half_reward_cycle: Epoch,

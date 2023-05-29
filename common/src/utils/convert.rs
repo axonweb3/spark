@@ -1,18 +1,18 @@
-use ckb_types::packed::{Byte32 as CByte32, Uint128Reader};
-use ckb_types::prelude::{Entity, Pack, Reader, Unpack};
+use ckb_types::packed::Byte32 as CByte32;
+use ckb_types::prelude::{Entity, Pack};
 use ckb_types::{H160, H256};
 use molecule::prelude::Byte;
 
-use axon_types::basic::{Byte32, Identity, Uint128, Uint16, Uint32, Uint64};
+use axon_types::basic::{Byte32, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64};
 
 pub fn new_u128(v: &[u8]) -> u128 {
-    Uint128Reader::new_unchecked(v).unpack()
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&v[0..16]);
+    u128::from_le_bytes(bytes)
 }
 
 pub fn to_u128(v: &Uint128) -> u128 {
-    let mut array: [u8; 16] = [0u8; 16];
-    array.copy_from_slice(v.as_slice());
-    u128::from_le_bytes(array)
+    new_u128(v.as_slice())
 }
 
 pub fn to_u64(v: &Uint64) -> u64 {
@@ -45,6 +45,14 @@ pub fn to_h160(v: &Identity) -> H160 {
     H160::from_slice(v.as_slice()).expect("imposible")
 }
 
+pub fn to_identity(v: &H160) -> Identity {
+    Identity::new_unchecked(bytes::Bytes::from(v.as_bytes().to_owned()))
+}
+
+pub fn to_identity_opt(v: &H160) -> IdentityOpt {
+    IdentityOpt::new_unchecked(bytes::Bytes::from(v.as_bytes().to_owned()))
+}
+
 pub fn to_byte32(v: &H256) -> Byte32 {
     Byte32::from_slice(v.as_bytes()).expect("imposible")
 }
@@ -71,4 +79,10 @@ fn test_u128() {
 fn test_ckb_byte32() {
     let a = Byte32::default();
     assert_eq!(ckb_types::packed::Byte32::default(), to_ckb_byte32(&a));
+}
+
+#[test]
+fn test_axon_byte32() {
+    let c = ckb_types::packed::Byte32::default();
+    assert_eq!(Byte32::default().as_bytes(), to_axon_byte32(&c).as_bytes());
 }

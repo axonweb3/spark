@@ -9,7 +9,7 @@ use ckb_types::{
 };
 
 use common::traits::tx_builder::IWithdrawTxBuilder;
-use common::types::tx_builder::{Address, Epoch};
+use common::types::tx_builder::{Epoch, EthAddress};
 use common::utils::convert::*;
 
 use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
@@ -17,13 +17,13 @@ use crate::ckb::define::error::CkbTxResult;
 use crate::ckb::utils::{calc_amount::*, cell_data::*};
 
 pub struct WithdrawTxBuilder {
-    _user:         Address,
+    _user:         EthAddress,
     current_epoch: Epoch,
 }
 
 #[async_trait]
 impl IWithdrawTxBuilder for WithdrawTxBuilder {
-    fn new(_user: Address, current_epoch: Epoch) -> Self {
+    fn new(_user: EthAddress, current_epoch: Epoch) -> Self {
         Self {
             _user,
             current_epoch,
@@ -104,7 +104,7 @@ impl WithdrawTxBuilder {
             // withdraw AT cell data
             token_cell_data(
                 total_withdraw_amount,
-                withdraw_token_cell_data(Some(output_withdraw_infos.build())).as_bytes(),
+                withdraw_cell_data(Some(output_withdraw_infos.build())).as_bytes(),
             ),
         ])
     }

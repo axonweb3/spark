@@ -55,7 +55,7 @@ pub fn secp256k1_lock_dep(network_type: &NetworkType) -> CellDep {
     }
 }
 
-pub fn xudt_dep(network_type: &NetworkType) -> CellDep {
+pub fn xudt_type_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
             XUDT_MAINNET.tx_hash.clone(),
@@ -111,6 +111,21 @@ pub fn metadata_dep(network_type: &NetworkType) -> CellDep {
             METADATA_TYPE_TESTNET.tx_hash.clone(),
             METADATA_TYPE_TESTNET.index,
             METADATA_TYPE_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn stake_lock_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            STAKE_LOCK_MAINNET.tx_hash.clone(),
+            STAKE_LOCK_MAINNET.index,
+            STAKE_LOCK_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            STAKE_LOCK_TESTNET.tx_hash.clone(),
+            STAKE_LOCK_TESTNET.index,
+            STAKE_LOCK_TESTNET.dep_type
         ),
     }
 }

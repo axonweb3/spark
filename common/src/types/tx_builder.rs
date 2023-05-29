@@ -9,13 +9,14 @@ use axon_types::{
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
 
+use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::utils::convert::*;
 
 pub type Amount = u128;
 pub type Epoch = u64;
 pub type PrivateKey = ckb_types::H256;
 
-pub type Address = H160;
+pub type EthAddress = H160;
 pub type Staker = H160;
 pub type Delegator = H160;
 pub type StakerEthAddr = H160;
@@ -26,11 +27,18 @@ pub type NonTopStakers = HashMap<Staker, InStakeSmt>;
 pub type NonTopDelegators = HashMap<Delegator, HashMap<Staker, InDelegateSmt>>;
 
 #[derive(Clone)]
+pub struct CkbNetwork<C: CkbRpc> {
+    pub network_type: NetworkType,
+    pub client:       C,
+}
+
+#[derive(Clone)]
 pub enum NetworkType {
     Mainnet,
     Testnet,
 }
 
+#[derive(Default)]
 pub struct StakeDelegate {
     pub dividend_ratio:     u8,
     pub maximum_delegators: u32,

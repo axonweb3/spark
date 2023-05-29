@@ -130,35 +130,34 @@ impl DelegateSmtTxBuilder {
             }
 
             // todo: fix
-            let (delegate_data, withdraw_data) =
-                if statistics.withdraw_amounts.contains_key(delegator) {
-                    let withdraw_amount = statistics
-                        .withdraw_amounts
-                        .get(delegator)
-                        .unwrap()
-                        .to_owned();
-                    let old_withdraw_data = Bytes::new(); // todo: get withdraw AT cell
+            let (delegate_data, withdraw_data) = if statistics
+                .withdraw_amounts
+                .contains_key(delegator)
+            {
+                let withdraw_amount = statistics
+                    .withdraw_amounts
+                    .get(delegator)
+                    .unwrap()
+                    .to_owned();
+                let old_withdraw_data = Bytes::new(); // todo: get withdraw AT cell
 
-                    (
-                        token_cell_data(
-                            total_amount - withdraw_amount,
-                            delegate_token_cell_data(&[]).as_bytes(),
-                        ),
-                        Some(update_withdraw_data(
-                            old_withdraw_data,
-                            self.current_epoch,
-                            withdraw_amount,
-                        )),
-                    )
-                } else {
-                    (
-                        token_cell_data(
-                            total_amount.to_owned(),
-                            delegate_token_cell_data(&[]).as_bytes(),
-                        ),
-                        None,
-                    )
-                };
+                (
+                    token_cell_data(
+                        total_amount - withdraw_amount,
+                        delegate_cell_data(&[]).as_bytes(),
+                    ),
+                    Some(update_withdraw_data(
+                        old_withdraw_data,
+                        self.current_epoch,
+                        withdraw_amount,
+                    )),
+                )
+            } else {
+                (
+                    token_cell_data(total_amount.to_owned(), delegate_cell_data(&[]).as_bytes()),
+                    None,
+                )
+            };
 
             // delegate AT cell
             outputs.push(
@@ -231,7 +230,7 @@ impl DelegateSmtTxBuilder {
         }
 
         // todo: new smt roots
-        let new_roots = vec![(Address::default(), Byte32::default())];
+        let new_roots = vec![(EthAddress::default(), Byte32::default())];
 
         Ok((delegate_smt_cell_data(new_roots).as_bytes(), Statistics {
             expired_delegates,

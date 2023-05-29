@@ -1,12 +1,16 @@
 use anyhow::{anyhow, Result};
 use ckb_jsonrpc_types::{CellInfo, Uint32};
 use ckb_types::{
-    packed::{CellInput, OutPoint},
+    packed::{CellInput, OutPoint, Script},
     prelude::*,
 };
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::types::ckb_rpc_client::{Cell, Order, SearchKey};
+use common::types::ckb_rpc_client::{Cell, Order, ScriptType, SearchKey, SearchKeyFilter};
+use common::types::tx_builder::Amount;
+use common::utils::convert::new_u128;
+
+use crate::ckb::define::config::TOKEN_BYTES;
 
 pub async fn fetch_live_cells(
     ckb_rpc: &impl CkbRpc,
@@ -16,7 +20,8 @@ pub async fn fetch_live_cells(
 ) -> Result<(Vec<CellInput>, u64)> {
     let mut inputs = vec![];
     let mut after = None;
-    let limit = Uint32::from(100);
+    let limit = Uint32::from(20);
+
     while inputs_capacity < outputs_capacity {
         let result = ckb_rpc
             .get_cells(search_key.clone(), Order::Asc, limit, after)
@@ -64,15 +69,61 @@ pub async fn get_live_cell(
     Ok(cell.cell.unwrap())
 }
 
-pub async fn collect_cells(ckb_rpc: &impl CkbRpc, search_key: SearchKey) -> Result<Vec<Cell>> {
+pub async fn collect_cells(
+    ckb_rpc: &impl CkbRpc,
+    limit: u32,
+    search_key: SearchKey,
+) -> Result<Vec<Cell>> {
     let result = ckb_rpc
-        .get_cells(search_key.clone(), Order::Asc, Uint32::from(100), None)
+        .get_cells(search_key.clone(), Order::Asc, Uint32::from(limit), None)
         .await?;
 
-    let mut inputs = vec![];
+    let mut cells = vec![];
     result.objects.into_iter().for_each(|cell| {
-        inputs.push(cell);
+        cells.push(cell);
     });
 
-    Ok(inputs)
+    Ok(cells)
+}
+
+pub async fn collect_xudt(
+    ckb_rpc: &impl CkbRpc,
+    owner_lock: Script,
+    xudt: Script,
+    expected_amount: Amount,
+) -> Result<(Vec<Cell>, Amount)> {
+    let mut after = None;
+    let limit = Uint32::from(20);
+    let search_key = SearchKey {
+        script:               owner_lock.into(),
+        script_type:          ScriptType::Lock,
+        filter:               Some(SearchKeyFilter {
+            script: Some(xudt.into()),
+            ..Default::default()
+        }),
+        script_search_mode:   None,
+        with_data:            Some(true),
+        group_by_transaction: None,
+    };
+
+    let mut cells = vec![];
+    let mut total = 0;
+
+    while total < expected_amount {
+        let result = ckb_rpc
+            .get_cells(search_key.clone(), Order::Asc, limit, after)
+            .await?;
+        result.objects.into_iter().for_each(|cell| {
+            if total < expected_amount {
+                total += new_u128(&cell.output_data.as_ref().unwrap().as_bytes()[..TOKEN_BYTES]);
+                cells.push(cell);
+            }
+        });
+        if result.last_cursor.is_empty() {
+            break;
+        }
+        after = Some(result.last_cursor);
+    }
+
+    Ok((cells, total))
 }
