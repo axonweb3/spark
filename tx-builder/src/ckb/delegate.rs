@@ -3,41 +3,72 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use async_trait::async_trait;
 use axon_types::delegate::*;
-use axon_types::withdraw::WithdrawAtCellData;
+// use axon_types::withdraw::WithdrawAtCellData;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellOutput, Script},
+    packed::{CellInput, CellOutput, Script},
     prelude::{Builder, Entity, Pack},
 };
 
+use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IDelegateTxBuilder;
-use common::types::tx_builder::{DelegateItem, Epoch, EthAddress};
+use common::types::ckb_rpc_client::{Cell, ScriptType, SearchKey, SearchKeyFilter};
+use common::types::tx_builder::{
+    Amount, CkbNetwork, DelegateItem, Epoch, EthAddress, StakeTypeIds,
+};
 use common::utils::convert::*;
 
 use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
-use crate::ckb::utils::{calc_amount::*, cell_data::*};
+use crate::ckb::utils::{
+    calc_amount::*,
+    cell_collector::{collect_cells, collect_xudt},
+    cell_data::*,
+    cell_dep::*,
+    omni::*,
+    script::*,
+    tx::balance_tx,
+};
 
-pub struct DelegateTxBuilder {
-    _delegator:    EthAddress,
+pub struct DelegateTxBuilder<C: CkbRpc> {
+    ckb:           CkbNetwork<C>,
+    type_ids:      StakeTypeIds,
     current_epoch: Epoch,
     delegators:    Vec<DelegateItem>,
+    delegate_lock: Script,
+    token_lock:    Script,
+    xudt:          Script,
 }
 
 #[async_trait]
-impl IDelegateTxBuilder for DelegateTxBuilder {
-    fn new(_delegator: EthAddress, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self {
+impl<C: CkbRpc> IDelegateTxBuilder<C> for DelegateTxBuilder<C> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        delegator: EthAddress,
+        current_epoch: Epoch,
+        delegators: Vec<DelegateItem>,
+    ) -> Self {
+        let delegate_lock =
+            delegate_lock(&ckb.network_type, &type_ids.metadata_type_id, &delegator);
+        let token_lock = omni_eth_lock(&ckb.network_type, &delegator);
+        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+
         Self {
-            _delegator,
+            ckb,
+            type_ids,
             current_epoch,
-            delegators: delegate_info,
+            delegators,
+            delegate_lock,
+            token_lock,
+            xudt,
         }
     }
 
     async fn build_tx(&self) -> Result<TransactionView> {
         for delegate in self.delegators.iter() {
-            if delegate.inauguration_epoch > self.current_epoch + 2 {
+            if delegate.inauguration_epoch > self.current_epoch + INAUGURATION {
                 return Err(CkbTxErr::InaugurationEpoch {
                     expected: self.current_epoch,
                     found:    delegate.inauguration_epoch,
@@ -46,112 +77,204 @@ impl IDelegateTxBuilder for DelegateTxBuilder {
             }
         }
 
-        if self.is_first_delegate().await? {
+        let delegate_cell = self.get_delegate_cell().await?;
+
+        if delegate_cell.is_empty() {
             self.build_first_delegate_tx().await
         } else {
-            self.build_update_delegate_tx().await
+            self.build_update_delegate_tx(delegate_cell[0].clone())
+                .await
         }
     }
 }
 
-impl DelegateTxBuilder {
-    async fn is_first_delegate(&self) -> CkbTxResult<bool> {
-        // todo: search user's delegate AT cell
-        Ok(true)
+impl<C: CkbRpc> DelegateTxBuilder<C> {
+    async fn get_delegate_cell(&self) -> Result<Vec<Cell>> {
+        let delegate_cell = collect_cells(&self.ckb.client, 1, SearchKey {
+            script:               self.delegate_lock.clone().into(),
+            script_type:          ScriptType::Lock,
+            filter:               Some(SearchKeyFilter {
+                script: Some(self.xudt.clone().into()),
+                ..Default::default()
+            }),
+            script_search_mode:   None,
+            with_data:            Some(true),
+            group_by_transaction: None,
+        })
+        .await?;
+        Ok(delegate_cell)
     }
 
     async fn build_first_delegate_tx(&self) -> Result<TransactionView> {
-        // todo: collect AT cells
-        let inputs = vec![];
+        let mut inputs = vec![];
 
-        let wallet_data = vec![Bytes::default()]; // todo
-        let outputs_data = self.first_delegate_data(&wallet_data)?;
+        // AT cells
+        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
 
-        // todo: fill lock, type
-        let fake_lock = Script::default();
-        let fake_type = Script::default();
+        let outputs_data = self.first_delegate_data(token_amount)?;
+
         let outputs = vec![
             // AT cell
             CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
+                .lock(self.token_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // delegate AT cell
             CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
+                .lock(self.delegate_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
-            // withdraw AT cell
-            CellOutput::new_builder()
-                .lock(fake_lock)
-                .type_(Some(fake_type).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
+            // // withdraw AT cell
+            // CellOutput::new_builder()
+            //     .lock(fake_lock)
+            //     .type_(Some(fake_type).pack())
+            //     .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];
 
-        // todo
-        let cell_deps = vec![];
+        let cell_deps = vec![
+            omni_lock_dep(&self.ckb.network_type),
+            secp256k1_lock_dep(&self.ckb.network_type),
+            xudt_type_dep(&self.ckb.network_type),
+        ];
 
-        // todo: balance tx, fill placeholder witnesses
+        let witnesses = vec![
+            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
+            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+        ];
+
         let tx = TransactionBuilder::default()
             .inputs(inputs)
             .outputs(outputs)
             .outputs_data(outputs_data.pack())
             .cell_deps(cell_deps)
+            .witnesses(witnesses.pack())
             .build();
+
+        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
 
         Ok(tx)
     }
 
-    async fn build_update_delegate_tx(&self) -> Result<TransactionView> {
-        // todo: collect AT cells
-        // todo: get delegate AT cell
-        let inputs = vec![];
+    async fn build_update_delegate_tx(&self, delegate_cell: Cell) -> Result<TransactionView> {
+        // delegate AT cell
+        let mut inputs = vec![CellInput::new_builder()
+            .previous_output(delegate_cell.out_point.into())
+            .build()];
 
-        let wallet_data = vec![Bytes::default()]; // todo
-        let delegate_data = Bytes::default(); // todo
+        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
 
-        let outputs_data = self.update_delegate_data(&wallet_data, delegate_data)?;
+        let delegate_data = delegate_cell.output_data.unwrap().into_bytes();
+        let outputs_data = self.update_delegate_data(token_amount, delegate_data)?;
 
-        // todo: fill lock, type
-        let fake_lock = Script::default();
-        let fake_type = Script::default();
         let outputs = vec![
-            // AT cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // delegate AT cell
             CellOutput::new_builder()
-                .lock(fake_lock)
-                .type_(Some(fake_type).pack())
+                .lock(self.delegate_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
+            // AT cell
+            CellOutput::new_builder()
+                .lock(self.token_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
+                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
         ];
 
-        // todo
-        let cell_deps = vec![];
+        let cell_deps = vec![
+            omni_lock_dep(&self.ckb.network_type),
+            secp256k1_lock_dep(&self.ckb.network_type),
+            xudt_type_dep(&self.ckb.network_type),
+            delegate_dep(&self.ckb.network_type),
+            checkpoint_cell_dep(
+                &self.ckb.client,
+                &self.ckb.network_type,
+                &self.type_ids.checkpoint_type_id,
+            )
+            .await?,
+            metadata_cell_dep(
+                &self.ckb.client,
+                &self.ckb.network_type,
+                &self.type_ids.metadata_type_id,
+            )
+            .await?,
+        ];
 
-        // todo: balance tx, fill placeholder witnesses
+        let witnesses = vec![
+            omni_eth_witness_placeholder().as_bytes(), // delegate AT cell lock
+            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
+            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+        ];
+
         let tx = TransactionBuilder::default()
             .inputs(inputs)
             .outputs(outputs)
             .outputs_data(outputs_data.pack())
             .cell_deps(cell_deps)
+            .witnesses(witnesses.pack())
             .build();
+
+        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
 
         Ok(tx)
     }
 
-    fn first_delegate_data(&self, wallet_data: &[Bytes]) -> CkbTxResult<Vec<Bytes>> {
+    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+        let expected_amount = {
+            let mut total_increase = 0;
+            let mut total_decrease = 0;
+
+            for item in self.delegators.iter() {
+                if item.is_increase {
+                    total_increase += item.amount;
+                } else {
+                    total_decrease += item.amount;
+                }
+            }
+
+            if total_increase <= total_decrease {
+                1
+            } else {
+                total_increase - total_decrease
+            }
+        };
+
+        let (token_cells, amount) = collect_xudt(
+            &self.ckb.client,
+            self.token_lock.clone(),
+            self.xudt.clone(),
+            expected_amount,
+        )
+        .await?;
+
+        if token_cells.is_empty() {
+            return Err(CkbTxErr::CellNotFound("AT".to_owned()).into());
+        }
+
+        // AT cells
+        for token_cell in token_cells.into_iter() {
+            inputs.push(
+                CellInput::new_builder()
+                    .previous_output(token_cell.out_point.into())
+                    .build(),
+            );
+        }
+
+        Ok(amount)
+    }
+
+    fn first_delegate_data(&self, mut wallet_amount: Amount) -> CkbTxResult<Vec<Bytes>> {
         let mut total_amount = 0;
+        let mut delegates = vec![];
         for item in self.delegators.iter() {
             if !item.is_increase {
                 return Err(CkbTxErr::Increase(item.is_increase));
             }
             total_amount += item.amount;
+
+            let mut item = item.to_owned();
+            item.total_amount = item.amount;
+            delegates.push(item);
         }
 
-        let mut wallet_amount = ElectAmountCaculator::calc_wallet_amount(wallet_data);
         if wallet_amount < total_amount {
             return Err(CkbTxErr::ExceedWalletAmount {
                 wallet_amount,
@@ -162,23 +285,19 @@ impl DelegateTxBuilder {
 
         Ok(vec![
             // AT cell data
-            to_uint128(wallet_amount).as_bytes(),
+            wallet_amount.pack().as_bytes(),
             // delegate AT cell data
-            token_cell_data(
-                total_amount,
-                delegate_cell_data(&self.delegators).as_bytes(),
-            ),
+            token_cell_data(total_amount, delegate_cell_data(&delegates).as_bytes()),
             // withdraw AT cell data
-            token_cell_data(0, WithdrawAtCellData::default().as_bytes()),
+            // token_cell_data(0, WithdrawAtCellData::default().as_bytes()),
         ])
     }
 
     fn update_delegate_data(
         &self,
-        wallet_data: &[Bytes],
+        mut wallet_amount: Amount,
         delegate_data: Bytes,
     ) -> CkbTxResult<Vec<Bytes>> {
-        let mut wallet_amount = ElectAmountCaculator::calc_wallet_amount(wallet_data);
         let mut total_amount = new_u128(&delegate_data[..TOKEN_BYTES]);
 
         let mut delegate_data = delegate_data;
@@ -198,10 +317,10 @@ impl DelegateTxBuilder {
         )?;
 
         Ok(vec![
-            // AT cell data
-            wallet_amount.pack().as_bytes(),
             // delegate AT cell data
             token_cell_data(total_amount, updated_delegates.build().as_bytes()),
+            // AT cell data
+            wallet_amount.pack().as_bytes(),
         ])
     }
 
@@ -213,8 +332,7 @@ impl DelegateTxBuilder {
     ) -> CkbTxResult<(DelegateInfoDeltasBuilder, HashSet<EthAddress>)> {
         let mut last_delegates = HashMap::new();
         for delegate in cell_delegates.delegator_infos() {
-            let last_staker = delegate.staker();
-            last_delegates.insert(to_h160(&last_staker), delegate);
+            last_delegates.insert(to_h160(&delegate.staker()), delegate);
         }
 
         let mut stakers = HashSet::new();
@@ -235,14 +353,15 @@ impl DelegateTxBuilder {
                     delegate,
                     wallet_amount,
                     total_amount,
+                    to_u128(&last_delegate_info.total_amount()),
                 )?;
 
                 updated_delegates = updated_delegates.push(
                     (&DelegateItem {
                         staker:             delegate.staker.clone(),
+                        total_amount:       actual_info.total_elect_amount,
                         is_increase:        actual_info.is_increase,
                         amount:             actual_info.amount,
-                        total_amount:       *total_amount,
                         inauguration_epoch: delegate.inauguration_epoch,
                     })
                         .into(),
@@ -251,7 +370,9 @@ impl DelegateTxBuilder {
                 if delegate.is_increase {
                     process_new_delegate(delegate.amount, wallet_amount, total_amount)?;
                 }
-                updated_delegates = updated_delegates.push(delegate.into());
+                let mut delegate = delegate.to_owned();
+                delegate.total_amount = delegate.amount;
+                updated_delegates = updated_delegates.push((&delegate).into());
             }
         }
 
@@ -269,16 +390,25 @@ impl DelegateTxBuilder {
         let mut updated_delegates = updated_delegates;
 
         for delegate in cell_delegates.delegator_infos() {
-            let last_staker = delegate.staker();
-
-            if !new_stakers.contains(&to_h160(&last_staker)) && to_u128(&delegate.amount()) != 0 {
-                let delegate_item = delegate_item(&delegate);
-
-                if delegate_item.inauguration_epoch < self.current_epoch + INAUGURATION {
-                    process_expired_delegate(&delegate_item, wallet_amount, total_amount)?;
+            let delta = delegate_item(&delegate);
+            if !new_stakers.contains(&delta.staker)
+                && (delta.total_amount != 0 || delta.amount != 0)
+            {
+                let delta = if delta.inauguration_epoch < self.current_epoch + INAUGURATION {
+                    let total_staker_amount = process_expired_delegate(
+                        &delta,
+                        wallet_amount,
+                        total_amount,
+                        delta.total_amount,
+                    )?;
+                    delegate
+                        .as_builder()
+                        .total_amount(to_uint128(total_staker_amount))
+                        .build()
                 } else {
-                    updated_delegates = updated_delegates.push((&delegate_item).into());
-                }
+                    delegate
+                };
+                updated_delegates = updated_delegates.push(delta);
             }
         }
 
@@ -291,17 +421,22 @@ impl DelegateTxBuilder {
         new_delegate: &DelegateItem,
         wallet_amount: &mut u128,
         total_amount: &mut u128,
+        total_staker_amount: u128,
     ) -> CkbTxResult<ActualAmount> {
         let actual_info = ElectAmountCaculator::new(
             *wallet_amount,
-            *total_amount,
+            total_staker_amount,
             ElectAmountCaculator::last_delegate_info(last_delegate, self.current_epoch),
             ElectItem::Delegate(new_delegate),
         )
         .calc_actual_amount()?;
 
         *wallet_amount = actual_info.wallet_amount;
-        *total_amount = actual_info.total_elect_amount;
+        *total_amount = if actual_info.is_increase {
+            *total_amount + actual_info.total_elect_amount
+        } else {
+            *total_amount - actual_info.total_elect_amount
+        };
 
         Ok(actual_info)
     }
@@ -328,16 +463,18 @@ fn process_expired_delegate(
     delegate: &DelegateItem,
     wallet_amount: &mut u128,
     total_amount: &mut u128,
-) -> CkbTxResult<()> {
+    mut total_staker_amount: u128,
+) -> CkbTxResult<Amount> {
     if delegate.is_increase {
-        if *wallet_amount < delegate.amount {
-            return Err(CkbTxErr::ExceedWalletAmount {
-                wallet_amount: *wallet_amount,
-                amount:        delegate.amount,
+        if total_staker_amount < delegate.amount {
+            return Err(CkbTxErr::ExceedTotalAmount {
+                total_amount: total_staker_amount,
+                new_amount:   delegate.amount,
             });
         }
         *wallet_amount += delegate.amount;
         *total_amount -= delegate.amount;
+        total_staker_amount -= delegate.amount;
     }
-    Ok(())
+    Ok(total_staker_amount)
 }

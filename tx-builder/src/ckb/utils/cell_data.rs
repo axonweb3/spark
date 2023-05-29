@@ -62,9 +62,9 @@ pub fn delegate_cell_data(delegates: &[DelegateItem]) -> DelegateAtCellData {
 pub fn delegate_item(delegate: &DelegateInfoDelta) -> DelegateItem {
     DelegateItem {
         staker:             to_h160(&delegate.staker()),
+        total_amount:       to_u128(&delegate.total_amount()),
         is_increase:        to_bool(&delegate.is_increase()),
         amount:             to_u128(&delegate.amount()),
-        total_amount:       to_u128(&delegate.total_amount()),
         inauguration_epoch: to_u64(&delegate.inauguration_epoch()),
     }
 }

@@ -50,8 +50,14 @@ pub trait IStakeTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IDelegateTxBuilder {
-    fn new(delegator: EthAddress, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self;
+pub trait IDelegateTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        delegator: EthAddress,
+        current_epoch: Epoch,
+        delegate_info: Vec<DelegateItem>,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }

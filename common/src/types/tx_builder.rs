@@ -75,13 +75,30 @@ impl From<&StakeItem> for StakeInfoDelta {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DelegateItem {
     pub staker:             H160,
+    pub total_amount:       Amount, // delegate tx does not need to fill this field
     pub is_increase:        bool,
     pub amount:             Amount,
-    pub total_amount:       Amount,
     pub inauguration_epoch: Epoch,
+}
+
+impl DelegateItem {
+    pub fn new_for_delegate(
+        staker: H160,
+        is_increase: bool,
+        amount: Amount,
+        inauguration_epoch: Epoch,
+    ) -> Self {
+        Self {
+            staker,
+            is_increase,
+            amount,
+            inauguration_epoch,
+            total_amount: 0,
+        }
+    }
 }
 
 impl From<&DelegateItem> for DelegateInfoDelta {
@@ -90,6 +107,7 @@ impl From<&DelegateItem> for DelegateInfoDelta {
             .staker(Identity::new_unchecked(
                 delegate.staker.as_bytes().to_owned().into(),
             ))
+            .total_amount(to_uint128(delegate.total_amount))
             .is_increase(Byte::new(delegate.is_increase.into()))
             .amount(to_uint128(delegate.amount))
             .inauguration_epoch(to_uint64(delegate.inauguration_epoch))

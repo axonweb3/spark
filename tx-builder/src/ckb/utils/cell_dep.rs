@@ -158,3 +158,18 @@ pub fn stake_dep(network_type: &NetworkType) -> CellDep {
         ),
     }
 }
+
+pub fn delegate_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &DELEGATE_MAINNET.tx_hash,
+            DELEGATE_MAINNET.index,
+            DELEGATE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &DELEGATE_TESTNET.tx_hash,
+            DELEGATE_TESTNET.index,
+            DELEGATE_TESTNET.dep_type
+        ),
+    }
+}
