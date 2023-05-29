@@ -3,10 +3,14 @@ use std::collections::HashMap;
 use axon_types::{
     basic::{Byte20, Byte32, Byte65, Byte97, Identity},
     checkpoint::{CheckpointCellData, ProposeCount as AProposeCount, ProposeCounts},
-    delegate::DelegateInfoDelta,
+    delegate::{DelegateAtCellData as ADelegateAtCellData, DelegateInfoDelta, DelegateInfoDeltas},
     metadata::{
         MetaTypeIds, Metadata as AMetadata, MetadataCellData as AMetadataCellData, MetadataList,
         Validator as AValidator, ValidatorList,
+    },
+    withdraw::{
+        WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
+        WithdrawInfos as AWithdrawInfos,
     },
 };
 use ckb_types::{H160, H256};
@@ -53,6 +57,7 @@ pub struct DelegateItem {
     pub staker:             H160,
     pub is_increase:        bool,
     pub amount:             Amount,
+    pub total_amount:       Amount,
     pub inauguration_epoch: Epoch,
 }
 
@@ -247,6 +252,7 @@ impl From<MetadataCellData> for AMetadataCellData {
             .build()
     }
 }
+
 #[derive(Clone, Default)]
 pub struct StakeGroupInfo {
     pub staker:                   H160,
@@ -289,6 +295,78 @@ pub struct StakeSmtCellData {
     pub smt_root:         H256,
     pub version:          u8,
     pub metadata_type_id: H256,
+}
+
+#[derive(Clone, Default)]
+pub struct StakeAtCellData {
+    pub version:          u8,
+    pub l1_address:       H160,
+    pub l2_address:       H160,
+    pub stake_info:       StakeInfoDelta,
+    pub metadata_type_id: H256,
+}
+
+#[derive(Clone, Default)]
+pub struct StakeInfoDelta {
+    pub is_increase:        u8,
+    pub amount:             u128,
+    pub inauguration_epoch: u64,
+}
+
+#[derive(Clone, Default)]
+pub struct DelegateAtCellData {
+    pub version:          u8,
+    pub l1_address:       H160,
+    pub metadata_type_id: H256,
+    pub delegator_infos:  Vec<DelegateItem>,
+}
+
+impl From<DelegateAtCellData> for ADelegateAtCellData {
+    fn from(value: DelegateAtCellData) -> Self {
+        let infos = DelegateInfoDeltas::new_builder()
+            .extend(value.delegator_infos.iter().map(Into::into))
+            .build();
+        ADelegateAtCellData::new_builder()
+            .version(value.version.into())
+            .l1_address(Identity::from_slice(value.l1_address.as_bytes()).unwrap())
+            .metadata_type_id(to_byte32(&value.metadata_type_id))
+            .delegator_infos(infos)
+            .build()
+    }
+}
+#[derive(Clone, Default)]
+pub struct WithdrawAtCellData {
+    pub version:          u8,
+    pub metadata_type_id: H256,
+    pub withdraw_infos:   Vec<WithdrawInfo>,
+}
+
+impl From<WithdrawAtCellData> for AWithdrawAtCellData {
+    fn from(value: WithdrawAtCellData) -> Self {
+        let infos: AWithdrawInfos = AWithdrawInfos::new_builder()
+            .extend(value.withdraw_infos.into_iter().map(Into::into))
+            .build();
+        AWithdrawAtCellData::new_builder()
+            .version(value.version.into())
+            .metadata_type_id(to_byte32(&value.metadata_type_id))
+            .withdraw_infos(infos)
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct WithdrawInfo {
+    pub amount: u128,
+    pub epoch:  u64,
+}
+
+impl From<WithdrawInfo> for AWithdrawInfo {
+    fn from(value: WithdrawInfo) -> Self {
+        AWithdrawInfo::new_builder()
+            .amount(to_uint128(value.amount))
+            .epoch(to_uint64(value.epoch))
+            .build()
+    }
 }
 
 fn gen_validators(validators: &[Validator]) -> ValidatorList {

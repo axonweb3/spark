@@ -2,10 +2,14 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::metadata::MetadataCellData as AMetadataCellData;
+use axon_types::{
+    delegate::DelegateAtCellData as ADelegateAtCellData,
+    metadata::MetadataCellData as AMetadataCellData,
+    withdraw::WithdrawAtCellData as AWithdrawAtCellData,
+};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellOutput, Script},
+    packed::{CellInput, CellOutput, Script},
     prelude::{Entity, Pack},
 };
 
@@ -18,7 +22,7 @@ use ethereum_types::H160;
 
 pub struct MetadataSmtTxBuilder<PSmt> {
     _kicker:         PrivateKey,
-    _quorum:         u16,
+    quorum:          u16,
     last_checkpoint: Checkpoint,
     last_metadata:   Metadata,
     smt:             PSmt,
@@ -31,14 +35,14 @@ where
 {
     fn new(
         _kicker: PrivateKey,
-        _quorum: u16,
+        quorum: u16,
         last_metadata: Metadata,
         last_checkpoint: Checkpoint,
         smt: PSmt,
     ) -> Self {
         Self {
             _kicker,
-            _quorum,
+            quorum,
             last_checkpoint,
             last_metadata,
             smt,
@@ -103,7 +107,7 @@ where
                 let delegaters = DelegateSmtStorage::get_sub_leaves(
                     &self.smt,
                     self.last_checkpoint.epoch,
-                    staker.clone(),
+                    staker,
                 )
                 .await?;
                 mid.push(EpochStakeInfo {
@@ -114,9 +118,12 @@ where
             }
 
             let stake_infos = {
-                let mut res = Vec::with_capacity(self._quorum as usize);
-                for _ in 0..self._quorum {
-                    res.push(mid.pop().unwrap())
+                let mut res = Vec::with_capacity(self.quorum as usize);
+                for _ in 0..3 * self.quorum {
+                    match mid.pop() {
+                        Some(s) => res.push(s),
+                        None => break,
+                    }
                 }
                 res
             };
@@ -172,7 +179,7 @@ where
         .await
         .unwrap();
 
-        let stake_smt_update = {
+        let _stake_smt_update = {
             StakeSmtUpdateInfo {
                 all_stake_infos: {
                     let mut res = Vec::with_capacity(validators.len());
@@ -195,8 +202,7 @@ where
 
         let delegatets_remove_keys = no_top_delegators
             .iter()
-            .map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(d.clone())))
-            .flatten()
+            .flat_map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(*d)))
             .collect();
 
         DelegateSmtStorage::remove(
@@ -278,7 +284,7 @@ where
             Metadata {
                 epoch_len:       self.last_metadata.epoch_len,
                 period_len:      self.last_metadata.period_len,
-                quorum:          self._quorum,
+                quorum:          self.quorum,
                 gas_limit:       self.last_metadata.gas_limit,
                 gas_price:       self.last_metadata.gas_price,
                 interval:        self.last_metadata.interval,
@@ -304,17 +310,127 @@ where
         metadata_cell_data.metadata.remove(0);
         metadata_cell_data.metadata.push(new_metadata);
 
-        let stake_smt_cell_data = StakeSmtCellData {
+        let _stake_smt_cell_data = StakeSmtCellData {
             smt_root:         Into::<[u8; 32]>::into(new_stake_root).into(),
             version:          0,
             metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
         };
 
-        let delegate_smt_cell_data = DelegateSmtCellData {
+        let _delegate_smt_cell_data = DelegateSmtCellData {
             version:          0,
             smt_roots:        delegator_staker_smt_roots,
             metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
         };
+
+        let mut withdraw_set: HashMap<H160, u128> = HashMap::default();
+        // remove no top staker
+        let mut no_top_staker_cell_datas = Vec::with_capacity(no_top_stakers.len());
+        let mut no_top_staker_cell_inputs: Vec<CellInput> =
+            Vec::with_capacity(no_top_stakers.len());
+        let mut no_top_staker_cell_outputs: Vec<CellOutput> =
+            Vec::with_capacity(no_top_stakers.len());
+
+        for (addr, amount) in no_top_stakers.iter() {
+            *withdraw_set.entry(*addr).or_default() += amount;
+            // todo: fetch staker AT cell data
+            // AT cell data is u128 le bytes(total amount) + StakeAtCellData molecule data,
+            // here just a mock no top staker just change these staker's AT cell
+            // total amount
+            let data = bytes::Bytes::from(Vec::from(999u128.to_le_bytes()));
+            no_top_staker_cell_inputs.push(CellInput::default());
+            no_top_staker_cell_outputs.push(CellOutput::default());
+
+            let total_amount = {
+                let mut total = [0u8; 16];
+                total.copy_from_slice(&data[0..16]);
+                u128::from_le_bytes(total) - amount
+            };
+
+            let new_data = {
+                let mut res = total_amount.to_le_bytes().to_vec();
+                res.extend_from_slice(&data[16..]);
+                bytes::Bytes::from(res)
+            };
+            no_top_staker_cell_datas.push(new_data);
+        }
+
+        // remove no top delegator
+        let mut no_top_delegator_cell_inputs: Vec<CellInput> =
+            Vec::with_capacity(no_top_stakers.len());
+        let mut delegator_at_cell_datas = HashMap::with_capacity(no_top_stakers.len());
+        for (staker_address, v) in no_top_delegators.iter() {
+            for (addr, amount) in v {
+                *withdraw_set.entry(*addr).or_default() += amount;
+
+                let (_cell_output, total_amount, delegator_at_cell_data) =
+                    match delegator_at_cell_datas.entry(*addr) {
+                        std::collections::hash_map::Entry::Occupied(v) => v.into_mut(),
+                        std::collections::hash_map::Entry::Vacant(v) => {
+                            // todo: fetch delegator AT cell data
+                            // AT cell data is u128 le bytes(total amount) +
+                            // DelegateAtCellData molecule
+                            // data, here just a mock no top delegator just change
+                            // these delegator's AT cell
+                            // total amount
+                            no_top_delegator_cell_inputs.push(CellInput::default());
+                            v.insert((
+                                CellOutput::default(),
+                                999u128,
+                                DelegateAtCellData::default(),
+                            ))
+                        }
+                    };
+
+                *total_amount -= amount;
+                for i in delegator_at_cell_data.delegator_infos.iter_mut() {
+                    if i.staker == staker_address.0.into() {
+                        i.total_amount -= amount;
+                    }
+                }
+            }
+        }
+
+        let (_no_top_delegator_cell_outputs, _no_top_delegator_cell_output_datas): (
+            Vec<CellOutput>,
+            Vec<bytes::Bytes>,
+        ) = delegator_at_cell_datas
+            .into_values()
+            .map(|(cell_output, total_amount, data)| {
+                let mut res = total_amount.to_le_bytes().to_vec();
+                res.extend(Into::<ADelegateAtCellData>::into(data).as_slice());
+                (cell_output, bytes::Bytes::from(res))
+            })
+            .unzip();
+
+        let mut withdraw_inputs: Vec<CellInput> = Vec::with_capacity(withdraw_set.len());
+        let mut withdraw_outputs: Vec<CellOutput> = Vec::with_capacity(withdraw_set.len());
+        let mut withdraw_output_datas: Vec<bytes::Bytes> = Vec::with_capacity(withdraw_set.len());
+        for (_addr, amount) in withdraw_set {
+            // fetch withdraw cell data
+            withdraw_inputs.push(CellInput::default());
+            withdraw_outputs.push(CellOutput::default());
+            let mut total_amount = 999u128;
+            total_amount += amount;
+            let mut withdraw_data = WithdrawAtCellData::default();
+            if withdraw_data
+                .withdraw_infos
+                .last()
+                .map(|v| v.epoch == self.last_checkpoint.epoch)
+                .unwrap_or_default()
+            {
+                withdraw_data.withdraw_infos.last_mut().unwrap().amount += amount;
+            } else {
+                withdraw_data.withdraw_infos.push(WithdrawInfo {
+                    amount,
+                    epoch: self.last_checkpoint.epoch,
+                })
+            }
+            withdraw_output_datas.push({
+                let mut res = total_amount.to_le_bytes().to_vec();
+                res.extend(Into::<AWithdrawAtCellData>::into(withdraw_data).as_slice());
+                bytes::Bytes::from(res)
+            })
+        }
 
         // todo
         let outputs_data = vec![Into::<AMetadataCellData>::into(metadata_cell_data).as_bytes()];
