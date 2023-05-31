@@ -241,6 +241,7 @@ impl DelegateTxBuilder {
                         staker:             delegate.staker.clone(),
                         is_increase:        actual_info.is_increase,
                         amount:             actual_info.amount,
+                        total_amount:       *total_amount,
                         inauguration_epoch: delegate.inauguration_epoch,
                     })
                         .into(),
