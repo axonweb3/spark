@@ -86,3 +86,15 @@ fn test_axon_byte32() {
     let c = ckb_types::packed::Byte32::default();
     assert_eq!(Byte32::default().as_bytes(), to_axon_byte32(&c).as_bytes());
 }
+
+#[test]
+fn test_h256() {
+    let v: Vec<u8> = vec![
+        1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    assert_eq!(
+        H256::from_slice(&v).unwrap(),
+        to_h256(&CByte32::new_unchecked(v.into())),
+    );
+}

@@ -311,11 +311,9 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             } else {
                 WITHDRAW_LOCK_TESTNET.code_hash.clone()
             },
-            xudt_type_hash: if self.ckb.network_type == NetworkType::Mainnet {
-                XUDT_TYPE_MAINNET.code_hash.clone()
-            } else {
-                XUDT_TYPE_TESTNET.code_hash.clone()
-            },
+            xudt_type_hash: to_h256(
+                &xudt_type(&self.ckb.network_type, &selection_lock_hash).calc_script_hash(),
+            ),
         };
 
         // metadata cell data
