@@ -63,8 +63,13 @@ pub trait IDelegateTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IWithdrawTxBuilder {
-    fn new(user: EthAddress, current_epoch: Epoch) -> Self;
+pub trait IWithdrawTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        user: EthAddress,
+        current_epoch: Epoch,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }

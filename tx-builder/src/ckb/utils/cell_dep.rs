@@ -173,3 +173,18 @@ pub fn delegate_dep(network_type: &NetworkType) -> CellDep {
         ),
     }
 }
+
+pub fn withdraw_lock_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            WITHDRAW_LOCK_MAINNET.tx_hash.clone(),
+            WITHDRAW_LOCK_MAINNET.index,
+            WITHDRAW_LOCK_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            WITHDRAW_LOCK_TESTNET.tx_hash.clone(),
+            WITHDRAW_LOCK_TESTNET.index,
+            WITHDRAW_LOCK_TESTNET.dep_type
+        ),
+    }
+}

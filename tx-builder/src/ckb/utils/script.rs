@@ -2,6 +2,7 @@ use anyhow::Result;
 use axon_types::delegate::DelegateArgs;
 use axon_types::selection::SelectionLockArgs;
 use axon_types::stake::StakeArgs;
+use axon_types::withdraw::WithdrawArgs;
 use bytes::Bytes;
 use ckb_hash::new_blake2b;
 use ckb_sdk::constants::{SIGHASH_TYPE_HASH, TYPE_ID_CODE_HASH};
@@ -12,7 +13,7 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::types::tx_builder::NetworkType;
-use common::utils::convert::{to_axon_byte32, to_identity_opt};
+use common::utils::convert::{to_axon_byte32, to_identity, to_identity_opt};
 
 use crate::ckb::define::script::*;
 
@@ -211,6 +212,29 @@ pub fn delegate_lock(
         NetworkType::Testnet => script!(
             &DELEGATE_TESTNET.code_hash,
             DELEGATE_TESTNET.hash_type,
+            args
+        ),
+    }
+}
+
+pub fn withdraw_lock(network_type: &NetworkType, metadata_type_id: &H256, addr: &H160) -> Script {
+    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
+    let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
+    let args = WithdrawArgs::new_builder()
+        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
+        .addr(to_identity(addr))
+        .build()
+        .as_bytes();
+
+    match network_type {
+        NetworkType::Mainnet => script!(
+            &WITHDRAW_LOCK_MAINNET.code_hash,
+            WITHDRAW_LOCK_MAINNET.hash_type,
+            args
+        ),
+        NetworkType::Testnet => script!(
+            &WITHDRAW_LOCK_TESTNET.code_hash,
+            WITHDRAW_LOCK_TESTNET.hash_type,
             args
         ),
     }
