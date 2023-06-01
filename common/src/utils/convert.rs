@@ -74,6 +74,14 @@ pub fn to_byte65(v: &H512) -> Byte65 {
     Byte65::new_unchecked(bytes::Bytes::copy_from_slice(v.as_bytes()))
 }
 
+pub fn to_eth_h160(v: &H160) -> ethereum_types::H160 {
+    ethereum_types::H160::from_slice(v.as_bytes())
+}
+
+pub fn to_ckb_h160(v: &ethereum_types::H160) -> H160 {
+    H160::from_slice(v.as_bytes()).unwrap()
+}
+
 #[test]
 fn test_u128() {
     let a = 100_u128;
@@ -101,5 +109,23 @@ fn test_h256() {
     assert_eq!(
         H256::from_slice(&v).unwrap(),
         to_h256(&CByte32::new_unchecked(v.into())),
+    );
+}
+
+#[test]
+fn test_eth_h160() {
+    let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    assert_eq!(
+        ethereum_types::H160::from_slice(&v),
+        to_eth_h160(&H160::from_slice(&v).unwrap()),
+    );
+}
+
+#[test]
+fn test_ckb_h160() {
+    let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    assert_eq!(
+        H160::from_slice(&v).unwrap(),
+        to_ckb_h160(&ethereum_types::H160::from_slice(&v)),
     );
 }

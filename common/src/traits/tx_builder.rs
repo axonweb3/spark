@@ -5,6 +5,9 @@ use ckb_types::core::TransactionView;
 use ckb_types::H256;
 
 use crate::traits::ckb_rpc_client::CkbRpc;
+use crate::traits::smt::{
+    DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage,
+};
 use crate::types::tx_builder::*;
 
 // todo: the parameters of the new method have not stabilized yet
@@ -75,16 +78,21 @@ pub trait IWithdrawTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IRewardTxBuilder {
+pub trait IRewardTxBuilder<C, S>
+where
+    C: CkbRpc,
+    S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
+{
     fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: RewardTypeIds,
+        smt: S,
+        info: RewardInfo,
         user: EthAddress,
         current_epoch: Epoch,
-        base_reward: u128,
-        half_reward_cycle: Epoch,
-        theoretical_propose_count: u64,
     ) -> Self;
 
-    async fn build_txs(&self) -> Result<Vec<TransactionView>>;
+    async fn build_tx(&self) -> Result<TransactionView>;
 }
 
 #[async_trait]

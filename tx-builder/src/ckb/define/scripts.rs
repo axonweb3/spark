@@ -202,4 +202,20 @@ lazy_static::lazy_static! {
         index: 0,
         dep_type: DepType::Code,
     };
+
+    // todo
+    pub static ref DELEGATE_REQUIREMENT_TYPE_MAINNET: Script = Script {
+        code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
+    pub static ref DELEGATE_REQUIREMENT_TYPE_TESTNET: Script = Script {
+        code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
+        hash_type: ScriptHashType::Type,
+        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        index: 0,
+        dep_type: DepType::Code,
+    };
 }
