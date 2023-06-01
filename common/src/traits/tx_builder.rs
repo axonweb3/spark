@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::rpc::ckb_indexer::Cell;
 use ckb_types::core::TransactionView;
 use ckb_types::H256;
 
@@ -8,6 +7,7 @@ use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::traits::smt::{
     DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage,
 };
+use crate::types::ckb_rpc_client::Cell;
 use crate::types::tx_builder::*;
 
 #[async_trait]
@@ -122,8 +122,17 @@ pub trait IMetadataTxBuilder<PSmt> {
 }
 
 #[async_trait]
-pub trait IStakeSmtTxBuilder {
-    fn new(kicker: PrivateKey, current_epoch: Epoch, quorum: u16, stake_cells: Vec<Cell>) -> Self;
+pub trait IStakeSmtTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        kicker: PrivateKey,
+        xudt_args: H256,
+        current_epoch: Epoch,
+        metadata_type_id: H256,
+        staker: EthAddress,
+        quorum: u16,
+        stake_cells: Vec<Cell>,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)>;
 }

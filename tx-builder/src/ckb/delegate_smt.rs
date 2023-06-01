@@ -6,7 +6,6 @@ use axon_types::{
     basic::Byte32,
     delegate::{DelegateInfoDelta, DelegateInfoDeltas},
 };
-use ckb_sdk::rpc::ckb_indexer::Cell;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -15,6 +14,7 @@ use ckb_types::{
 };
 
 use common::traits::tx_builder::IDelegateSmtTxBuilder;
+use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
 use common::utils::convert::*;
 
@@ -35,7 +35,7 @@ impl IDelegateSmtTxBuilder for DelegateSmtTxBuilder {
         _kicker: PrivateKey,
         current_epoch: Epoch,
         _quorum: u16,
-        _delegate_cells: Vec<Cell>,
+        _delegate_cells: Vec<common::types::ckb_rpc_client::Cell>,
     ) -> Self {
         Self {
             _kicker,

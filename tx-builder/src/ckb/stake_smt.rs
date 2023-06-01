@@ -3,42 +3,63 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use async_trait::async_trait;
 use axon_types::{basic::Byte32, stake::StakeInfoDelta};
-use ckb_sdk::rpc::ckb_indexer::Cell;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellOutput, Script},
     prelude::{Entity, Pack},
+    H256,
 };
 
-use common::traits::tx_builder::IStakeSmtTxBuilder;
-use common::types::tx_builder::*;
+use common::types::{ckb_rpc_client::Cell, tx_builder::*};
 use common::utils::convert::*;
+use common::{
+    traits::{ckb_rpc_client::CkbRpc, tx_builder::IStakeSmtTxBuilder},
+    types::ckb_rpc_client::{ScriptType, SearchKey, SearchKeyFilter},
+};
 
 use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::*;
 use crate::ckb::utils::cell_data::*;
 
-pub struct StakeSmtTxBuilder {
+use super::utils::{
+    cell_collector::collect_cells,
+    script::{stake_lock, xudt_type},
+};
+
+pub struct StakeSmtTxBuilder<C: CkbRpc> {
+    ckb:           CkbNetwork<C>,
     _kicker:       PrivateKey,
+    xudt:          Script,
     current_epoch: Epoch,
     quorum:        u16,
     _stake_cells:  Vec<Cell>,
+    stake_lock:    Script,
 }
 
 #[async_trait]
-impl IStakeSmtTxBuilder for StakeSmtTxBuilder {
+impl<C: CkbRpc> IStakeSmtTxBuilder<C> for StakeSmtTxBuilder<C> {
     fn new(
+        ckb: CkbNetwork<C>,
         _kicker: PrivateKey,
+        xudt_args: H256,
         current_epoch: Epoch,
+        metadata_type_id: H256,
+        staker: EthAddress,
         quorum: u16,
         _stake_cells: Vec<Cell>,
     ) -> Self {
+        let stake_lock = stake_lock(&ckb.network_type, &metadata_type_id, &staker);
+        let xudt = xudt_type(&ckb.network_type, &xudt_args.pack());
+
         Self {
+            ckb,
             _kicker,
+            xudt,
             current_epoch,
             quorum,
             _stake_cells,
+            stake_lock,
         }
     }
 
@@ -46,8 +67,8 @@ impl IStakeSmtTxBuilder for StakeSmtTxBuilder {
         // todo: get stake smt cell
         let inputs = vec![];
 
-        let stake_datas: HashMap<Staker, Bytes> = HashMap::new(); // todo
-        let (root, statistics) = self.collect(stake_datas)?;
+        let stake_data: HashMap<Staker, Bytes> = HashMap::new(); // todo
+        let (root, statistics) = self.collect(stake_data)?;
 
         // todo: fill lock, type
         let fake_lock = Script::default();
@@ -95,7 +116,23 @@ struct Statistics {
     pub total_stake_amounts: HashMap<Staker, Amount>,
 }
 
-impl StakeSmtTxBuilder {
+impl<C: CkbRpc> StakeSmtTxBuilder<C> {
+    async fn get_stake_smt_cell(&self) -> Result<Vec<Cell>> {
+        let stake_cell = collect_cells(&self.ckb.client, 1, SearchKey {
+            script:               self.stake_lock.clone().into(),
+            script_type:          ScriptType::Type,
+            filter:               Some(SearchKeyFilter {
+                script: Some(self.xudt.clone().into()),
+                ..Default::default()
+            }),
+            script_search_mode:   None,
+            with_data:            Some(true),
+            group_by_transaction: None,
+        })
+        .await?;
+        Ok(stake_cell)
+    }
+
     // todo: witness?
     fn fill_tx(
         &self,
