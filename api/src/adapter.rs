@@ -74,4 +74,10 @@ where
     async fn get_address_state(&self, addr: Address) -> Result<Vec<Model>> {
         self.relation_storage.get_address_state(addr).await
     }
+
+    async fn get_latest_stake_transactions(&self, offset: u64, limit: u64) -> Result<Vec<Model>> {
+        self.relation_storage
+            .get_latest_stake_transactions(offset, limit)
+            .await
+    }
 }

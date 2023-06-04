@@ -96,7 +96,7 @@ impl TransactionStorage for TransactionHistory {
     async fn get_top_stake_address(&self, operation: u32) -> Result<Vec<Model>> {
         let mut cursor = transaction::Entity::find()
             .filter(transaction::Column::Operation.eq(operation))
-            .cursor_by(transaction::Column::Amount);
+            .cursor_by(transaction::Column::TotalAmount);
         match cursor.all(&self.db).await {
             Ok(records) => Ok(records),
             Err(e) => Err(StorageError::SqlCursorError(e).into()),
@@ -107,6 +107,15 @@ impl TransactionStorage for TransactionHistory {
         let mut cursor = transaction::Entity::find()
             .filter(transaction::Column::Address.eq(addr.to_string()))
             .cursor_by(transaction::Column::Id);
+        match cursor.all(&self.db).await {
+            Ok(records) => Ok(records),
+            Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_latest_stake_transactions(&self, offset: u64, limit: u64) -> Result<Vec<Model>> {
+        let mut cursor = transaction::Entity::find().cursor_by(transaction::Column::Id);
+        cursor.after(offset).before(offset + limit);
         match cursor.all(&self.db).await {
             Ok(records) => Ok(records),
             Err(e) => Err(StorageError::SqlCursorError(e).into()),

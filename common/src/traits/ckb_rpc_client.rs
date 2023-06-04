@@ -1,8 +1,8 @@
-use anyhow::Result;
-use async_trait::async_trait;
-use ckb_jsonrpc_types::{
+use crate::types::{
     BlockNumber, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction, Uint32,
 };
+use anyhow::Result;
+use async_trait::async_trait;
 use ckb_types::H256;
 
 use crate::types::ckb_rpc_client::{Cell, IndexerTip, Order, Pagination, RpcSearchKey, SearchKey};
