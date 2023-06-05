@@ -17,7 +17,6 @@ pub trait IInitTxBuilder<C: CkbRpc> {
         max_supply: Amount,
         checkpoint: Checkpoint,
         metadata: Metadata,
-        type_ids: TypeIds,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, TypeIds)>;
@@ -40,27 +39,37 @@ pub trait IMintTxBuilder<C: CkbRpc> {
 pub trait IStakeTxBuilder<C: CkbRpc> {
     fn new(
         ckb: CkbNetwork<C>,
-        metadata_type_id: H256,
-        xudt_args: H256,
+        type_ids: StakeTypeIds,
         staker: EthAddress,
         current_epoch: Epoch,
         stake: StakeItem,
-        delegate: Option<StakeDelegate>,
+        first_stake_info: Option<FirstStakeInfo>,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }
 
 #[async_trait]
-pub trait IDelegateTxBuilder {
-    fn new(delegator: EthAddress, current_epoch: Epoch, delegate_info: Vec<DelegateItem>) -> Self;
+pub trait IDelegateTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        delegator: EthAddress,
+        current_epoch: Epoch,
+        delegate_info: Vec<DelegateItem>,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }
 
 #[async_trait]
-pub trait IWithdrawTxBuilder {
-    fn new(user: EthAddress, current_epoch: Epoch) -> Self;
+pub trait IWithdrawTxBuilder<C: CkbRpc> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        user: EthAddress,
+        current_epoch: Epoch,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }

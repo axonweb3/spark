@@ -8,6 +8,6 @@ pub mod mint;
 pub mod reward;
 pub mod stake;
 pub mod stake_smt;
-mod test;
+mod tests;
 pub mod utils;
 pub mod withdraw;

@@ -4,82 +4,172 @@ use axon_types::withdraw::*;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellOutput, Script},
+    packed::{CellInput, CellOutput, Script},
     prelude::{Builder, Entity, Pack},
 };
 
+use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IWithdrawTxBuilder;
-use common::types::tx_builder::{Epoch, EthAddress};
+use common::types::ckb_rpc_client::Cell;
+use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;
 
-use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::CkbTxResult;
-use crate::ckb::utils::{calc_amount::*, cell_data::*};
+use crate::ckb::utils::{
+    cell_collector::{collect_xudt, get_withdraw_cell},
+    cell_data::*,
+    cell_dep::*,
+    omni::*,
+    script::*,
+    tx::balance_tx,
+};
 
-pub struct WithdrawTxBuilder {
-    _user:         EthAddress,
+use super::define::error::CkbTxErr;
+
+pub struct WithdrawTxBuilder<C: CkbRpc> {
+    ckb:           CkbNetwork<C>,
+    type_ids:      StakeTypeIds,
     current_epoch: Epoch,
+    withdraw_lock: Script,
+    token_lock:    Script,
+    xudt:          Script,
 }
 
 #[async_trait]
-impl IWithdrawTxBuilder for WithdrawTxBuilder {
-    fn new(_user: EthAddress, current_epoch: Epoch) -> Self {
+impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        type_ids: StakeTypeIds,
+        user: EthAddress,
+        current_epoch: Epoch,
+    ) -> Self {
+        let withdraw_lock = withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &user);
+        let token_lock = omni_eth_lock(&ckb.network_type, &user);
+        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+
         Self {
-            _user,
+            ckb,
+            type_ids,
             current_epoch,
+            withdraw_lock,
+            token_lock,
+            xudt,
         }
     }
 
     async fn build_tx(&self) -> Result<TransactionView> {
-        // todo: collect AT cells
-        // todo: get withdraw AT cell
-        let inputs = vec![];
+        let withdraw_cell = self.get_withdraw_cell().await?;
 
-        let wallet_data = vec![Bytes::default()]; // todo
-        let withdraw_data = Bytes::default(); // todo
-        let outputs_data = self.build_data(&wallet_data, withdraw_data).await?;
+        // withdraw AT cell
+        let mut inputs = vec![CellInput::new_builder()
+            .previous_output(withdraw_cell.out_point.into())
+            .build()];
 
-        // todo: fill lock, type
-        let fake_lock = Script::default();
-        let fake_type = Script::default();
+        // AT cell
+        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+
+        let withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
+        let outputs_data = self.build_data(token_amount, withdraw_data).await?;
+
         let outputs = vec![
-            // AT cell
-            CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // withdraw AT cell
             CellOutput::new_builder()
-                .lock(fake_lock)
-                .type_(Some(fake_type).pack())
+                .lock(self.withdraw_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
+            // AT cell
+            CellOutput::new_builder()
+                .lock(self.token_lock.clone())
+                .type_(Some(self.xudt.clone()).pack())
+                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
         ];
 
-        // todo
-        let cell_deps = vec![];
+        let cell_deps = vec![
+            omni_lock_dep(&self.ckb.network_type),
+            secp256k1_lock_dep(&self.ckb.network_type),
+            xudt_type_dep(&self.ckb.network_type),
+            withdraw_lock_dep(&self.ckb.network_type),
+            checkpoint_cell_dep(
+                &self.ckb.client,
+                &self.ckb.network_type,
+                &self.type_ids.checkpoint_type_id,
+            )
+            .await?,
+            metadata_cell_dep(
+                &self.ckb.client,
+                &self.ckb.network_type,
+                &self.type_ids.metadata_type_id,
+            )
+            .await?,
+        ];
 
-        // todo: balance tx, fill placeholder witnesses
+        let witnesses = vec![
+            omni_eth_witness_placeholder().as_bytes(), // withdraw AT cell lock
+            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
+            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+        ];
+
         let tx = TransactionBuilder::default()
             .inputs(inputs)
             .outputs(outputs)
             .outputs_data(outputs_data.pack())
             .cell_deps(cell_deps)
+            .witnesses(witnesses.pack())
             .build();
+
+        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
 
         Ok(tx)
     }
 }
 
-impl WithdrawTxBuilder {
+impl<C: CkbRpc> WithdrawTxBuilder<C> {
+    async fn get_withdraw_cell(&self) -> Result<Cell> {
+        let withdraw_cell = get_withdraw_cell(
+            &self.ckb.client,
+            self.withdraw_lock.clone(),
+            self.xudt.clone(),
+        )
+        .await?;
+
+        if withdraw_cell.is_none() {
+            return Err(CkbTxErr::CellNotFound("Withdraw".to_owned()).into());
+        }
+
+        Ok(withdraw_cell.unwrap())
+    }
+
+    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+        let (token_cells, amount) = collect_xudt(
+            &self.ckb.client,
+            self.token_lock.clone(),
+            self.xudt.clone(),
+            1,
+        )
+        .await?;
+
+        if token_cells.is_empty() {
+            return Err(CkbTxErr::CellNotFound("AT".to_owned()).into());
+        }
+
+        // AT cell
+        inputs.push(
+            CellInput::new_builder()
+                .previous_output(token_cells[0].out_point.clone().into())
+                .build(),
+        );
+
+        Ok(amount)
+    }
+
     async fn build_data(
         &self,
-        wallet_data: &[Bytes],
-        withdraw_data: Bytes,
+        mut wallet_amount: Amount,
+        mut withdraw_data: Bytes,
     ) -> CkbTxResult<Vec<Bytes>> {
-        let mut wallet_amount = ElectAmountCaculator::calc_wallet_amount(wallet_data);
         let mut total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
 
-        let mut withdraw_data = withdraw_data;
         let cell_withdraws =
             WithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
 
@@ -99,13 +189,16 @@ impl WithdrawTxBuilder {
         total_withdraw_amount -= unlock_amount;
 
         Ok(vec![
-            // AT cell data
-            wallet_amount.pack().as_bytes(),
             // withdraw AT cell data
             token_cell_data(
                 total_withdraw_amount,
-                withdraw_cell_data(Some(output_withdraw_infos.build())).as_bytes(),
+                WithdrawAtCellData::new_builder()
+                    .withdraw_infos(output_withdraw_infos.build())
+                    .build()
+                    .as_bytes(),
             ),
+            // AT cell data
+            wallet_amount.pack().as_bytes(),
         ])
     }
 }

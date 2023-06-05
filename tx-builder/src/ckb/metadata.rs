@@ -20,6 +20,8 @@ use common::traits::{
 use common::types::tx_builder::*;
 use ethereum_types::H160;
 
+use crate::ckb::define::types::*;
+
 pub struct MetadataSmtTxBuilder<PSmt> {
     _kicker:         PrivateKey,
     quorum:          u16,
@@ -312,12 +314,10 @@ where
 
         let _stake_smt_cell_data = StakeSmtCellData {
             smt_root:         Into::<[u8; 32]>::into(new_stake_root).into(),
-            version:          0,
             metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
         };
 
         let _delegate_smt_cell_data = DelegateSmtCellData {
-            version:          0,
             smt_roots:        delegator_staker_smt_roots,
             metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
         };

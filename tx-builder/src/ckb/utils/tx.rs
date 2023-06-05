@@ -12,13 +12,13 @@ use ckb_types::{
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::ckb_rpc_client::{ScriptType, SearchKey};
 
-use crate::ckb::define::config::FEE_RATE;
+use crate::ckb::define::constants::FEE_RATE;
 use crate::ckb::define::error::CkbTxErr;
 use crate::ckb::utils::cell_collector::*;
 
 const KB: u64 = 1000;
 
-/// There is no CKB cell in the input and output of the transaction.
+/// There is no pure CKB cell in the input and output of the transaction.
 /// Collect CKB cells and add them to the input of the transaction.
 /// Add a CKB change cell to the output of the transaction.
 pub async fn balance_tx(

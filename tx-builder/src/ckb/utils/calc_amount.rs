@@ -5,7 +5,7 @@ use ckb_types::bytes::Bytes;
 use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
 use common::utils::convert::*;
 
-use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::*;
 
 pub struct ElectAmountCaculator<'a> {

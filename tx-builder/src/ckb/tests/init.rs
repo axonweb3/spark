@@ -3,7 +3,7 @@ mod tests {
     use ckb_types::h256;
 
     use common::traits::tx_builder::IInitTxBuilder;
-    use common::types::tx_builder::{Checkpoint, CkbNetwork, Metadata, NetworkType, TypeIds};
+    use common::types::tx_builder::{Checkpoint, CkbNetwork, Metadata, NetworkType};
     use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
     use crate::ckb::init::InitTxBuilder;
@@ -22,9 +22,11 @@ mod tests {
             },
             test_seeder_key,
             10000,
-            Checkpoint::default(),
+            Checkpoint {
+                epoch: 1,
+                ..Default::default()
+            },
             Metadata::default(),
-            TypeIds::default(),
         )
         .build_tx()
         .await
@@ -35,11 +37,11 @@ mod tests {
         match send_tx(&ckb_client, &tx.data().into()).await {
             Ok(tx_hash) => {
                 println!("tx hash: 0x{}", tx_hash);
-                println!(
-                    "selection type id args: 0x{}",
-                    type_id_args.selection_type_id,
-                );
-                println!("issue type id args: 0x{}", type_id_args.issue_type_id);
+                println!("selection type id: 0x{}", type_id_args.selection_type_id);
+                println!("issue type id: 0x{}", type_id_args.issue_type_id);
+                println!("checkpoint type id: 0x{}", type_id_args.checkpoint_type_id);
+                println!("metadata type id: 0x{}", type_id_args.metadata_type_id);
+                println!("xudt owner: 0x{}", type_id_args.xudt_owner);
             }
             Err(e) => println!("{}", e),
         }

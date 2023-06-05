@@ -1,9 +1,10 @@
+use ckb_fixed_hash_core::H512;
 use ckb_types::packed::Byte32 as CByte32;
 use ckb_types::prelude::{Entity, Pack};
 use ckb_types::{H160, H256};
 use molecule::prelude::Byte;
 
-use axon_types::basic::{Byte32, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64};
+use axon_types::basic::{Byte32, Byte65, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64};
 
 pub fn new_u128(v: &[u8]) -> u128 {
     let mut bytes = [0u8; 16];
@@ -69,6 +70,10 @@ pub fn to_axon_byte32(v: &ckb_types::packed::Byte32) -> Byte32 {
     Byte32::new_unchecked(v.as_bytes())
 }
 
+pub fn to_byte65(v: &H512) -> Byte65 {
+    Byte65::new_unchecked(bytes::Bytes::copy_from_slice(v.as_bytes()))
+}
+
 #[test]
 fn test_u128() {
     let a = 100_u128;
@@ -85,4 +90,16 @@ fn test_ckb_byte32() {
 fn test_axon_byte32() {
     let c = ckb_types::packed::Byte32::default();
     assert_eq!(Byte32::default().as_bytes(), to_axon_byte32(&c).as_bytes());
+}
+
+#[test]
+fn test_h256() {
+    let v: Vec<u8> = vec![
+        1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    assert_eq!(
+        H256::from_slice(&v).unwrap(),
+        to_h256(&CByte32::new_unchecked(v.into())),
+    );
 }
