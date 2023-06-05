@@ -10,7 +10,7 @@ use common::types::ckb_rpc_client::{Cell, Order, ScriptType, SearchKey, SearchKe
 use common::types::tx_builder::Amount;
 use common::utils::convert::new_u128;
 
-use crate::ckb::define::config::TOKEN_BYTES;
+use crate::ckb::define::constants::TOKEN_BYTES;
 use crate::ckb::define::error::*;
 
 pub async fn fetch_live_cells(
@@ -145,4 +145,53 @@ pub async fn get_unique_cell(ckb_rpc: &impl CkbRpc, type_id_script: Script) -> R
     }
 
     Ok(cells[0].clone())
+}
+
+pub async fn get_stake_cell(
+    ckb_rpc: &impl CkbRpc,
+    stake_lock: Script,
+    xudt: Script,
+) -> Result<Option<Cell>> {
+    get_special_token_cell(ckb_rpc, stake_lock, xudt).await
+}
+
+pub async fn get_delegate_cell(
+    ckb_rpc: &impl CkbRpc,
+    delegate_lock: Script,
+    xudt: Script,
+) -> Result<Option<Cell>> {
+    get_special_token_cell(ckb_rpc, delegate_lock, xudt).await
+}
+
+pub async fn get_withdraw_cell(
+    ckb_rpc: &impl CkbRpc,
+    withdraw_lock: Script,
+    xudt: Script,
+) -> Result<Option<Cell>> {
+    get_special_token_cell(ckb_rpc, withdraw_lock, xudt).await
+}
+
+async fn get_special_token_cell(
+    ckb_rpc: &impl CkbRpc,
+    lock: Script,
+    xudt: Script,
+) -> Result<Option<Cell>> {
+    let cells = collect_cells(ckb_rpc, 1, SearchKey {
+        script:               lock.into(),
+        script_type:          ScriptType::Lock,
+        filter:               Some(SearchKeyFilter {
+            script: Some(xudt.into()),
+            ..Default::default()
+        }),
+        script_search_mode:   None,
+        with_data:            Some(true),
+        group_by_transaction: None,
+    })
+    .await?;
+
+    if cells.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(cells[0].clone()))
+    }
 }

@@ -41,7 +41,13 @@ pub enum NetworkType {
     Testnet,
 }
 
-#[derive(Default)]
+pub struct FirstStakeInfo {
+    pub l1_pub_key:  Byte65,
+    pub bls_pub_key: Byte97,
+    pub delegate:    DelegateRequirement,
+}
+
+#[derive(Clone, Default)]
 pub struct DelegateRequirement {
     pub commission_rate:    u8,
     pub maximum_delegators: u32,

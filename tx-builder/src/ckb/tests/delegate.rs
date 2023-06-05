@@ -11,7 +11,7 @@ mod tests {
     use crate::ckb::utils::omni::{omni_eth_address, omni_eth_ckb_address, omni_eth_signer};
     use crate::ckb::utils::tx::{gen_script_group, send_tx};
 
-    // #[tokio::test]
+    #[tokio::test]
     async fn _first_delegate_tx() {
         _delegate_tx(DelegateItem {
             is_increase: true,
@@ -22,7 +22,7 @@ mod tests {
         .await;
     }
 
-    // #[tokio::test]
+    #[tokio::test]
     async fn _add_delegate_tx() {
         _delegate_tx(DelegateItem {
             is_increase: true,
@@ -33,7 +33,7 @@ mod tests {
         .await;
     }
 
-    // #[tokio::test]
+    #[tokio::test]
     async fn _reedem_delegate_tx() {
         _delegate_tx(DelegateItem {
             is_increase: false,

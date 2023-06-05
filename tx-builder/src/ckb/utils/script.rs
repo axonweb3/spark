@@ -15,7 +15,7 @@ use ckb_types::{H160, H256};
 use common::types::tx_builder::NetworkType;
 use common::utils::convert::{to_axon_byte32, to_identity, to_identity_opt};
 
-use crate::ckb::define::script::*;
+use crate::ckb::define::scripts::*;
 
 macro_rules! script {
     ($code_hash: expr, $hash_type: expr, $args: expr) => {

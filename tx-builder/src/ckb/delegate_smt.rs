@@ -18,7 +18,7 @@ use common::traits::tx_builder::IDelegateSmtTxBuilder;
 use common::types::tx_builder::*;
 use common::utils::convert::*;
 
-use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::*;
 use crate::ckb::utils::cell_data::*;
 

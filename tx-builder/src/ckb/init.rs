@@ -22,8 +22,8 @@ use common::traits::tx_builder::IInitTxBuilder;
 use common::types::tx_builder::*;
 use common::utils::convert::to_h256;
 
-use crate::ckb::define::config::START_EPOCH;
-use crate::ckb::define::script::*;
+use crate::ckb::define::constants::START_EPOCH;
+use crate::ckb::define::scripts::*;
 use crate::ckb::define::types::MetadataCellData;
 use crate::ckb::utils::cell_dep::*;
 use crate::ckb::utils::omni::*;

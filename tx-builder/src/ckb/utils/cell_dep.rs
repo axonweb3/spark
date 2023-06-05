@@ -8,7 +8,7 @@ use ckb_types::{
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::tx_builder::NetworkType;
 
-use crate::ckb::define::script::*;
+use crate::ckb::define::scripts::*;
 use crate::ckb::utils::cell_collector::get_unique_cell;
 use crate::ckb::utils::script::{checkpoint_type, metadata_type};
 
@@ -177,12 +177,12 @@ pub fn delegate_dep(network_type: &NetworkType) -> CellDep {
 pub fn withdraw_lock_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
-            WITHDRAW_LOCK_MAINNET.tx_hash.clone(),
+            &WITHDRAW_LOCK_MAINNET.tx_hash,
             WITHDRAW_LOCK_MAINNET.index,
             WITHDRAW_LOCK_MAINNET.dep_type
         ),
         NetworkType::Testnet => cell_dep!(
-            WITHDRAW_LOCK_TESTNET.tx_hash.clone(),
+            &WITHDRAW_LOCK_TESTNET.tx_hash,
             WITHDRAW_LOCK_TESTNET.index,
             WITHDRAW_LOCK_TESTNET.dep_type
         ),

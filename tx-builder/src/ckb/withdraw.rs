@@ -10,14 +10,14 @@ use ckb_types::{
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IWithdrawTxBuilder;
-use common::types::ckb_rpc_client::{Cell, ScriptType, SearchKey, SearchKeyFilter};
+use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;
 
-use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::CkbTxResult;
 use crate::ckb::utils::{
-    cell_collector::{collect_cells, collect_xudt},
+    cell_collector::{collect_xudt, get_withdraw_cell},
     cell_data::*,
     cell_dep::*,
     omni::*,
@@ -126,24 +126,18 @@ impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
 
 impl<C: CkbRpc> WithdrawTxBuilder<C> {
     async fn get_withdraw_cell(&self) -> Result<Cell> {
-        let withdraw_cells = collect_cells(&self.ckb.client, 1, SearchKey {
-            script:               self.withdraw_lock.clone().into(),
-            script_type:          ScriptType::Lock,
-            filter:               Some(SearchKeyFilter {
-                script: Some(self.xudt.clone().into()),
-                ..Default::default()
-            }),
-            script_search_mode:   None,
-            with_data:            Some(true),
-            group_by_transaction: None,
-        })
+        let withdraw_cell = get_withdraw_cell(
+            &self.ckb.client,
+            self.withdraw_lock.clone(),
+            self.xudt.clone(),
+        )
         .await?;
 
-        if withdraw_cells.is_empty() {
+        if withdraw_cell.is_none() {
             return Err(CkbTxErr::CellNotFound("Withdraw".to_owned()).into());
         }
 
-        Ok(withdraw_cells[0].clone())
+        Ok(withdraw_cell.unwrap())
     }
 
     async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {

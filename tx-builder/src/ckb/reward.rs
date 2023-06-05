@@ -15,7 +15,7 @@ use common::traits::tx_builder::IRewardTxBuilder;
 use common::types::tx_builder::{Amount, Epoch, EthAddress};
 use common::utils::convert::new_u128;
 
-use crate::ckb::define::config::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::CkbTxResult;
 
 pub struct RewardTxBuilder {

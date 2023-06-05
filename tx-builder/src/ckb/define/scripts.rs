@@ -150,7 +150,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_TESTNET: Script = Script {
         code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        tx_hash: h256!("0xdfc4f59052fa596a2a8d0581be95450ce859e2da28c07aedb603d23429421f88"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -166,7 +166,7 @@ lazy_static::lazy_static! {
     pub static ref DELEGATE_TESTNET: Script = Script {
         code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        tx_hash: h256!("0x00b121bb81f6e82ff5a15bfec5edfa1c2ba7336088975be97242bc030c0cc7a5"),
         index: 0,
         dep_type: DepType::Code,
     };

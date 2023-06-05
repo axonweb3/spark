@@ -43,7 +43,7 @@ pub trait IStakeTxBuilder<C: CkbRpc> {
         staker: EthAddress,
         current_epoch: Epoch,
         stake: StakeItem,
-        delegate: Option<DelegateRequirement>,
+        first_stake_info: Option<FirstStakeInfo>,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;

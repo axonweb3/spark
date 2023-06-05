@@ -6,8 +6,8 @@ pub type CkbTxResult<T> = std::result::Result<T, CkbTxErr>;
 
 #[derive(Error, Debug)]
 pub enum CkbTxErr {
-    #[error("Missing delegate information for the first stake")]
-    Delegate,
+    #[error("Missing information for the first stake")]
+    FirstStake,
 
     #[error("Invalid inaugration epoch, expected: {expected:?}, found: {found:?}")]
     InaugurationEpoch { expected: Epoch, found: Epoch },
@@ -43,4 +43,7 @@ pub enum CkbTxErr {
 
     #[error("Cell not found: {0}")]
     CellNotFound(String),
+
+    #[error("Deserialize bls pub key error")]
+    Deserialize,
 }

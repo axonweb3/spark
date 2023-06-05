@@ -1,4 +1,5 @@
 use axon_types::{
+    basic::{Byte65, Byte97},
     delegate::{DelegateAtCellData as ADelegateAtCellData, DelegateInfoDeltas},
     metadata::{MetadataCellData as AMetadataCellData, MetadataList},
     stake::StakeAtCellData as AStakeAtCellData,
@@ -60,18 +61,22 @@ pub struct StakeSmtCellData {
     pub smt_root:         H256,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct StakeAtCellData {
     // pub version:          u8, // useless
     // pub l1_address:       H160, // useless
     // pub l2_address:       H160, // useless
     // pub metadata_type_id: H256, // useless
-    pub stake_info: StakeItem,
+    pub l1_pub_key:  Byte65,
+    pub bls_pub_key: Byte97,
+    pub stake_info:  StakeItem,
 }
 
 impl From<StakeAtCellData> for AStakeAtCellData {
     fn from(value: StakeAtCellData) -> Self {
         AStakeAtCellData::new_builder()
+            .l1_pub_key(value.l1_pub_key)
+            .bls_pub_key(value.bls_pub_key)
             .delta((&value.stake_info).into())
             .build()
     }

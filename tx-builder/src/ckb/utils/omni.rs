@@ -13,7 +13,7 @@ use molecule::prelude::Entity;
 
 use common::types::tx_builder::NetworkType;
 
-use crate::ckb::define::script::{OMNI_LOCK_MAINNET, OMNI_LOCK_TESTNET};
+use crate::ckb::define::scripts::{OMNI_LOCK_MAINNET, OMNI_LOCK_TESTNET};
 
 pub fn omni_eth_address(private_key: H256) -> Result<H160> {
     let sender_key = secp256k1::SecretKey::from_slice(private_key.as_bytes())?;

@@ -7,10 +7,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "d99d50f" }
+axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "95d21e7" }
 bytes = "1.0"
 ckb-jsonrpc-types = "0.108"
 ckb-sdk = "2.4"
+ckb-fixed-hash-core = "0.109"
 ckb-types = "0.108"
 dashmap = "5.4"
 derive_more = "0.99"

@@ -1,18 +1,15 @@
 use axon_types::{basic::*, delegate::*, reward::RewardSmtCellData, stake::*, withdraw::*};
-use bytes::{BufMut, Bytes};
+use bytes::Bytes;
 use ckb_types::{
-    bytes::BytesMut,
     prelude::{Builder, Entity},
     H160,
 };
 
-use common::types::tx_builder::{
-    Amount, DelegateItem, DelegateRequirement as CDelegateRequirement, Epoch, StakeItem,
-};
+use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
 use common::utils::convert::*;
 
-use crate::ckb::define::config::TOKEN_BYTES;
-use crate::ckb::define::types::WithdrawInfo as CWithdrawInfo;
+use crate::ckb::define::constants::TOKEN_BYTES;
+use crate::ckb::define::types::WithdrawInfo as SWithdrawInfo;
 
 pub fn stake_cell_data(
     is_increase: bool,
@@ -27,23 +24,6 @@ pub fn stake_cell_data(
                 inauguration_epoch,
             })
                 .into(),
-        )
-        .build()
-}
-
-pub fn stake_delegate_cell_data(
-    threshold: u128,
-    maximum_delegators: u32,
-    commission_rate: u8,
-) -> DelegateCellData {
-    DelegateCellData::new_builder()
-        .delegate_requirement(
-            CDelegateRequirement {
-                threshold,
-                maximum_delegators,
-                commission_rate,
-            }
-            .into(),
         )
         .build()
 }
@@ -78,10 +58,9 @@ pub fn stake_item(stake: &StakeInfoDelta) -> StakeItem {
 }
 
 pub fn token_cell_data(amount: u128, extra_args: Bytes) -> Bytes {
-    let mut data = BytesMut::with_capacity(16 + extra_args.len());
-    data.put(&amount.to_le_bytes()[..]);
-    data.put(extra_args.as_ref());
-    data.freeze()
+    let mut res = amount.to_le_bytes().to_vec();
+    res.extend(extra_args.to_vec());
+    bytes::Bytes::from(res)
 }
 
 pub fn stake_smt_cell_data(root: Byte32) -> StakeSmtCellData {
@@ -128,7 +107,7 @@ pub fn update_withdraw_data(
         let epoch = to_u64(&item.epoch());
         new_withdraw_infos = new_withdraw_infos.push(if epoch == current_epoch {
             total_withdraw_amount += new_amount;
-            WithdrawInfo::from(CWithdrawInfo {
+            WithdrawInfo::from(SWithdrawInfo {
                 epoch:  current_epoch,
                 amount: to_u128(&item.amount()) + new_amount,
             })
