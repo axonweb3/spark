@@ -17,7 +17,7 @@ ckb-sdk = "2.4"
 ckb-types = "0.108"
 common = { path = "../common" }
 ethereum-types = "0.14"
-faster-hex= "0.6"
+faster-hex = "0.6"
 lazy_static = "1.4"
 molecule = "0.7"
 ophelia = "0.3"
