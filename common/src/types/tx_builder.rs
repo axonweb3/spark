@@ -269,6 +269,20 @@ pub struct RewardTypeIds {
     pub xudt_owner:           H256,
 }
 
+pub struct StakeSmtTypeIds {
+    pub metadata_type_id:   H256,
+    pub stake_smt_type_id:  H256,
+    pub checkpoint_type_id: H256,
+    pub xudt_owner:         H256,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct DelegateTypeIds {
+    pub metadata_type_id:   H256,
+    pub checkpoint_type_id: H256,
+    pub xudt_owner:         H256,
+}
+
 #[derive(Clone, Default)]
 pub struct TypeIds {
     pub issue_type_id:        H256,

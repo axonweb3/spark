@@ -5,7 +5,7 @@ use ckb_types::{
     H160,
 };
 
-use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
+use common::types::{tx_builder::{Amount, DelegateItem, Epoch, StakeItem}, smt::Root};
 use common::utils::convert::*;
 
 use crate::ckb::define::constants::TOKEN_BYTES;
@@ -63,8 +63,9 @@ pub fn token_cell_data(amount: u128, extra_args: Bytes) -> Bytes {
     bytes::Bytes::from(res)
 }
 
-pub fn stake_smt_cell_data(root: Byte32) -> StakeSmtCellData {
-    StakeSmtCellData::new_builder().smt_root(root).build()
+pub fn stake_smt_cell_data(root: &Root) -> StakeSmtCellData {
+    let root_bytes = Byte32::from_slice(root.as_slice()).unwrap();
+    StakeSmtCellData::new_builder().smt_root(root_bytes).build()
 }
 
 pub fn delegate_smt_cell_data(roots: Vec<(H160, Byte32)>) -> DelegateSmtCellData {

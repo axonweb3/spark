@@ -171,6 +171,20 @@ pub fn metadata_type(network_type: &NetworkType, args: &H256) -> Script {
     }
 }
 
+pub fn stake_smt_type(network_type: &NetworkType, metadata_type_id: &H256) -> Script {
+    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
+    let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
+    let args = StakeArgs::new_builder()
+        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
+        .build()
+        .as_bytes();
+
+    match network_type {
+        NetworkType::Mainnet => script!(&STAKE_MAINNET.code_hash, STAKE_MAINNET.hash_type, args),
+        NetworkType::Testnet => script!(&STAKE_TESTNET.code_hash, STAKE_TESTNET.hash_type, args),
+    }
+}
+
 pub fn stake_lock(
     network_type: &NetworkType,
     metadata_type_id: &H256,
@@ -181,20 +195,6 @@ pub fn stake_lock(
     let args = StakeArgs::new_builder()
         .metadata_type_id(to_axon_byte32(&metadata_type_hash))
         .stake_addr(to_identity_opt(staker_addr))
-        .build()
-        .as_bytes();
-
-    match network_type {
-        NetworkType::Mainnet => script!(&STAKE_MAINNET.code_hash, STAKE_MAINNET.hash_type, args),
-        NetworkType::Testnet => script!(&STAKE_TESTNET.code_hash, STAKE_TESTNET.hash_type, args),
-    }
-}
-
-pub fn stake_smt_type(network_type: &NetworkType, metadata_type_id: &H256) -> Script {
-    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
-    let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
-    let args = StakeArgs::new_builder()
-        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
         .build()
         .as_bytes();
 
@@ -232,7 +232,6 @@ pub fn delegate_lock(
 }
 
 pub fn delegate_smt_type(network_type: &NetworkType, metadata_type_id: &H256) -> Script {
-    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
     let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
     let args = DelegateArgs::new_builder()
         .metadata_type_id(to_axon_byte32(&metadata_type_hash))

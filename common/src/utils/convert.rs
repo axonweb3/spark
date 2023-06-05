@@ -32,6 +32,12 @@ pub fn to_bool(v: &Byte) -> bool {
     v.as_slice()[0].eq(&1)
 }
 
+pub fn to_usize(v: Uint32) -> usize {
+    let mut array: [u8; 8] = [0u8; 8];
+    array[..4].copy_from_slice(v.as_slice());
+    usize::from_le_bytes(array)
+}
+
 pub fn to_uint128(v: u128) -> Uint128 {
     Uint128::new_unchecked(v.pack().as_bytes())
 }

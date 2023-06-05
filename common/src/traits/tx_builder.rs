@@ -122,28 +122,29 @@ pub trait IMetadataTxBuilder<PSmt> {
 }
 
 #[async_trait]
-pub trait IStakeSmtTxBuilder<C: CkbRpc> {
+pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
     fn new(
         ckb: CkbNetwork<C>,
         kicker: PrivateKey,
-        xudt_args: H256,
         current_epoch: Epoch,
-        metadata_type_id: H256,
-        staker: EthAddress,
+        type_ids: StakeSmtTypeIds,
         quorum: u16,
         stake_cells: Vec<Cell>,
+        stake_smt_storage: S,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)>;
 }
 
 #[async_trait]
-pub trait IDelegateSmtTxBuilder {
+pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage + Send + Sync> {
     fn new(
+        ckb: CkbNetwork<C>,
         kicker: PrivateKey,
         current_epoch: Epoch,
-        quorum: u16,
+        type_ids: DelegateTypeIds,
         delegate_cells: Vec<Cell>,
+        delegate_smt_storage: D,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopDelegators)>;
