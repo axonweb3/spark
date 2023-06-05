@@ -286,11 +286,12 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             } else {
                 CHECKPOINT_TYPE_TESTNET.code_hash.clone()
             },
-            metadata_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
-                METADATA_TYPE_MAINNET.code_hash.clone()
-            } else {
-                METADATA_TYPE_TESTNET.code_hash.clone()
-            },
+            metadata_code_hash: ckb_sdk::constants::TYPE_ID_CODE_HASH, // mock
+            // metadata_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
+            //     METADATA_TYPE_MAINNET.code_hash.clone()
+            // } else {
+            //     METADATA_TYPE_TESTNET.code_hash.clone()
+            // },
             reward_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
                 REWARD_TYPE_MAINNET.code_hash.clone()
             } else {
