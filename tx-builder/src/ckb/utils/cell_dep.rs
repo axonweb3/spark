@@ -10,7 +10,9 @@ use common::types::tx_builder::NetworkType;
 
 use crate::ckb::define::scripts::*;
 use crate::ckb::utils::cell_collector::get_unique_cell;
-use crate::ckb::utils::script::{checkpoint_type, metadata_type};
+use crate::ckb::utils::script::{
+    checkpoint_type, delegate_smt_type, metadata_type, stake_smt_type,
+};
 
 macro_rules! out_point {
     ($tx_hash: expr, $index: expr) => {
@@ -136,6 +138,22 @@ pub async fn metadata_cell_dep(
     unique_cell_dep(ckb_rpc, metadata_type(network_type, type_id)).await
 }
 
+pub async fn stake_smt_cell_dep(
+    ckb_rpc: &impl CkbRpc,
+    network_type: &NetworkType,
+    type_id: &H256,
+) -> Result<CellDep> {
+    unique_cell_dep(ckb_rpc, stake_smt_type(network_type, type_id)).await
+}
+
+pub async fn delegate_smt_cell_dep(
+    ckb_rpc: &impl CkbRpc,
+    network_type: &NetworkType,
+    type_id: &H256,
+) -> Result<CellDep> {
+    unique_cell_dep(ckb_rpc, delegate_smt_type(network_type, type_id)).await
+}
+
 async fn unique_cell_dep(ckb_rpc: &impl CkbRpc, type_id_script: CScript) -> Result<CellDep> {
     let cell = get_unique_cell(ckb_rpc, type_id_script).await?;
 
@@ -185,6 +203,21 @@ pub fn withdraw_lock_dep(network_type: &NetworkType) -> CellDep {
             &WITHDRAW_LOCK_TESTNET.tx_hash,
             WITHDRAW_LOCK_TESTNET.index,
             WITHDRAW_LOCK_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn delegate_requriement_type_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &DELEGATE_REQUIREMENT_TYPE_MAINNET.tx_hash,
+            DELEGATE_REQUIREMENT_TYPE_MAINNET.index,
+            DELEGATE_REQUIREMENT_TYPE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &DELEGATE_REQUIREMENT_TYPE_TESTNET.tx_hash,
+            DELEGATE_REQUIREMENT_TYPE_TESTNET.index,
+            DELEGATE_REQUIREMENT_TYPE_TESTNET.dep_type
         ),
     }
 }

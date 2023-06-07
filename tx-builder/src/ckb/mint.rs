@@ -14,12 +14,12 @@ use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IMintTxBuilder;
-use common::types::ckb_rpc_client::{Cell, ScriptType, SearchKey};
+use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
 use common::utils::convert::{to_u128, to_uint128};
 
 use crate::ckb::define::error::CkbTxErr;
-use crate::ckb::utils::cell_collector::collect_cells;
+use crate::ckb::utils::cell_collector::get_unique_cell;
 use crate::ckb::utils::cell_dep::*;
 use crate::ckb::utils::omni::*;
 use crate::ckb::utils::script::*;
@@ -55,27 +55,10 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
         let seeder = omni_eth_address(self.seeder_key.clone())?;
         let seeder_lock = omni_eth_lock(&self.ckb.network_type, &seeder);
 
-        let selection_cell = collect_cells(&self.ckb.client, 1, SearchKey {
-            script:               type_id_script(&self.selection_type_id).into(),
-            script_type:          ScriptType::Type,
-            filter:               None,
-            script_search_mode:   None,
-            with_data:            None,
-            group_by_transaction: None,
-        })
-        .await?[0]
-            .clone();
-
-        let issue_cell = collect_cells(&self.ckb.client, 1, SearchKey {
-            script:               type_id_script(&self.issue_type_id).into(),
-            script_type:          ScriptType::Type,
-            filter:               None,
-            script_search_mode:   None,
-            with_data:            None,
-            group_by_transaction: None,
-        })
-        .await?[0]
-            .clone();
+        let selection_cell =
+            get_unique_cell(&self.ckb.client, type_id_script(&self.selection_type_id)).await?;
+        let issue_cell =
+            get_unique_cell(&self.ckb.client, type_id_script(&self.issue_type_id)).await?;
 
         let inputs = vec![
             // selection cell

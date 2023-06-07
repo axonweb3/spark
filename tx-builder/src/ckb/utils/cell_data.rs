@@ -1,4 +1,4 @@
-use axon_types::{basic::*, delegate::*, reward::RewardSmtCellData, stake::*, withdraw::*};
+use axon_types::{basic::*, delegate::*, stake::*, withdraw::*};
 use bytes::Bytes;
 use ckb_types::{
     prelude::{Builder, Entity},
@@ -84,12 +84,6 @@ fn delegate_smt_roots(roots: Vec<(H160, Byte32)>) -> StakerSmtRoots {
         )
     }
     smt_roots.build()
-}
-
-pub fn _reward_smt_cell_data(root: Byte32) -> RewardSmtCellData {
-    RewardSmtCellData::new_builder()
-        .claim_smt_root(root)
-        .build()
 }
 
 pub fn update_withdraw_data(

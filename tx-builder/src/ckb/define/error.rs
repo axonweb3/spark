@@ -1,3 +1,4 @@
+use ethereum_types::H160;
 use thiserror::Error;
 
 use common::types::tx_builder::{Amount, Epoch};
@@ -46,4 +47,13 @@ pub enum CkbTxErr {
 
     #[error("Deserialize bls pub key error")]
     Deserialize,
+
+    #[error("User's reward epoch not found")]
+    RewardEpochNotFound,
+
+    #[error("The minimum value of the current epoch should be 2")]
+    EpochTooSmall,
+
+    #[error("Stake amount not found in stack SMT")]
+    StakeAmountNotFound(H160),
 }

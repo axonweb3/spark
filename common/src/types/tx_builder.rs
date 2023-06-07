@@ -227,6 +227,16 @@ pub struct StakeTypeIds {
     pub xudt_owner:         H256,
 }
 
+#[derive(Clone, Default, Debug)]
+pub struct RewardTypeIds {
+    pub metadata_type_id:     H256,
+    pub checkpoint_type_id:   H256,
+    pub reward_smt_type_id:   H256,
+    pub stake_smt_type_id:    H256,
+    pub delegate_smt_type_id: H256,
+    pub xudt_owner:           H256,
+}
+
 #[derive(Clone, Default)]
 pub struct TypeIds {
     pub issue_type_id:        H256,
@@ -295,4 +305,10 @@ fn gen_validators(validators: &[Validator]) -> ValidatorList {
         validator_list = validator_list.push(validator.into());
     }
     validator_list.build()
+}
+
+pub struct RewardInfo {
+    pub base_reward:               Amount,
+    pub half_reward_cycle:         Epoch,
+    pub theoretical_propose_count: u64,
 }

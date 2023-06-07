@@ -4323,6 +4323,7 @@ dependencies = [
  "reqwest",
  "rpc-client",
  "secp256k1",
+ "storage",
  "thiserror",
  "tokio",
 ]

@@ -9,7 +9,7 @@ use crate::types::smt::{
 /// High level business logic SMT APIs for staker, delegator, proposal and
 /// reward
 #[async_trait]
-pub trait StakeSmtStorage {
+pub trait StakeSmtStorage: Send + Sync {
     async fn new_epoch(&self, epoch: Epoch) -> Result<()>;
 
     async fn insert(&self, epoch: Epoch, stakers: Vec<UserAmount>) -> Result<()>;
@@ -32,7 +32,7 @@ pub trait StakeSmtStorage {
 }
 
 #[async_trait]
-pub trait DelegateSmtStorage {
+pub trait DelegateSmtStorage: Send + Sync {
     async fn new_epoch(&self, epoch: Epoch) -> Result<()>;
 
     async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()>;
@@ -75,7 +75,7 @@ pub trait DelegateSmtStorage {
 }
 
 #[async_trait]
-pub trait RewardSmtStorage {
+pub trait RewardSmtStorage: Send + Sync {
     async fn insert(&self, epoch: Epoch, address: Address) -> Result<()>;
 
     async fn get_root(&self) -> Result<Root>;
@@ -86,7 +86,7 @@ pub trait RewardSmtStorage {
 }
 
 #[async_trait]
-pub trait ProposalSmtStorage {
+pub trait ProposalSmtStorage: Send + Sync {
     async fn insert(&self, epoch: Epoch, proposals: Vec<(Validator, ProposalCount)>) -> Result<()>;
 
     async fn get_count(&self, epoch: Epoch, validator: Validator) -> Result<Option<ProposalCount>>;

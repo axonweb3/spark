@@ -131,7 +131,7 @@ pub async fn collect_xudt(
 
 pub async fn get_unique_cell(ckb_rpc: &impl CkbRpc, type_id_script: Script) -> Result<Cell> {
     let cells = collect_cells(ckb_rpc, 1, SearchKey {
-        script:               type_id_script.into(),
+        script:               type_id_script.clone().into(),
         script_type:          ScriptType::Type,
         filter:               None,
         script_search_mode:   None,
@@ -141,7 +141,7 @@ pub async fn get_unique_cell(ckb_rpc: &impl CkbRpc, type_id_script: Script) -> R
     .await?;
 
     if cells.is_empty() {
-        return Err(CkbTxErr::CellNotFound("Checkpoint".to_owned()).into());
+        return Err(CkbTxErr::CellNotFound(type_id_script.to_string()).into());
     }
 
     Ok(cells[0].clone())
