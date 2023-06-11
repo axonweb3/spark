@@ -316,7 +316,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=95d21e7#95d21e7222665c5ad6a0c91a81b1a7dca763ce80"
+source = "git+https://github.com/axonweb3/axon-contract?rev=85475db#85475dba80d6ac0bdcbadb7866d44238a2c37c12"
 dependencies = [
  "molecule",
  "molecule2",
@@ -1123,11 +1123,15 @@ dependencies = [
  "dashmap",
  "derive_more",
  "ethereum-types",
+ "faster-hex",
+ "hex",
  "lazy_static",
  "molecule",
  "parking_lot 0.12.1",
+ "rand 0.8.5",
  "sea-orm",
  "serde",
+ "serde_json",
  "sparse-merkle-tree",
  "thiserror",
  "tokio",
@@ -2428,7 +2432,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=95d21e7#95d21e7222665c5ad6a0c91a81b1a7dca763ce80"
+source = "git+https://github.com/axonweb3/axon-contract?rev=85475db#85475dba80d6ac0bdcbadb7866d44238a2c37c12"
 
 [[package]]
 name = "native-tls"
@@ -3230,6 +3234,7 @@ dependencies = [
  "common",
  "dashmap",
  "jsonrpc-core",
+ "jsonrpsee",
  "log",
  "reqwest",
  "serde",

@@ -4,6 +4,7 @@ use anyhow::Result;
 use ckb_jsonrpc_types::{
     BlockNumber, Capacity, CellOutput, JsonBytes, OutPoint, Script, Uint32, Uint64,
 };
+use ckb_sdk::rpc::ckb_indexer::Cell as CkbCell;
 use ckb_types::H256;
 use serde::{Deserialize, Serialize};
 
@@ -123,6 +124,18 @@ pub struct Cell {
     pub out_point:    OutPoint,
     pub block_number: BlockNumber,
     pub tx_index:     Uint32,
+}
+
+impl From<Cell> for CkbCell {
+    fn from(cell: Cell) -> Self {
+        Self {
+            output:       cell.output,
+            output_data:  cell.output_data,
+            out_point:    cell.out_point,
+            block_number: cell.block_number,
+            tx_index:     cell.tx_index,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::types::axon_rpc_client::ProposeCount as EthProposeCount;
 use axon_types::{
     basic::{Byte20, Byte32, Byte65, Byte97, Identity},
     checkpoint::{CheckpointCellData, ProposeCount as AProposeCount, ProposeCounts},
@@ -11,9 +12,12 @@ use axon_types::{
 };
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
+use serde::{Deserialize, Serialize};
 
 use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::utils::convert::*;
+
+use crate::types::axon_rpc_client::Proof as EthProof;
 
 pub type Amount = u128;
 pub type Epoch = u64;
@@ -148,7 +152,7 @@ impl From<&Checkpoint> for CheckpointCellData {
     }
 }
 
-fn propose_counts(proposes: &[ProposeCount]) -> ProposeCounts {
+pub fn propose_counts(proposes: &[ProposeCount]) -> ProposeCounts {
     let mut propose_count = ProposeCounts::new_builder();
     for propose in proposes.iter() {
         propose_count = propose_count.push(propose.into());
@@ -165,6 +169,19 @@ pub struct Proof {
     pub bitmap:     bytes::Bytes,
 }
 
+impl From<&EthProof> for Proof {
+    fn from(eth_proof: &EthProof) -> Self {
+        Self {
+            number:     eth_proof.number,
+            round:      eth_proof.round,
+            block_hash: to_ckb_h256(&eth_proof.block_hash),
+            signature:  eth_proof.signature.clone(),
+            bitmap:     eth_proof.bitmap.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProposeCount {
     pub proposer: H160,
     pub count:    u32,
@@ -176,6 +193,15 @@ impl From<&ProposeCount> for AProposeCount {
             .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
             .count(to_uint32(propose.count))
             .build()
+    }
+}
+
+impl From<&EthProposeCount> for ProposeCount {
+    fn from(propose: &EthProposeCount) -> Self {
+        Self {
+            proposer: to_ckb_h160(&propose.address),
+            count:    propose.count.try_into().unwrap(),
+        }
     }
 }
 
@@ -218,6 +244,12 @@ impl From<&Validator> for AValidator {
             .propose_count(to_uint64(validator.propose_count))
             .build()
     }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct CheckpointTypeIds {
+    pub metadata_type_id:   H256,
+    pub checkpoint_type_id: H256,
 }
 
 #[derive(Clone, Default, Debug)]

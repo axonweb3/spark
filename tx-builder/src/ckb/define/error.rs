@@ -56,4 +56,14 @@ pub enum CkbTxErr {
 
     #[error("Stake amount not found in stack SMT")]
     StakeAmountNotFound(H160),
+
+    #[error(
+        "Not right checkpoint occassion, latest epoch {current_epoch:?} and period {current_period:?}, recorded epoch {recorded_epoch:?} and period {recorded_period:?} is not meet the condition"
+    )]
+    NotCheckpointOccasion {
+        current_epoch:   u64,
+        current_period:  u32,
+        recorded_epoch:  u64,
+        recorded_period: u32,
+    },
 }

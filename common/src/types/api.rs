@@ -2,12 +2,21 @@ use crate::types::H160;
 use ckb_types::H256;
 use serde::{Deserialize, Serialize};
 
+use crate::types::axon_rpc_client::{Header, Metadata};
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ChainState {
-    pub epoch:              u64,
-    pub period:             u64,
-    pub block_number:       u64,
-    pub total_stake_amount: u64,
+    pub epoch:        u64,
+    pub block_number: u64,
+}
+
+impl ChainState {
+    pub fn new(h: Header, m: Metadata) -> Self {
+        ChainState {
+            block_number: h.number,
+            epoch:        m.version.end.saturating_sub(m.version.start),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
