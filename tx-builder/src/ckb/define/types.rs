@@ -2,7 +2,10 @@ use axon_types::{
     basic::{Byte65, Byte97},
     delegate::{DelegateAtCellData as ADelegateAtCellData, DelegateInfoDeltas},
     metadata::{MetadataCellData as AMetadataCellData, MetadataList},
-    stake::StakeAtCellData as AStakeAtCellData,
+    stake::{
+        StakeAtCellData as AStakeAtCellData, StakeInfo as AStakeInfo, StakeInfos,
+        StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+    },
     withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
         WithdrawInfos as AWithdrawInfos,
@@ -47,11 +50,36 @@ pub struct StakeInfo {
     pub amount: u128,
 }
 
+impl From<StakeInfo> for AStakeInfo {
+    fn from(value: StakeInfo) -> Self {
+        AStakeInfo::new_builder()
+            .addr(to_identity(&value.addr))
+            .amount(to_uint128(value.amount))
+            .build()
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct StakeSmtUpdateInfo {
     pub all_stake_infos: Vec<StakeInfo>,
     pub old_epoch_proof: Vec<u8>,
     pub new_epoch_proof: Vec<u8>,
+}
+
+impl From<StakeSmtUpdateInfo> for AStakeSmtUpdateInfo {
+    fn from(value: StakeSmtUpdateInfo) -> Self {
+        AStakeSmtUpdateInfo::new_builder()
+            .all_stake_infos({
+                let mut list = StakeInfos::new_builder();
+                for info in value.all_stake_infos.into_iter() {
+                    list = list.push(AStakeInfo::from(info));
+                }
+                list.build()
+            })
+            .old_epoch_proof(to_bytes(value.old_epoch_proof))
+            .new_epoch_proof(to_bytes(value.new_epoch_proof))
+            .build()
+    }
 }
 
 #[derive(Clone, Default)]

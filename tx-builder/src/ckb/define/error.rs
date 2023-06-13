@@ -56,7 +56,7 @@ pub enum CkbTxErr {
 
     #[error("Stake amount not found in stack SMT")]
     StakeAmountNotFound(H160),
-    
+
     #[error(
         "Not right checkpoint occassion, latest epoch {current_epoch:?} and period {current_period:?}, recorded epoch {recorded_epoch:?} and period {recorded_period:?} is not meet the condition"
     )]
@@ -66,7 +66,7 @@ pub enum CkbTxErr {
         recorded_epoch:  u64,
         recorded_period: u32,
     },
-    
+
     #[error("there should be only one smt cell for the tx, found: {0}")]
     SmtCellNum(usize),
 }

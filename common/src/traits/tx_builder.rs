@@ -143,9 +143,9 @@ pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage + Send + Sync> 
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: DelegateTypeIds,
-        delegate_cells: Vec<Cell>,
+        delegate_at_cells: Vec<Cell>,
         delegate_smt_storage: D,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopDelegators)>;
+    async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)>;
 }

@@ -278,9 +278,10 @@ pub struct StakeSmtTypeIds {
 
 #[derive(Clone, Default, Debug)]
 pub struct DelegateTypeIds {
-    pub metadata_type_id:   H256,
-    pub checkpoint_type_id: H256,
-    pub xudt_owner:         H256,
+    pub metadata_type_id:     H256,
+    pub delegate_smt_type_id: H256,
+    pub checkpoint_type_id:   H256,
+    pub xudt_owner:           H256,
 }
 
 #[derive(Clone, Default)]
