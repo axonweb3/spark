@@ -16,16 +16,21 @@ use storage::{
 static RELATION_DB_URL: &str = "sqlite::memory:";
 static ROCKS_DB_PATH: &str = "./free-space/smt";
 
-pub async fn mock_data(hash: String, amount: String) -> Result<transaction::ActiveModel, AnyError> {
+pub async fn mock_data(hash: String, amount: u32) -> Result<transaction::ActiveModel, AnyError> {
     Ok(transaction::ActiveModel {
         address: Set(H160::zero().to_string()),
         timestamp: Set(1),
         operation: Set(1),
         event: Set(1),
         tx_hash: Set(hash),
-        amount: Set(amount),
+        total_amount: Set(amount),
         status: Set(1),
         epoch: Set(1),
+        stake_amount: Set(1),
+        delegate_amount: Set(1),
+        withdrawable_amount: Set(1),
+        stake_rate: Set("".to_string()),
+        delegate_rate: Set("".to_string()),
         ..Default::default()
     })
 }
@@ -42,12 +47,8 @@ async fn _mock_adapter() {
 #[tokio::test]
 async fn mock_db() {
     let mut relation_db1 = TransactionHistory::new(RELATION_DB_URL).await;
-    let data0 = mock_data("0x01".to_owned(), "100".to_owned())
-        .await
-        .unwrap();
-    let data1 = mock_data("0x02".to_owned(), "100".to_owned())
-        .await
-        .unwrap();
+    let data0 = mock_data("0x01".to_owned(), 100).await.unwrap();
+    let data1 = mock_data("0x02".to_owned(), 100).await.unwrap();
     relation_db1.insert(data0).await.unwrap();
     relation_db1.insert(data1).await.unwrap();
     let res = relation_db1

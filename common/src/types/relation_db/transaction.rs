@@ -7,15 +7,20 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(table_name = "transaction")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id:        u32,
-    pub address:   String,
-    pub timestamp: u32,
-    pub operation: u32,
-    pub event:     u32,
-    pub tx_hash:   String,
-    pub amount:    String,
-    pub epoch:     u32,
-    pub status:    u32,
+    pub id:                  u32,
+    pub address:             String,
+    pub timestamp:           u32,
+    pub operation:           u32,
+    pub event:               u32,
+    pub tx_hash:             String,
+    pub total_amount:        u32,
+    pub stake_amount:        u32,
+    pub delegate_amount:     u32,
+    pub withdrawable_amount: u32,
+    pub stake_rate:          String,
+    pub delegate_rate:       String,
+    pub epoch:               u32,
+    pub status:              u32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

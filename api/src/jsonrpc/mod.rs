@@ -1,14 +1,15 @@
+pub mod axon;
 pub mod operation;
 pub mod query;
 use crate::error::ApiError;
 use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
 use common::types::api::{
-    AddressAmount, ChainState, HistoryEvent, LockStatusType, OperationType, RewardState,
-    StakeAmount, StakeState,
+    AddressAmount, ChainState, HistoryEvent, OperationType, RewardHistory, RewardState,
+    StakeAmount, StakeHistory, StakeRate, StakeState, StakeTransaction,
 };
-use common::types::relation_db::transaction::Model;
 use common::types::smt::Address;
+use common::types::Transaction;
 use common::{traits::api::APIAdapter, types::H256};
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
@@ -17,7 +18,15 @@ use std::{net::SocketAddr, sync::Arc};
 
 #[rpc(server)]
 pub trait AccountHistoryRpc {
-    /// Sends signed transaction, returning its hash.
+    #[method(name = "getStakeRate")]
+    async fn get_stake_rate(&self, addr: Address) -> RpcResult<StakeRate>;
+
+    #[method(name = "getStakeState")]
+    async fn get_stake_state(&self, addr: Address) -> RpcResult<StakeState>;
+
+    #[method(name = "getRewardState")]
+    async fn get_reward_state(&self, addr: Address) -> RpcResult<RewardState>;
+
     #[method(name = "getStakeHistory")]
     async fn get_stake_history(
         &self,
@@ -26,7 +35,7 @@ pub trait AccountHistoryRpc {
         page_size: u64,
         enent: HistoryEvent,
         operation_type: OperationType,
-    ) -> RpcResult<Vec<Model>>;
+    ) -> RpcResult<Vec<StakeHistory>>;
 
     #[method(name = "getRewardHistory")]
     async fn get_reward_history(
@@ -34,8 +43,7 @@ pub trait AccountHistoryRpc {
         addr: Address,
         page_number: u64,
         page_size: u64,
-        lock_type: LockStatusType,
-    ) -> RpcResult<Vec<Model>>;
+    ) -> RpcResult<RewardHistory>;
 
     #[method(name = "getStakeAmountByEpoch")]
     async fn get_stake_amount_by_epoch(
@@ -46,43 +54,60 @@ pub trait AccountHistoryRpc {
     ) -> RpcResult<Vec<StakeAmount>>;
 
     #[method(name = "getTopStakeAddress")]
-    async fn get_top_stake_address(&self, page_size: u64) -> RpcResult<Vec<AddressAmount>>;
+    async fn get_top_stake_address(
+        &self,
+        page_number: u64,
+        page_size: u64,
+    ) -> RpcResult<Vec<AddressAmount>>;
 
-    #[method(name = "getStakeState")]
-    async fn get_stake_state(&self, addr: Address) -> RpcResult<StakeState>;
-
-    #[method(name = "getRewardState")]
-    async fn get_reward_state(&self, addr: Address) -> RpcResult<RewardState>;
+    #[method(name = "getLatestStakeTransactions")]
+    async fn get_latest_stake_transactions(
+        &self,
+        page_number: u64,
+        page_size: u64,
+    ) -> RpcResult<Vec<StakeTransaction>>;
 }
 
 #[rpc(server)]
 pub trait AxonStatusRpc {
-    #[method(name = "get_chain_state")]
+    #[method(name = "getChainState")]
     async fn get_chain_state(&self) -> RpcResult<ChainState>;
 }
 
 #[rpc(server)]
 pub trait OperationRpc {
-    #[method(name = "addStake")]
-    async fn add_stake(&self, address: H256, amount: u64) -> RpcResult<String>;
+    #[method(name = "setStakeRate")]
+    async fn set_stake_rate(
+        &self,
+        address: H256,
+        stake_rate: u64,
+        delegate_rate: u64,
+    ) -> RpcResult<String>;
 
-    #[method(name = "redeemStake")]
-    async fn redeem_stake(&self, address: H256, amount: u64) -> RpcResult<String>;
+    #[method(name = "stake")]
+    async fn stake(&self, address: H256, amount: u64) -> RpcResult<String>;
 
-    #[method(name = "addDelegate")]
-    async fn add_delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
+    #[method(name = "unstake")]
+    async fn unstake(&self, address: H256, amount: u64) -> RpcResult<String>;
 
-    #[method(name = "redeemDelegate")]
-    async fn redeem_delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
+    #[method(name = "delegate")]
+    async fn delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
 
-    #[method(name = "withdraw")]
-    async fn withdraw(&self) -> RpcResult<Vec<H256>>;
+    #[method(name = "undelegate")]
+    async fn undelegate(&self, address: H256, amount: u64) -> RpcResult<String>;
 
-    #[method(name = "unlockReward")]
-    async fn unlock_reward(&self) -> RpcResult<Vec<H256>>;
+    #[method(name = "withdrawStake")]
+    async fn withdraw_stake(
+        &self,
+        address: H256,
+        withdraw_type: OperationType,
+    ) -> RpcResult<String>;
+
+    #[method(name = "withdrawRewards")]
+    async fn withdraw_rewards(&self, address: H256) -> RpcResult<String>;
 
     #[method(name = "sendTransaction")]
-    async fn send_transaction(&self) -> RpcResult<Vec<H256>>;
+    async fn send_transaction(&self, tx: Transaction) -> RpcResult<H256>;
 }
 
 #[allow(dead_code)]

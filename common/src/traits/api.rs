@@ -30,4 +30,10 @@ pub trait APIAdapter: Send + Sync {
     async fn get_top_stake_address(&self, operation: u32) -> Result<Vec<Model>>;
 
     async fn get_address_state(&self, addr: Address) -> Result<Vec<Model>>;
+
+    async fn get_latest_stake_transactions(
+        &self,
+        offset: u64,
+        page_size: u64,
+    ) -> Result<Vec<Model>>;
 }

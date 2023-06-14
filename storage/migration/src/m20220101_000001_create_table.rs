@@ -37,7 +37,36 @@ impl MigrationTrait for Migration {
                             .string_len(66)
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Transaction::Amount).string().not_null())
+                    .col(
+                        ColumnDef::new(Transaction::TotalAmount)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Transaction::StakeAmount)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Transaction::DelegateAmount)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Transaction::WithdrawableAmount)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Transaction::StakeRate)
+                            .string_len(10)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Transaction::DelegateRate)
+                            .string_len(10)
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Transaction::Epoch).integer().not_null())
                     .col(ColumnDef::new(Transaction::Status).integer().not_null())
                     .to_owned(),
@@ -63,7 +92,12 @@ enum Transaction {
     Operation,
     Event,
     TxHash,
-    Amount,
+    TotalAmount,
+    StakeAmount,
+    DelegateAmount,
+    WithdrawableAmount,
+    StakeRate,
+    DelegateRate,
     Epoch,
     Status,
 }
