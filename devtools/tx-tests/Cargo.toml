@@ -1,0 +1,27 @@
+[package]
+name = "tx-tests"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "6e35725" }
+bytes = "1.0"
+ckb-sdk = "2.4"
+ckb-types = "0.108"
+clap = { version = "4", features = ["cargo"] }
+common = { path = "../../common" }
+faster-hex = "0.6"
+kicker = { path = "../../kicker" }
+molecule = "0.7"
+ophelia = "0.3"
+ophelia-blst = "0.3"
+rpc-client = { path = "../../rpc-client" }
+serde = "1.0.32"
+serde_derive = "1.0.32"
+storage = { path = "../../storage" }
+stringreader = "0.1"
+tokio = "1.28"
+toml = "0.7"
+tx-builder = { path = "../../tx-builder" }

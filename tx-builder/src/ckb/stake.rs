@@ -54,7 +54,7 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
         first_stake_info: Option<FirstStakeInfo>,
     ) -> Self {
         let stake_lock = stake_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
-        let withdraw_lock = always_success_lock(&ckb.network_type); // todo
+        let withdraw_lock = withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
         let token_lock = omni_eth_lock(&ckb.network_type, &staker);
         let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
 
@@ -82,7 +82,6 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
 
         let stake_cell =
             get_stake_cell(&self.ckb.client, self.stake_lock.clone(), self.xudt.clone()).await?;
-
         if stake_cell.is_none() {
             self.build_first_stake_tx().await
         } else {
@@ -174,7 +173,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            stake_dep(&self.ckb.network_type),
+            stake_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,
@@ -190,7 +189,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         ];
 
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // stake AT cell lock
+            stake_witness_placeholder(0u8).as_bytes(), // stake AT cell lock, todo
             omni_eth_witness_placeholder().as_bytes(), // AT cell lock
             omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
         ];

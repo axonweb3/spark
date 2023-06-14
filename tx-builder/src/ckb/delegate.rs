@@ -173,7 +173,7 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            delegate_dep(&self.ckb.network_type),
+            delegate_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,

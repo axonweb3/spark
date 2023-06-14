@@ -19,9 +19,9 @@ mod tests {
         let test_staker2_key =
             h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62");
         let selection_type_id =
-            h256!("0xee87a969797b0aef47bde619d85d1a3207bc64f9b11f3e827d922d1aedcf960f");
+            h256!("0xcefb1b795b553e93e791cd6471ddbd053d83fdb53db5b0e615001e47d6b10c76");
         let issue_type_id =
-            h256!("0xabceb12dd11e06d850309214de8e61cb0bb917ee92db2da0bdf4d4aa10f4a2f1");
+            h256!("0x9c043ae89b1c76d10751f4af8fb9054f51cdfd7243bf3435a0727b9dd9f180ef");
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
         let tx = MintTxBuilder::new(
@@ -41,7 +41,7 @@ mod tests {
         .await
         .unwrap();
 
-        println!("tx: {}", tx);
+        // println!("tx: {}", tx);
 
         match send_tx(&ckb_client, &tx.data().into()).await {
             Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
