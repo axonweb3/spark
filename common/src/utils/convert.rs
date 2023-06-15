@@ -22,6 +22,12 @@ pub fn to_u64(v: &Uint64) -> u64 {
     u64::from_le_bytes(array)
 }
 
+pub fn to_u32(v: &Uint32) -> u32 {
+    let mut array: [u8; 4] = [0u8; 4];
+    array.copy_from_slice(v.as_slice());
+    u32::from_le_bytes(array)
+}
+
 pub fn to_bool(v: &Byte) -> bool {
     v.as_slice()[0].eq(&1)
 }
@@ -82,6 +88,10 @@ pub fn to_ckb_h160(v: &ethereum_types::H160) -> H160 {
     H160::from_slice(v.as_bytes()).unwrap()
 }
 
+pub fn to_ckb_h256(v: &ethereum_types::H256) -> H256 {
+    H256::from_slice(v.as_bytes()).unwrap()
+}
+
 #[test]
 fn test_u128() {
     let a = 100_u128;
@@ -127,5 +137,17 @@ fn test_ckb_h160() {
     assert_eq!(
         H160::from_slice(&v).unwrap(),
         to_ckb_h160(&ethereum_types::H160::from_slice(&v)),
+    );
+}
+
+#[test]
+fn test_ckb_h256() {
+    let v: Vec<u8> = vec![
+        1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    assert_eq!(
+        H256::from_slice(&v).unwrap(),
+        to_ckb_h256(&ethereum_types::H256::from_slice(&v)),
     );
 }

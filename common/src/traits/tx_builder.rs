@@ -10,8 +10,6 @@ use crate::traits::smt::{
 };
 use crate::types::tx_builder::*;
 
-// todo: the parameters of the new method have not stabilized yet
-
 #[async_trait]
 pub trait IInitTxBuilder<C: CkbRpc> {
     fn new(
@@ -96,8 +94,16 @@ where
 }
 
 #[async_trait]
-pub trait ICheckpointTxBuilder {
-    fn new(kicker: PrivateKey, checkpoint: Checkpoint) -> Self;
+pub trait ICheckpointTxBuilder<C>
+where
+    C: CkbRpc,
+{
+    async fn new(
+        kicker_key: PrivateKey,
+        ckb: CkbNetwork<C>,
+        type_ids: CheckpointTypeIds,
+        latest_checkpoint_info: Checkpoint,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }

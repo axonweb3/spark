@@ -8,4 +8,7 @@ pub enum RpcError {
 
     #[error("jsonrpc output failure {0}")]
     InvalidData(io::Error),
+
+    #[error("axon ws client build failure {0}")]
+    WsClientBuildFailed(String),
 }
