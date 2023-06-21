@@ -95,9 +95,9 @@ pub struct StakeAmount {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeRate {
-    pub address:       String,
-    pub stake_rate:    String,
-    pub delegate_rate: String,
+    pub address:        String,
+    pub stake_rate:     String,
+    pub minimum_amount: String
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

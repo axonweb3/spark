@@ -42,9 +42,9 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
 
         res.get(0)
             .map(|s| StakeRate {
-                address:       addr.to_string(),
-                stake_rate:    s.stake_rate.clone(),
-                delegate_rate: s.delegate_rate.clone(),
+                address:        addr.to_string(),
+                stake_rate:     s.stake_rate.clone(),
+                minimum_amount: s.minimum_amount.to_string(),
             })
             .ok_or(ErrorObjectOwned::owned(
                 INVALID_PARAMS_CODE,

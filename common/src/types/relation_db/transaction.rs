@@ -18,7 +18,7 @@ pub struct Model {
     pub delegate_amount:     u32,
     pub withdrawable_amount: u32,
     pub stake_rate:          String,
-    pub delegate_rate:       String,
+    pub minimum_amount:      u32,
     pub epoch:               u32,
     pub status:              u32,
 }
