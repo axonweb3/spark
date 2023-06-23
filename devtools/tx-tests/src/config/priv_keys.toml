@@ -1,0 +1,6 @@
+seeder_privkey = "0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e61"
+
+staker_privkeys = [
+    "0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60",
+    "0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62",
+]

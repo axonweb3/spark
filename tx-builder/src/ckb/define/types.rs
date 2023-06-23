@@ -37,7 +37,7 @@ pub struct StakerSmtRoot {
 #[derive(Clone, Default)]
 pub struct DelegateSmtCellData {
     // pub version:          u8, // useless
-    pub metadata_type_id: H256,               // useless
+    pub metadata_type_id: H256,
     pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
 }
 
@@ -57,7 +57,7 @@ pub struct StakeSmtUpdateInfo {
 #[derive(Clone, Default)]
 pub struct StakeSmtCellData {
     // pub version:          u8, // useless
-    pub metadata_type_id: H256, // useless
+    pub metadata_type_id: H256,
     pub smt_root:         H256,
 }
 
