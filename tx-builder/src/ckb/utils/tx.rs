@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
 use ckb_jsonrpc_types::{OutputsValidator, Transaction};
 use ckb_sdk::types::ScriptGroup;
@@ -8,6 +6,7 @@ use ckb_types::{
     packed::{Byte32, Bytes, CellInput, CellOutput, Script},
     prelude::*,
 };
+use linked_hash_map::LinkedHashMap;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::ckb_rpc_client::{ScriptType, SearchKey};
@@ -42,15 +41,15 @@ pub async fn send_tx(ckb_rpc: &impl CkbRpc, tx: &Transaction) -> Result<String> 
 }
 
 pub struct ScriptGroups {
-    pub lock_groups: HashMap<Byte32, ScriptGroup>,
-    pub type_groups: HashMap<Byte32, ScriptGroup>,
+    pub lock_groups: LinkedHashMap<Byte32, ScriptGroup>,
+    pub type_groups: LinkedHashMap<Byte32, ScriptGroup>,
 }
 
 pub async fn gen_script_group(ckb_rpc: &impl CkbRpc, tx: &TransactionView) -> Result<ScriptGroups> {
     #[allow(clippy::mutable_key_type)]
-    let mut lock_groups: HashMap<Byte32, ScriptGroup> = HashMap::default();
+    let mut lock_groups: LinkedHashMap<Byte32, ScriptGroup> = LinkedHashMap::default();
     #[allow(clippy::mutable_key_type)]
-    let mut type_groups: HashMap<Byte32, ScriptGroup> = HashMap::default();
+    let mut type_groups: LinkedHashMap<Byte32, ScriptGroup> = LinkedHashMap::default();
 
     for (i, input) in tx.inputs().into_iter().enumerate() {
         let output = ckb_rpc

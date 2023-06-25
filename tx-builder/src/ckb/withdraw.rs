@@ -177,7 +177,7 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
         let mut unlock_amount = 0;
 
         for withdraw_info in cell_withdraws.withdraw_infos() {
-            let epoch = to_u64(&withdraw_info.epoch());
+            let epoch = to_u64(&withdraw_info.unlock_epoch());
             if epoch <= self.current_epoch {
                 unlock_amount += to_u128(&withdraw_info.amount());
             } else {

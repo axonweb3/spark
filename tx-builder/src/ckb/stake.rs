@@ -20,7 +20,7 @@ use common::utils::convert::*;
 
 use crate::ckb::define::constants::*;
 use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
-use crate::ckb::define::types::StakeAtCellData;
+use crate::ckb::define::types::{StakeAtCellData, StakeAtCellLockData};
 use crate::ckb::utils::{
     calc_amount::*,
     cell_collector::{collect_xudt, get_stake_cell, get_withdraw_cell},
@@ -29,6 +29,7 @@ use crate::ckb::utils::{
     omni::*,
     script::*,
     tx::balance_tx,
+    witness::stake_witness_placeholder,
 };
 
 pub struct StakeTxBuilder<C: CkbRpc> {
@@ -279,9 +280,11 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             token_cell_data(
                 self.stake.amount,
                 AStakeAtCellData::from(StakeAtCellData {
-                    l1_pub_key:  first_stake.l1_pub_key.clone(),
-                    bls_pub_key: first_stake.bls_pub_key.clone(),
-                    stake_info:  self.stake.clone(),
+                    lock: StakeAtCellLockData {
+                        l1_pub_key:  first_stake.l1_pub_key.clone(),
+                        bls_pub_key: first_stake.bls_pub_key.clone(),
+                        stake_info:  self.stake.clone(),
+                    },
                 })
                 .as_bytes(),
             ),
@@ -303,7 +306,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         let mut stake_data = stake_data;
         let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
         let last_info =
-            ElectAmountCalculator::last_stake_info(&stake_data.delta(), self.current_epoch);
+            ElectAmountCalculator::last_stake_info(&stake_data.lock().delta(), self.current_epoch);
 
         let actual_info = ElectAmountCalculator::new(
             wallet_amount,
@@ -313,20 +316,29 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         )
         .calc_actual_amount()?;
 
+        let inner_stake_data = stake_data.lock();
+
         Ok(vec![
             // stake AT cell data
             token_cell_data(
                 actual_info.total_elect_amount,
-                AStakeAtCellData::from(StakeAtCellData {
-                    l1_pub_key:  stake_data.l1_pub_key(),
-                    bls_pub_key: stake_data.bls_pub_key(),
-                    stake_info:  StakeItem {
-                        is_increase:        actual_info.is_increase,
-                        amount:             actual_info.amount,
-                        inauguration_epoch: self.stake.inauguration_epoch,
-                    },
-                })
-                .as_bytes(),
+                stake_data
+                    .as_builder()
+                    .lock(
+                        inner_stake_data
+                            .as_builder()
+                            .delta(
+                                (&StakeItem {
+                                    is_increase:        actual_info.is_increase,
+                                    amount:             actual_info.amount,
+                                    inauguration_epoch: self.stake.inauguration_epoch,
+                                })
+                                    .into(),
+                            )
+                            .build(),
+                    )
+                    .build()
+                    .as_bytes(),
             ),
             // AT cell data
             actual_info.wallet_amount.pack().as_bytes(),

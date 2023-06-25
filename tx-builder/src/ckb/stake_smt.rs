@@ -44,10 +44,12 @@ use crate::ckb::utils::{
     cell_data::{stake_item, token_cell_data, update_withdraw_data},
     cell_dep::{
         checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, stake_lock_dep,
-        withdraw_lock_dep, xudt_type_dep,
+        stake_smt_type_dep, withdraw_lock_dep, xudt_type_dep,
     },
     omni::{omni_eth_address, omni_eth_witness_placeholder},
-    script::{always_success_lock, omni_eth_lock, stake_lock, stake_smt_type, xudt_type},
+    script::{
+        always_success_lock, omni_eth_lock, stake_lock, stake_smt_type, withdraw_lock, xudt_type,
+    },
     tx::balance_tx,
 };
 
@@ -132,6 +134,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
             stake_lock_dep(&self.ckb.network_type),
+            stake_smt_type_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,
@@ -165,8 +168,10 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             .witnesses(witnesses.pack())
             .build();
 
-        let kicker_addr = omni_eth_address(self.kicker.clone())?;
-        let kicker_lock = omni_eth_lock(&self.ckb.network_type, &kicker_addr);
+        let kicker_lock = omni_eth_lock(
+            &self.ckb.network_type,
+            &omni_eth_address(self.kicker.clone())?,
+        );
         let tx = balance_tx(&self.ckb.client, kicker_lock, tx).await?;
 
         // todo: sign tx
@@ -176,9 +181,8 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
 }
 
 struct Statistics {
-    pub non_top_stakers:     HashMap<TxStaker, InStakeSmt>,
-    pub withdraw_amounts:    HashMap<TxStaker, Amount>,
-    pub total_stake_amounts: HashMap<TxStaker, Amount>,
+    pub non_top_stakers:  HashMap<TxStaker, InStakeSmt>,
+    pub withdraw_amounts: HashMap<TxStaker, Amount>,
 }
 
 impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
@@ -186,26 +190,59 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
     async fn fill_tx(
         &self,
         statistics: &Statistics,
-        cells: &HashMap<TxStaker, Cell>,
+        inputs_stake_cells: &HashMap<TxStaker, Cell>,
         inputs: &mut Vec<CellInput>,
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
     ) -> Result<()> {
         let xudt = xudt_type(&self.ckb.network_type, &self.type_ids.xudt_owner.pack());
-        for (staker, total_stake_amount) in statistics.total_stake_amounts.iter() {
-            let withdraw_lock = always_success_lock(&self.ckb.network_type); // todo: withdraw lock
-
+        for (staker, stake_cell) in inputs_stake_cells.iter() {
+            // inputs: stake AT cell
             inputs.push(
                 CellInput::new_builder()
-                    .previous_output(cells[staker].out_point.clone().into())
+                    .previous_output(inputs_stake_cells[staker].out_point.clone().into())
                     .build(),
             );
 
-            let mut old_stake_at_cell_data_bytes =
-                cells[staker].output_data.clone().unwrap().into_bytes();
-            let old_stake_at_cell_data =
-                StakeAtCellData::new_unchecked(old_stake_at_cell_data_bytes.split_off(TOKEN_BYTES));
-            let new_stake_at_cell_data = old_stake_at_cell_data
+            let (old_total_stake_amount, old_stake_data) = self.parse_stake_data(stake_cell);
+
+            let withdraw_lock = withdraw_lock(
+                &self.ckb.network_type,
+                &self.type_ids.metadata_type_id,
+                staker,
+            );
+
+            let (new_total_stake_amount, withdraw_data) =
+                if statistics.withdraw_amounts.contains_key(staker) {
+                    let withdraw_amount =
+                        statistics.withdraw_amounts.get(staker).unwrap().to_owned();
+
+                    let old_withdraw_cell =
+                        get_withdraw_cell(&self.ckb.client, withdraw_lock.clone(), xudt.clone())
+                            .await?
+                            .unwrap();
+
+                    // inputs: withdraw AT cell
+                    inputs.push(
+                        CellInput::new_builder()
+                            .previous_output(old_withdraw_cell.out_point.clone().into())
+                            .build(),
+                    );
+
+                    (
+                        old_total_stake_amount - withdraw_amount,
+                        Some(update_withdraw_data(
+                            old_withdraw_cell,
+                            self.current_epoch + INAUGURATION,
+                            withdraw_amount,
+                        )),
+                    )
+                } else {
+                    (old_total_stake_amount, None)
+                };
+
+            let new_stake_data = old_stake_data
+                .lock()
                 .as_builder()
                 .delta(
                     (&StakeItem {
@@ -218,71 +255,40 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
                 .build()
                 .as_bytes();
 
-            let (stake_data, withdraw_data) = if statistics.withdraw_amounts.contains_key(staker) {
-                let withdraw_amount = statistics.withdraw_amounts.get(staker).unwrap().to_owned();
-                let old_withdraw_cell =
-                    get_withdraw_cell(&self.ckb.client, withdraw_lock.clone(), xudt.clone())
-                        .await?
-                        .unwrap();
-
-                inputs.push(
-                    CellInput::new_builder()
-                        .previous_output(old_withdraw_cell.out_point.clone().into())
-                        .build(),
-                );
-
-                (
-                    token_cell_data(total_stake_amount - withdraw_amount, new_stake_at_cell_data),
-                    Some(update_withdraw_data(
-                        old_withdraw_cell,
-                        self.current_epoch + INAUGURATION,
-                        withdraw_amount,
-                    )),
-                )
-            } else {
-                (
-                    token_cell_data(total_stake_amount.to_owned(), new_stake_at_cell_data),
-                    None,
-                )
-            };
-
-            let stake_lock = stake_lock(
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-                staker,
-            );
-
-            // stake AT cell
+            // outputs: stake AT cell
+            outputs_data.push(token_cell_data(new_total_stake_amount, new_stake_data));
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(stake_lock.clone())
+                    .lock(stake_lock(
+                        &self.ckb.network_type,
+                        &self.type_ids.metadata_type_id,
+                        staker,
+                    ))
                     .type_(Some(xudt.clone()).pack())
-                    .build_exact_capacity(Capacity::bytes(stake_data.len())?)?,
+                    .build_exact_capacity(Capacity::bytes(outputs_data.last().unwrap().len())?)?,
             );
-            outputs_data.push(stake_data);
 
-            // withdraw AT cell
+            // outputs: withdraw AT cell
             if withdraw_data.is_some() {
                 outputs.push(
                     CellOutput::new_builder()
-                        .lock(withdraw_lock.clone())
+                        .lock(withdraw_lock)
                         .type_(Some(xudt.clone()).pack())
                         .build_exact_capacity(Capacity::bytes(
-                            withdraw_data.clone().unwrap().len(),
+                            withdraw_data.as_ref().unwrap().len(),
                         )?)?,
                 );
-                outputs_data.push(withdraw_data.unwrap())
+                outputs_data.push(withdraw_data.unwrap());
             }
         }
         Ok(())
     }
 
-    fn get_stake_at_cell_data(&self, cell: &Cell) -> (Amount, StakeAtCellData) {
+    fn parse_stake_data(&self, cell: &Cell) -> (Amount, StakeAtCellData) {
         let mut cell_data_bytes = cell.output_data.clone().unwrap().into_bytes();
         let total_stake_amount = new_u128(&cell_data_bytes[..TOKEN_BYTES]);
-        let stake_at_cell_data =
-            StakeAtCellData::new_unchecked(cell_data_bytes.split_off(TOKEN_BYTES));
-        (total_stake_amount, stake_at_cell_data)
+        let stake_data = StakeAtCellData::new_unchecked(cell_data_bytes.split_off(TOKEN_BYTES));
+        (total_stake_amount, stake_data)
     }
 
     async fn update_stake_smt(&self, new_smt: HashMap<SmtStaker, Amount>) -> Result<Root> {
@@ -312,8 +318,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
 
         let mut new_smt = old_smt.clone();
         let mut withdraw_amounts = HashMap::new(); // records all the stakers' withdraw amounts
-        let mut total_stake_amounts = HashMap::new(); // records all the stakers' total stake amounts which require to be updated
-        let mut cells = HashMap::new();
+        let mut inputs_stake_cells = HashMap::new();
 
         for cell in self.stake_cells.clone().into_iter() {
             let staker = TxStaker::from_slice(
@@ -323,15 +328,14 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             )
             .unwrap();
 
-            let (total_stake_amount, stake) = self.get_stake_at_cell_data(&cell);
-            let stake_delta = stake_item(&stake.delta());
+            let (_, stake_data) = self.parse_stake_data(&cell);
+            let stake_delta = stake_item(&stake_data.lock().delta());
 
             if stake_delta.inauguration_epoch < self.current_epoch + INAUGURATION {
                 continue;
             }
 
-            cells.insert(staker.clone(), cell);
-            total_stake_amounts.insert(staker.clone(), total_stake_amount);
+            inputs_stake_cells.insert(staker.clone(), cell);
 
             let smt_staker = SmtStaker::from(staker.0);
             if new_smt.contains_key(&smt_staker) {
@@ -352,7 +356,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             }
         }
 
-        let non_top_stakers = self.remove_non_top_stakers(&old_smt, &mut new_smt);
+        let non_top_stakers = self.collect_non_top_stakers(&old_smt, &mut new_smt);
 
         for (staker, in_smt) in non_top_stakers.iter() {
             let smt_staker = SmtStaker::from(staker.0);
@@ -362,10 +366,10 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
 
                 // It represents the case where the staker doesn't update its staking but is
                 // removed from the smt since it's no longer the top stakers. In this case, the
-                // staker's stake at cell needs to be updated. So the cell should be put to the
+                // staker's stake cell needs to be updated. So the cell should be put to the
                 // inputs.
-                if !total_stake_amounts.contains_key(staker) {
-                    let cell = get_stake_cell(
+                if !inputs_stake_cells.contains_key(staker) {
+                    let stake_cell = get_stake_cell(
                         &self.ckb.client,
                         stake_lock(
                             &self.ckb.network_type,
@@ -377,14 +381,10 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
                     .await?
                     .unwrap();
 
-                    let (total_stake_amount, _) = self.get_stake_at_cell_data(&cell);
-
-                    cells.insert(staker.clone(), cell);
-                    total_stake_amounts.insert(staker.clone(), total_stake_amount);
+                    inputs_stake_cells.insert(staker.clone(), stake_cell);
                 }
             } else {
-                total_stake_amounts.remove(staker);
-                cells.remove(staker);
+                inputs_stake_cells.remove(staker);
             }
         }
 
@@ -420,14 +420,13 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             new_epoch_proof,
         });
 
-        Ok((new_root, cells, Statistics {
+        Ok((new_root, inputs_stake_cells, Statistics {
             non_top_stakers,
             withdraw_amounts,
-            total_stake_amounts,
         }))
     }
 
-    fn remove_non_top_stakers(
+    fn collect_non_top_stakers(
         &self,
         old_smt: &HashMap<SmtStaker, Amount>,
         new_smt: &mut HashMap<SmtStaker, Amount>,

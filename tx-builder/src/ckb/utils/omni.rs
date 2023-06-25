@@ -69,15 +69,3 @@ pub fn omni_eth_witness_placeholder() -> WitnessArgs {
         .lock(Some(lock_field).pack())
         .build()
 }
-
-// todo: should be removed
-pub fn stake_witness_placeholder(input_type: u8) -> WitnessArgs {
-    let lock_field = OmniLockWitnessLock::new_builder()
-        .signature(Some(bytes::Bytes::from(vec![0u8; 65])).pack())
-        .build()
-        .as_bytes();
-    WitnessArgs::new_builder()
-        .lock(Some(lock_field).pack())
-        .input_type(Some(bytes::Bytes::from(vec![input_type; 1])).pack())
-        .build()
-}

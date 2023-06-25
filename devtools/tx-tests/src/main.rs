@@ -34,12 +34,21 @@ async fn main() {
                 .num_args(1)
                 .default_value("")
                 .help("test stake tx"),
+        )
+        .arg(
+            clap::Arg::new("delegate")
+                .short('d')
+                .required(false)
+                .num_args(1)
+                .default_value("")
+                .help("test delegate tx"),
         );
 
     let matches = cmd.get_matches();
     let init = matches.get_one::<bool>("init").unwrap().to_owned();
     let mint = matches.get_one::<bool>("mint").unwrap().to_owned();
     let stake = matches.get_one::<String>("stake").unwrap().as_str();
+    let delegate = matches.get_one::<String>("delegate").unwrap().as_str();
 
     let ckb = CkbNetwork {
         network_type: NetworkType::Testnet,
@@ -59,6 +68,15 @@ async fn main() {
             "first" => first_stake_tx(ckb.clone()).await,
             "add" => add_stake_tx(ckb.clone()).await,
             "redeem" => reedem_stake_tx(ckb.clone()).await,
+            _ => unimplemented!(),
+        }
+    }
+
+    if !delegate.is_empty() {
+        match delegate {
+            "first" => first_delegate_tx(ckb.clone()).await,
+            "add" => add_delegate_tx(ckb.clone()).await,
+            "redeem" => reedem_delegate_tx(ckb.clone()).await,
             _ => unimplemented!(),
         }
     }

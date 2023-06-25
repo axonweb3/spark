@@ -382,7 +382,7 @@ where
                     };
 
                 *total_amount -= amount;
-                for i in delegator_at_cell_data.delegator_infos.iter_mut() {
+                for i in delegator_at_cell_data.lock.delegator_infos.iter_mut() {
                     if i.staker == staker_address.0.into() {
                         i.total_amount -= amount;
                     }
@@ -397,7 +397,7 @@ where
             .into_values()
             .map(|(cell_output, total_amount, data)| {
                 let mut res = total_amount.to_le_bytes().to_vec();
-                res.extend(Into::<ADelegateAtCellData>::into(data).as_slice());
+                res.extend((Into::<ADelegateAtCellData>::into(data)).as_slice());
                 (cell_output, bytes::Bytes::from(res))
             })
             .unzip();

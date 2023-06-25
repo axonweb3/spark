@@ -316,7 +316,7 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=6e35725#6e3572545b37e057d7764111a68bd9bacc859354"
+source = "git+https://github.com/axonweb3/axon-contract?rev=8677b51#8677b5188b29df8146fe1b532980220a83e8e215"
 dependencies = [
  "molecule",
  "molecule2",
@@ -2433,7 +2433,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=6e35725#6e3572545b37e057d7764111a68bd9bacc859354"
+source = "git+https://github.com/axonweb3/axon-contract?rev=8677b51#8677b5188b29df8146fe1b532980220a83e8e215"
 
 [[package]]
 name = "native-tls"
@@ -4355,6 +4355,7 @@ dependencies = [
  "ethereum-types",
  "faster-hex",
  "lazy_static",
+ "linked-hash-map",
  "molecule",
  "ophelia",
  "ophelia-blst",
