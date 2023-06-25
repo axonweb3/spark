@@ -35,7 +35,8 @@ pub trait StakeSmtStorage: Send + Sync {
 pub trait DelegateSmtStorage: Send + Sync {
     async fn new_epoch(&self, epoch: Epoch) -> Result<()>;
 
-    async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()>;
+    async fn insert(&self, epoch: Epoch, staker: Staker, delegators: Vec<UserAmount>)
+        -> Result<()>;
 
     async fn remove(&self, epoch: Epoch, delegators: Vec<(Staker, Delegator)>) -> Result<()>;
 

@@ -5,28 +5,14 @@ use ckb_types::{
     H160,
 };
 
-use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
+use common::types::{
+    ckb_rpc_client::Cell,
+    tx_builder::{DelegateItem, Epoch, StakeItem},
+};
 use common::utils::convert::*;
 
 use crate::ckb::define::constants::TOKEN_BYTES;
 use crate::ckb::define::types::WithdrawInfo as SWithdrawInfo;
-
-pub fn stake_cell_data(
-    is_increase: bool,
-    amount: Amount,
-    inauguration_epoch: Epoch,
-) -> StakeAtCellData {
-    StakeAtCellData::new_builder()
-        .delta(
-            (&StakeItem {
-                is_increase,
-                amount,
-                inauguration_epoch,
-            })
-                .into(),
-        )
-        .build()
-}
 
 pub fn delegate_cell_data(delegates: &[DelegateItem]) -> DelegateAtCellData {
     let mut delegator_infos = DelegateInfoDeltas::new_builder();
@@ -63,10 +49,6 @@ pub fn token_cell_data(amount: u128, extra_args: Bytes) -> Bytes {
     bytes::Bytes::from(res)
 }
 
-pub fn stake_smt_cell_data(root: Byte32) -> StakeSmtCellData {
-    StakeSmtCellData::new_builder().smt_root(root).build()
-}
-
 pub fn delegate_smt_cell_data(roots: Vec<(H160, Byte32)>) -> DelegateSmtCellData {
     DelegateSmtCellData::new_builder()
         .smt_roots(delegate_smt_roots(roots))
@@ -87,19 +69,21 @@ fn delegate_smt_roots(roots: Vec<(H160, Byte32)>) -> StakerSmtRoots {
 }
 
 pub fn update_withdraw_data(
-    withdraw_data: bytes::Bytes,
+    withdraw_cell: Cell,
     current_epoch: Epoch,
     new_amount: u128,
 ) -> bytes::Bytes {
-    let mut withdraw_data = withdraw_data;
+    let mut withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
     let mut total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
     let cell_withdraws = WithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
 
     let mut new_withdraw_infos = WithdrawInfos::new_builder();
+    let mut is_inserted = false;
 
     for item in cell_withdraws.withdraw_infos() {
         let epoch = to_u64(&item.epoch());
         new_withdraw_infos = new_withdraw_infos.push(if epoch == current_epoch {
+            is_inserted = true;
             total_withdraw_amount += new_amount;
             WithdrawInfo::from(SWithdrawInfo {
                 epoch:  current_epoch,
@@ -108,6 +92,13 @@ pub fn update_withdraw_data(
         } else {
             item
         });
+    }
+
+    if !is_inserted {
+        new_withdraw_infos = new_withdraw_infos.push(WithdrawInfo::from(SWithdrawInfo {
+            epoch:  current_epoch,
+            amount: new_amount,
+        }));
     }
 
     token_cell_data(total_withdraw_amount, new_withdraw_infos.build().as_bytes())

@@ -43,7 +43,7 @@ async fn test_stake_functions() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(result, amount * 2);
+    assert_eq!(result, amount);
 
     // new epoch
     StakeSmtStorage::new_epoch(&smt_manager, epoch + 1)
@@ -53,7 +53,7 @@ async fn test_stake_functions() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(result, amount * 2);
+    assert_eq!(result, amount);
 
     // remove
     StakeSmtStorage::remove(&smt_manager, epoch, vec![staker])
@@ -77,14 +77,14 @@ async fn test_delegate_functions() {
     let epoch = 1;
     let amount = 100u128;
 
-    let delegators = vec![(staker, UserAmount {
+    let delegators = vec![UserAmount {
         user: delegator,
         amount,
         is_increase: true,
-    })];
+    }];
 
     // insert & get
-    DelegateSmtStorage::insert(&smt_manager, epoch, delegators.clone())
+    DelegateSmtStorage::insert(&smt_manager, epoch, staker, delegators.clone())
         .await
         .unwrap();
     let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
@@ -94,14 +94,14 @@ async fn test_delegate_functions() {
     assert_eq!(result, amount);
 
     // update
-    DelegateSmtStorage::insert(&smt_manager, epoch, delegators)
+    DelegateSmtStorage::insert(&smt_manager, epoch, staker, delegators)
         .await
         .unwrap();
     let result = DelegateSmtStorage::get_amount(&smt_manager, epoch, staker, delegator)
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(result, amount * 2);
+    assert_eq!(result, amount);
 
     // new epoch
     DelegateSmtStorage::new_epoch(&smt_manager, epoch + 1)
@@ -111,7 +111,7 @@ async fn test_delegate_functions() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(result, amount * 2);
+    assert_eq!(result, amount);
 
     // remove
     let delegators = vec![(staker, delegator)];

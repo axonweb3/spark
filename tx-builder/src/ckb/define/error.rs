@@ -66,4 +66,7 @@ pub enum CkbTxErr {
         recorded_epoch:  u64,
         recorded_period: u32,
     },
+
+    #[error("there should be only one smt cell for the tx, found: {0}")]
+    SmtCellNum(usize),
 }

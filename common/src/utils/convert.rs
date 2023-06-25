@@ -4,7 +4,9 @@ use ckb_types::prelude::{Entity, Pack};
 use ckb_types::{H160, H256};
 use molecule::prelude::Byte;
 
-use axon_types::basic::{Byte32, Byte65, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64};
+use axon_types::basic::{
+    Byte32, Byte65, Bytes, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64,
+};
 
 pub fn new_u128(v: &[u8]) -> u128 {
     let mut bytes = [0u8; 16];
@@ -30,6 +32,16 @@ pub fn to_u32(v: &Uint32) -> u32 {
 
 pub fn to_bool(v: &Byte) -> bool {
     v.as_slice()[0].eq(&1)
+}
+
+pub fn to_usize(v: Uint32) -> usize {
+    let mut array: [u8; 8] = [0u8; 8];
+    array[..4].copy_from_slice(v.as_slice());
+    usize::from_le_bytes(array)
+}
+
+pub fn to_bytes(v: Vec<u8>) -> Bytes {
+    Bytes::new_unchecked(bytes::Bytes::from(v))
 }
 
 pub fn to_uint128(v: u128) -> Uint128 {

@@ -23,6 +23,7 @@ pub type Staker = H160;
 pub type Delegator = H160;
 pub type Validator = H160;
 
+// todo: refactor, is_increase no longer needed
 #[derive(Clone, Debug)]
 pub struct UserAmount {
     pub user:        Address,

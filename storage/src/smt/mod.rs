@@ -148,44 +148,20 @@ impl StakeSmtStorage for SmtManager {
     }
 
     async fn insert(&self, epoch: Epoch, stakers: Vec<UserAmount>) -> Result<()> {
-        // aggregate staking records
-        let hash_map = stakers
-            .into_iter()
-            .fold(HashMap::new(), |mut hash_map, record| {
-                let UserAmount {
-                    user,
-                    amount,
-                    is_increase,
-                } = record;
-                hash_map
-                    .entry(user)
-                    .or_insert_with(Vec::new)
-                    .push((amount, is_increase));
-                hash_map
-            });
+        let leaves = StakeSmtStorage::get_sub_leaves(self, epoch).await?;
+        StakeSmtStorage::remove(self, epoch, leaves.into_keys().collect()).await?;
 
-        let mut updated_stakers = vec![];
-        for (addr, amounts) in hash_map {
-            let mut stored_amount = StakeSmtStorage::get_amount(self, epoch, addr)
-                .await?
-                .unwrap_or_default();
-            let _ = amounts
-                .into_iter()
-                .map(|(v, inc)| {
-                    stored_amount = if inc {
-                        stored_amount + v
-                    } else {
-                        stored_amount.saturating_sub(v)
-                    };
-                })
-                .collect::<()>();
-            updated_stakers.push((
-                SmtKeyEncode::Address(addr).to_h256(),
-                SmtValueEncode::Amount(stored_amount).to_leaf_value(),
-            ));
-        }
+        let new_stakers = stakers
+            .iter()
+            .map(|s| {
+                (
+                    SmtKeyEncode::Address(s.user).to_h256(),
+                    SmtValueEncode::Amount(s.amount).to_leaf_value(),
+                )
+            })
+            .collect();
 
-        self.insert_full_stake(epoch, updated_stakers).await
+        self.insert_full_stake(epoch, new_stakers).await
     }
 
     async fn remove(&self, epoch: Epoch, stakers: Vec<Staker>) -> Result<()> {
@@ -330,60 +306,30 @@ impl DelegateSmtStorage for SmtManager {
         self.insert_full_delegate(epoch, delegators).await
     }
 
-    async fn insert(&self, epoch: Epoch, delegators: Vec<(Staker, UserAmount)>) -> Result<()> {
-        // aggregate records by staker
-        let staker_hash_map =
-            delegators
-                .into_iter()
-                .fold(HashMap::new(), |mut hash_map, record| {
-                    let (staker, record) = record;
-                    hash_map.entry(staker).or_insert_with(Vec::new).push(record);
-                    hash_map
-                });
+    async fn insert(
+        &self,
+        epoch: Epoch,
+        staker: Staker,
+        delegators: Vec<UserAmount>,
+    ) -> Result<()> {
+        let leaves = DelegateSmtStorage::get_sub_leaves(self, epoch, staker).await?;
+        let old_delegators = leaves.into_keys().map(|k| (staker, k)).collect();
+        DelegateSmtStorage::remove(self, epoch, old_delegators).await?;
 
-        let mut updated_delegators = HashMap::with_capacity(staker_hash_map.len());
-        for (staker, amounts) in staker_hash_map {
-            // for each staker, aggregate records by delegator
-            let delegator_hash_map =
-                amounts
-                    .into_iter()
-                    .fold(HashMap::new(), |mut hash_map, record| {
-                        let UserAmount {
-                            user,
-                            amount,
-                            is_increase,
-                        } = record;
-                        hash_map
-                            .entry(user)
-                            .or_insert_with(Vec::new)
-                            .push((amount, is_increase));
-                        hash_map
-                    });
-            let mut kvs = vec![];
-            for (delegator, amounts) in delegator_hash_map {
-                let mut stored_amount =
-                    DelegateSmtStorage::get_amount(self, epoch, staker, delegator)
-                        .await?
-                        .unwrap_or_default();
-                let _ = amounts
-                    .into_iter()
-                    .map(|(v, inc)| {
-                        stored_amount = if inc {
-                            stored_amount + v
-                        } else {
-                            stored_amount.saturating_sub(v)
-                        };
-                    })
-                    .collect::<()>();
-                kvs.push((
-                    SmtKeyEncode::Address(delegator).to_h256(),
-                    SmtValueEncode::Amount(stored_amount).to_leaf_value(),
-                ));
-            }
-            updated_delegators.insert(staker, kvs);
-        }
+        let kvs = delegators
+            .iter()
+            .map(|s| {
+                (
+                    SmtKeyEncode::Address(s.user).to_h256(),
+                    SmtValueEncode::Amount(s.amount).to_leaf_value(),
+                )
+            })
+            .collect();
 
-        self.insert_full_delegate(epoch, updated_delegators).await
+        let mut new_delegators = HashMap::with_capacity(1);
+        new_delegators.insert(staker, kvs);
+
+        self.insert_full_delegate(epoch, new_delegators).await
     }
 
     async fn remove(&self, epoch: Epoch, delegators: Vec<(Staker, Delegator)>) -> Result<()> {

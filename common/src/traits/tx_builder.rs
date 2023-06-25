@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::rpc::ckb_indexer::Cell;
 use ckb_types::core::TransactionView;
 use ckb_types::H256;
 
@@ -8,6 +7,7 @@ use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::traits::smt::{
     DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage,
 };
+use crate::types::ckb_rpc_client::Cell;
 use crate::types::tx_builder::*;
 
 #[async_trait]
@@ -122,20 +122,30 @@ pub trait IMetadataTxBuilder<PSmt> {
 }
 
 #[async_trait]
-pub trait IStakeSmtTxBuilder {
-    fn new(kicker: PrivateKey, current_epoch: Epoch, quorum: u16, stake_cells: Vec<Cell>) -> Self;
+pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
+    fn new(
+        ckb: CkbNetwork<C>,
+        kicker: PrivateKey,
+        current_epoch: Epoch,
+        type_ids: StakeSmtTypeIds,
+        quorum: u16,
+        stake_cells: Vec<Cell>,
+        stake_smt_storage: S,
+    ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)>;
 }
 
 #[async_trait]
-pub trait IDelegateSmtTxBuilder {
+pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage + Send + Sync> {
     fn new(
+        ckb: CkbNetwork<C>,
         kicker: PrivateKey,
         current_epoch: Epoch,
-        quorum: u16,
-        delegate_cells: Vec<Cell>,
+        type_ids: DelegateTypeIds,
+        delegate_at_cells: Vec<Cell>,
+        delegate_smt_storage: D,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopDelegators)>;
+    async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)>;
 }

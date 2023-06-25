@@ -171,18 +171,8 @@ pub fn metadata_type(network_type: &NetworkType, args: &H256) -> Script {
     }
 }
 
-pub fn stake_lock(
-    network_type: &NetworkType,
-    metadata_type_id: &H256,
-    staker_addr: &H160,
-) -> Script {
-    let metadata_type_hash = metadata_type(network_type, metadata_type_id).calc_script_hash();
-    let args = StakeArgs::new_builder()
-        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
-        .stake_addr(to_identity(staker_addr))
-        .build()
-        .as_bytes();
-
+pub fn stake_smt_type(network_type: &NetworkType, stake_smt_type_id: &H256) -> Script {
+    let args = Bytes::from(stake_smt_type_id.as_bytes().to_vec());
     match network_type {
         NetworkType::Mainnet => script!(
             &STAKE_LOCK_MAINNET.code_hash,
@@ -197,8 +187,19 @@ pub fn stake_lock(
     }
 }
 
-pub fn stake_smt_type(network_type: &NetworkType, stake_smt_type_id: &H256) -> Script {
-    let args = Bytes::from(stake_smt_type_id.as_bytes().to_vec());
+pub fn stake_lock(
+    network_type: &NetworkType,
+    metadata_type_id: &H256,
+    staker_addr: &H160,
+) -> Script {
+    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
+    let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
+    let args = StakeArgs::new_builder()
+        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
+        .stake_addr(to_identity(staker_addr))
+        .build()
+        .as_bytes();
+
     match network_type {
         NetworkType::Mainnet => script!(
             &STAKE_SMT_TYPE_MAINNET.code_hash,
@@ -239,12 +240,8 @@ pub fn delegate_lock(
     }
 }
 
-pub fn delegate_smt_type(network_type: &NetworkType, metadata_type_id: &H256) -> Script {
-    let metadata_type_hash = metadata_type(network_type, metadata_type_id).calc_script_hash();
-    let args = DelegateArgs::new_builder()
-        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
-        .build()
-        .as_bytes();
+pub fn delegate_smt_type(network_type: &NetworkType, delegate_smt_type_id: &H256) -> Script {
+    let args = Bytes::from(delegate_smt_type_id.as_bytes().to_vec());
 
     match network_type {
         NetworkType::Mainnet => script!(
