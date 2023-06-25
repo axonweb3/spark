@@ -95,7 +95,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         let mut inputs = vec![];
 
         // AT cells
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let mut outputs_data = self.first_stake_data(token_amount)?;
 
@@ -151,7 +151,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             .build()];
 
         // AT cells
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let stake_data = stake_cell.output_data.unwrap().into_bytes();
         let outputs_data = self.update_stake_data(token_amount, stake_data)?;
@@ -207,7 +207,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         Ok(tx)
     }
 
-    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+    async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
         let (token_cells, amount) = collect_xudt(
             &self.ckb.client,
             self.token_lock.clone(),
@@ -303,9 +303,9 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         let mut stake_data = stake_data;
         let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
         let last_info =
-            ElectAmountCaculator::last_stake_info(&stake_data.delta(), self.current_epoch);
+            ElectAmountCalculator::last_stake_info(&stake_data.delta(), self.current_epoch);
 
-        let actual_info = ElectAmountCaculator::new(
+        let actual_info = ElectAmountCalculator::new(
             wallet_amount,
             total_stake_amount,
             last_info,
