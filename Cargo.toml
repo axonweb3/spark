@@ -15,6 +15,7 @@ tx-builder = { path = "./tx-builder" }
 members = [
     "api",
     "common",
+    "devtools/tx-tests",
     "kicker",
     "query",
     "rpc-client",

@@ -14,7 +14,7 @@ use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;
 
-use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
+use crate::ckb::define::constants::TOKEN_BYTES;
 use crate::ckb::define::error::CkbTxResult;
 use crate::ckb::utils::{
     cell_collector::{collect_xudt, get_withdraw_cell},
@@ -67,7 +67,7 @@ impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
             .build()];
 
         // AT cell
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
         let outputs_data = self.build_data(token_amount, withdraw_data).await?;
@@ -140,7 +140,7 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
         Ok(withdraw_cell.unwrap())
     }
 
-    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+    async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
         let (token_cells, amount) = collect_xudt(
             &self.ckb.client,
             self.token_lock.clone(),
@@ -178,7 +178,7 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
 
         for withdraw_info in cell_withdraws.withdraw_infos() {
             let epoch = to_u64(&withdraw_info.epoch());
-            if epoch <= self.current_epoch - INAUGURATION {
+            if epoch <= self.current_epoch {
                 unlock_amount += to_u128(&withdraw_info.amount());
             } else {
                 output_withdraw_infos = output_withdraw_infos.push(withdraw_info);

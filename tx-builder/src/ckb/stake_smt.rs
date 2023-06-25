@@ -43,7 +43,7 @@ use crate::ckb::utils::{
     cell_collector::{get_stake_cell, get_unique_cell, get_withdraw_cell},
     cell_data::{stake_item, token_cell_data, update_withdraw_data},
     cell_dep::{
-        checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, stake_dep,
+        checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, stake_lock_dep,
         withdraw_lock_dep, xudt_type_dep,
     },
     omni::{omni_eth_address, omni_eth_witness_placeholder},
@@ -86,10 +86,9 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
     }
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)> {
-        let stake_lock = always_success_lock(&self.ckb.network_type); // todo: stake smt lock
-        let stake_type = stake_smt_type(&self.ckb.network_type, &self.type_ids.stake_smt_type_id);
-
-        let stake_smt_cell = get_unique_cell(&self.ckb.client, stake_type.clone()).await?;
+        let stake_smt_type =
+            stake_smt_type(&self.ckb.network_type, &self.type_ids.stake_smt_type_id);
+        let stake_smt_cell = get_unique_cell(&self.ckb.client, stake_smt_type.clone()).await?;
 
         let mut inputs = vec![
             // stake smt cell
@@ -111,14 +110,14 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
         let mut outputs = vec![
             // stake smt cell
             CellOutput::new_builder()
-                .lock(stake_lock.clone())
-                .type_(Some(stake_type.clone()).pack())
+                .lock(always_success_lock(&self.ckb.network_type))
+                .type_(Some(stake_smt_type).pack())
                 .build_exact_capacity(Capacity::bytes(new_stake_smt_cell_data.len())?)?,
         ];
 
         let mut outputs_data = vec![new_stake_smt_cell_data];
 
-        // insert stake AT cells and withdraw AT cells to outputs
+        // insert stake AT cells and withdraw AT cells to the transaction
         self.fill_tx(
             &statistics,
             &cells,
@@ -132,7 +131,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            stake_dep(&self.ckb.network_type),
+            stake_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,

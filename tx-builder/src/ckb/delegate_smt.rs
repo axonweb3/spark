@@ -37,8 +37,8 @@ use crate::ckb::utils::cell_data::{
 use crate::ckb::utils::{
     cell_collector::{collect_cells, get_delegate_cell, get_unique_cell, get_withdraw_cell},
     cell_dep::{
-        checkpoint_cell_dep, delegate_dep, metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep,
-        withdraw_lock_dep, xudt_type_dep,
+        checkpoint_cell_dep, delegate_lock_dep, metadata_cell_dep, omni_lock_dep,
+        secp256k1_lock_dep, withdraw_lock_dep, xudt_type_dep,
     },
     omni::{omni_eth_address, omni_eth_witness_placeholder},
     script::{
@@ -116,7 +116,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage + Send + Sync> IDelegateSmtTxBuilder<C, D>
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            delegate_dep(&self.ckb.network_type),
+            delegate_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,

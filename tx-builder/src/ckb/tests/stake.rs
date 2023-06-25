@@ -18,23 +18,6 @@ mod tests {
     use crate::ckb::utils::omni::{omni_eth_address, omni_eth_ckb_address, omni_eth_signer};
     use crate::ckb::utils::tx::{gen_script_group, send_tx};
 
-    fn gen_pubkey() -> (Byte65, Byte97) {
-        let pub_key =
-            hex_decode("ac85bbb40347b6e06ac2dc2da1f75eece029cdc0ed2d456c457d27e288bfbfbcd4c5c19716e9b250134a0e76ce50fa22");
-        let bls_public_key: BlsPublicKey = BlsPublicKey::try_from(pub_key.as_ref()).unwrap();
-        (
-            Byte65::new_unchecked(Bytes::from(pub_key)),
-            Byte97::new_unchecked(bls_public_key.to_bytes()),
-        )
-    }
-
-    #[test]
-    fn bls_pub_key() {
-        let (pub_key, bls_pub_key) = gen_pubkey();
-        println!("pub key len: {:?}", pub_key.as_bytes().len());
-        println!("bls pub key len: {}", bls_pub_key.as_bytes().len());
-    }
-
     // #[tokio::test]
     async fn _first_stake_tx() {
         let (l1_pub_key, bls_pub_key) = gen_pubkey();
@@ -43,8 +26,9 @@ mod tests {
             StakeItem {
                 is_increase:        true,
                 amount:             10,
-                inauguration_epoch: 3,
+                inauguration_epoch: 2,
             },
+            0,
             Some(FirstStakeInfo {
                 l1_pub_key,
                 bls_pub_key,
@@ -64,8 +48,9 @@ mod tests {
             StakeItem {
                 is_increase:        true,
                 amount:             50,
-                inauguration_epoch: 3,
+                inauguration_epoch: 2,
             },
+            0,
             None,
         )
         .await;
@@ -77,21 +62,26 @@ mod tests {
             StakeItem {
                 is_increase:        false,
                 amount:             30,
-                inauguration_epoch: 3,
+                inauguration_epoch: 2,
             },
+            0,
             None,
         )
         .await;
     }
 
-    async fn _stake_tx(stake_item: StakeItem, first_stake: Option<FirstStakeInfo>) {
+    async fn _stake_tx(
+        stake_item: StakeItem,
+        current_epoch: u64,
+        first_stake: Option<FirstStakeInfo>,
+    ) {
         let test_staker_key =
             h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62");
-        let xudt_args = h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");
+        let xudt_args = h256!("0x3e38962edb59144c4d6a6ab60818baffcb3013cbcb1e49cf01a2ef5e1a4e6f1e");
         let checkpoint_type_id =
-            h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");
+            h256!("0x1c90bb3f8b1a078b859257114e63b4d676e5076d0730a0e67d24e28f9bc51a49");
         let metadata_type_id =
-            h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");
+            h256!("0x9357db18577ff029f8f183a2fe3c19a04f7db3323d40ee0e3d54de00c2c767e4");
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
         let staker_eth_addr = omni_eth_address(test_staker_key.clone()).unwrap();
@@ -110,7 +100,7 @@ mod tests {
                 xudt_owner: xudt_args,
             },
             staker_eth_addr,
-            1,
+            current_epoch,
             stake_item,
             first_stake,
         )
@@ -151,5 +141,22 @@ mod tests {
         faster_hex::hex_decode(src, &mut ret).unwrap();
 
         ret
+    }
+
+    fn gen_pubkey() -> (Byte65, Byte97) {
+        let pub_key =
+            hex_decode("ac85bbb40347b6e06ac2dc2da1f75eece029cdc0ed2d456c457d27e288bfbfbcd4c5c19716e9b250134a0e76ce50fa22");
+        let bls_public_key: BlsPublicKey = BlsPublicKey::try_from(pub_key.as_ref()).unwrap();
+        (
+            Byte65::new_unchecked(Bytes::from(pub_key)),
+            Byte97::new_unchecked(bls_public_key.to_bytes()),
+        )
+    }
+
+    #[test]
+    fn bls_pub_key() {
+        let (pub_key, bls_pub_key) = gen_pubkey();
+        println!("pub key len: {:?}", pub_key.as_bytes().len());
+        println!("bls pub key len: {}", bls_pub_key.as_bytes().len());
     }
 }

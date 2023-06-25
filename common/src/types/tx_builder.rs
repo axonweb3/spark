@@ -207,8 +207,8 @@ impl From<&EthProposeCount> for ProposeCount {
 
 #[derive(Clone, Default)]
 pub struct Metadata {
-    pub epoch_len:       u32,
-    pub period_len:      u32,
+    pub epoch_len:       u32, // how many periods as one epoch
+    pub period_len:      u32, // how many blocks as one period
     pub quorum:          u16,
     pub gas_limit:       u64,
     pub gas_price:       u64,

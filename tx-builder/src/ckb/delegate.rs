@@ -173,7 +173,7 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            delegate_dep(&self.ckb.network_type),
+            delegate_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,
@@ -436,10 +436,10 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
         total_amount: &mut u128,
         total_staker_amount: u128,
     ) -> CkbTxResult<ActualAmount> {
-        let actual_info = ElectAmountCaculator::new(
+        let actual_info = ElectAmountCalculator::new(
             *wallet_amount,
             total_staker_amount,
-            ElectAmountCaculator::last_delegate_info(last_delegate, self.current_epoch),
+            ElectAmountCalculator::last_delegate_info(last_delegate, self.current_epoch),
             ElectItem::Delegate(new_delegate),
         )
         .calc_actual_amount()?;

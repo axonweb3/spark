@@ -54,7 +54,7 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
         first_stake_info: Option<FirstStakeInfo>,
     ) -> Self {
         let stake_lock = stake_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
-        let withdraw_lock = always_success_lock(&ckb.network_type); // todo
+        let withdraw_lock = withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
         let token_lock = omni_eth_lock(&ckb.network_type, &staker);
         let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
 
@@ -82,7 +82,6 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
 
         let stake_cell =
             get_stake_cell(&self.ckb.client, self.stake_lock.clone(), self.xudt.clone()).await?;
-
         if stake_cell.is_none() {
             self.build_first_stake_tx().await
         } else {
@@ -96,7 +95,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         let mut inputs = vec![];
 
         // AT cells
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let mut outputs_data = self.first_stake_data(token_amount)?;
 
@@ -152,7 +151,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             .build()];
 
         // AT cells
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let stake_data = stake_cell.output_data.unwrap().into_bytes();
         let outputs_data = self.update_stake_data(token_amount, stake_data)?;
@@ -174,7 +173,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
-            stake_dep(&self.ckb.network_type),
+            stake_lock_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,
@@ -190,7 +189,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         ];
 
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // stake AT cell lock
+            stake_witness_placeholder(0u8).as_bytes(), // stake AT cell lock, todo
             omni_eth_witness_placeholder().as_bytes(), // AT cell lock
             omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
         ];
@@ -208,7 +207,7 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         Ok(tx)
     }
 
-    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+    async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
         let (token_cells, amount) = collect_xudt(
             &self.ckb.client,
             self.token_lock.clone(),
@@ -304,9 +303,9 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         let mut stake_data = stake_data;
         let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
         let last_info =
-            ElectAmountCaculator::last_stake_info(&stake_data.delta(), self.current_epoch);
+            ElectAmountCalculator::last_stake_info(&stake_data.delta(), self.current_epoch);
 
-        let actual_info = ElectAmountCaculator::new(
+        let actual_info = ElectAmountCalculator::new(
             wallet_amount,
             total_stake_amount,
             last_info,

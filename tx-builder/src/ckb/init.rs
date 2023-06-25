@@ -89,14 +89,13 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             // metadata cell
             CellOutput::new_builder()
                 .lock(always_success_lock(&self.ckb.network_type))
-                .type_(Some(default_type_id()).pack())
-                // .type_(Some(metadata_type(&self.ckb.network_type, &H256::default())).pack())
+                .type_(Some(metadata_type(&self.ckb.network_type, &H256::default())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[3].len())?)?,
             // stake smt cell
             CellOutput::new_builder()
                 .lock(always_success_lock(&self.ckb.network_type))
                 .type_(Some(default_type_id()).pack())
-                // .type_(Some(stake_type(&self.ckb.network_type, &H256::default())).pack())
+                // .type_(Some(stake_smt_type(&self.ckb.network_type, &H256::default())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[4].len())?)?,
             // delegate smt cell
             CellOutput::new_builder()
@@ -117,6 +116,9 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             secp256k1_lock_dep(&self.ckb.network_type),
             checkpoint_type_dep(&self.ckb.network_type),
             metadata_type_dep(&self.ckb.network_type),
+            // stake_smt_type_dep(&self.ckb.network_type),
+            // delegate_smt_type_dep(&self.ckb.network_type),
+            // reward_type_dep(&self.ckb.network_type),
         ];
 
         let witnesses = vec![
@@ -214,8 +216,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             .output(3)
             .unwrap()
             .as_builder()
-            // .type_(Some(metadata_type(&self.ckb.network_type, &metadata_type_id)).pack())
-            .type_(Some(type_id_script(&metadata_type_id)).pack())
+            .type_(Some(metadata_type(&self.ckb.network_type, &metadata_type_id)).pack())
             .build();
 
         // stake smt cell
@@ -224,8 +225,8 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             .output(4)
             .unwrap()
             .as_builder()
-            // .type_(Some(stake_type(&self.ckb.network_type, &metadata_type_id)).pack())
             .type_(Some(type_id_script(&stake_smt_type_id)).pack())
+            // .type_(Some(stake_smt_type(&self.ckb.network_type, &stake_smt_type_id)).pack())
             .build();
 
         // delegate smt cell
@@ -286,26 +287,25 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             } else {
                 CHECKPOINT_TYPE_TESTNET.code_hash.clone()
             },
-            metadata_code_hash: ckb_sdk::constants::TYPE_ID_CODE_HASH, // mock
-            // metadata_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
-            //     METADATA_TYPE_MAINNET.code_hash.clone()
-            // } else {
-            //     METADATA_TYPE_TESTNET.code_hash.clone()
-            // },
+            metadata_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
+                METADATA_TYPE_MAINNET.code_hash.clone()
+            } else {
+                METADATA_TYPE_TESTNET.code_hash.clone()
+            },
             reward_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
                 REWARD_TYPE_MAINNET.code_hash.clone()
             } else {
                 REWARD_TYPE_TESTNET.code_hash.clone()
             },
             stake_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
-                STAKE_MAINNET.code_hash.clone()
+                STAKE_SMT_TYPE_MAINNET.code_hash.clone()
             } else {
-                STAKE_TESTNET.code_hash.clone()
+                STAKE_SMT_TYPE_TESTNET.code_hash.clone()
             },
             delegate_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
-                DELEGATE_MAINNET.code_hash.clone()
+                DELEGATE_SMT_TYPE_MAINNET.code_hash.clone()
             } else {
-                DELEGATE_TESTNET.code_hash.clone()
+                DELEGATE_SMT_TYPE_TESTNET.code_hash.clone()
             },
             withdraw_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
                 WITHDRAW_LOCK_MAINNET.code_hash.clone()

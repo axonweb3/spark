@@ -9,7 +9,7 @@ mod tests {
     use crate::ckb::init::InitTxBuilder;
     use crate::ckb::utils::tx::send_tx;
 
-    // #[tokio::test]
+    #[tokio::test]
     async fn _send_init_tx() {
         let test_seeder_key =
             h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e61");
@@ -23,10 +23,16 @@ mod tests {
             test_seeder_key,
             10000,
             Checkpoint {
-                epoch: 1,
+                epoch: 0,
+                period: 0,
                 ..Default::default()
             },
-            Metadata::default(),
+            Metadata {
+                epoch_len: 2,
+                period_len: 2,
+                quorum: 2,
+                ..Default::default()
+            },
         )
         .build_tx()
         .await
@@ -41,6 +47,12 @@ mod tests {
                 println!("issue type id: 0x{}", type_id_args.issue_type_id);
                 println!("checkpoint type id: 0x{}", type_id_args.checkpoint_type_id);
                 println!("metadata type id: 0x{}", type_id_args.metadata_type_id);
+                println!("stake smt type id: 0x{}", type_id_args.stake_smt_type_id);
+                println!(
+                    "delegate smt type id: 0x{}",
+                    type_id_args.delegate_smt_type_id
+                );
+                println!("reward smt type id: 0x{}", type_id_args.reward_smt_type_id);
                 println!("xudt owner: 0x{}", type_id_args.xudt_owner);
             }
             Err(e) => println!("{}", e),

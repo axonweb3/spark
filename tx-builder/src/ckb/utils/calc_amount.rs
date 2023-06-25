@@ -8,7 +8,7 @@ use common::utils::convert::*;
 use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
 use crate::ckb::define::error::*;
 
-pub struct ElectAmountCaculator<'a> {
+pub struct ElectAmountCalculator<'a> {
     wallet_amount:      Amount,
     total_elect_amount: Amount,
     last_info:          LastElectItem,
@@ -33,7 +33,7 @@ pub struct ActualAmount {
     pub is_increase:        bool,
 }
 
-impl<'a> ElectAmountCaculator<'a> {
+impl<'a> ElectAmountCalculator<'a> {
     pub fn new(
         wallet_amount: Amount,
         total_elect_amount: Amount,

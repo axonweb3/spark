@@ -162,32 +162,62 @@ async fn unique_cell_dep(ckb_rpc: &impl CkbRpc, type_id_script: CScript) -> Resu
         .build())
 }
 
-pub fn stake_dep(network_type: &NetworkType) -> CellDep {
+pub fn stake_lock_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
-            &STAKE_MAINNET.tx_hash,
-            STAKE_MAINNET.index,
-            STAKE_MAINNET.dep_type
+            &STAKE_LOCK_MAINNET.tx_hash,
+            STAKE_LOCK_MAINNET.index,
+            STAKE_LOCK_MAINNET.dep_type
         ),
         NetworkType::Testnet => cell_dep!(
-            &STAKE_TESTNET.tx_hash,
-            STAKE_TESTNET.index,
-            STAKE_TESTNET.dep_type
+            &STAKE_LOCK_TESTNET.tx_hash,
+            STAKE_LOCK_TESTNET.index,
+            STAKE_LOCK_TESTNET.dep_type
         ),
     }
 }
 
-pub fn delegate_dep(network_type: &NetworkType) -> CellDep {
+pub fn stake_smt_type_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
-            &DELEGATE_MAINNET.tx_hash,
-            DELEGATE_MAINNET.index,
-            DELEGATE_MAINNET.dep_type
+            &STAKE_SMT_TYPE_MAINNET.tx_hash,
+            STAKE_SMT_TYPE_MAINNET.index,
+            STAKE_SMT_TYPE_MAINNET.dep_type
         ),
         NetworkType::Testnet => cell_dep!(
-            &DELEGATE_TESTNET.tx_hash,
-            DELEGATE_TESTNET.index,
-            DELEGATE_TESTNET.dep_type
+            &STAKE_SMT_TYPE_TESTNET.tx_hash,
+            STAKE_SMT_TYPE_TESTNET.index,
+            STAKE_SMT_TYPE_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn delegate_lock_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &DELEGATE_LOCK_MAINNET.tx_hash,
+            DELEGATE_LOCK_MAINNET.index,
+            DELEGATE_LOCK_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &DELEGATE_LOCK_TESTNET.tx_hash,
+            DELEGATE_LOCK_TESTNET.index,
+            DELEGATE_LOCK_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn delegate_smt_type_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &DELEGATE_SMT_TYPE_MAINNET.tx_hash,
+            DELEGATE_SMT_TYPE_MAINNET.index,
+            DELEGATE_SMT_TYPE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &DELEGATE_SMT_TYPE_TESTNET.tx_hash,
+            DELEGATE_SMT_TYPE_TESTNET.index,
+            DELEGATE_SMT_TYPE_TESTNET.dep_type
         ),
     }
 }
@@ -218,6 +248,21 @@ pub fn delegate_requriement_type_dep(network_type: &NetworkType) -> CellDep {
             &DELEGATE_REQUIREMENT_TYPE_TESTNET.tx_hash,
             DELEGATE_REQUIREMENT_TYPE_TESTNET.index,
             DELEGATE_REQUIREMENT_TYPE_TESTNET.dep_type
+        ),
+    }
+}
+
+pub fn reward_type_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &REWARD_TYPE_MAINNET.tx_hash,
+            REWARD_TYPE_MAINNET.index,
+            REWARD_TYPE_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &REWARD_TYPE_TESTNET.tx_hash,
+            REWARD_TYPE_TESTNET.index,
+            REWARD_TYPE_TESTNET.dep_type
         ),
     }
 }
