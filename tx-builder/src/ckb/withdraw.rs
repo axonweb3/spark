@@ -67,7 +67,7 @@ impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
             .build()];
 
         // AT cell
-        let token_amount = self.add_token_to_intpus(&mut inputs).await?;
+        let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
         let outputs_data = self.build_data(token_amount, withdraw_data).await?;
@@ -140,7 +140,7 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
         Ok(withdraw_cell.unwrap())
     }
 
-    async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
+    async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
         let (token_cells, amount) = collect_xudt(
             &self.ckb.client,
             self.token_lock.clone(),

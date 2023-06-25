@@ -49,7 +49,7 @@ pub fn to_uint16(v: u16) -> Uint16 {
 }
 
 pub fn to_h160(v: &Identity) -> H160 {
-    H160::from_slice(v.as_slice()).expect("imposible")
+    H160::from_slice(v.as_slice()).expect("impossible")
 }
 
 pub fn to_identity(v: &H160) -> Identity {
@@ -61,11 +61,11 @@ pub fn to_identity_opt(v: &H160) -> IdentityOpt {
 }
 
 pub fn to_byte32(v: &H256) -> Byte32 {
-    Byte32::from_slice(v.as_bytes()).expect("imposible")
+    Byte32::from_slice(v.as_bytes()).expect("impossible")
 }
 
 pub fn to_h256(v: &CByte32) -> H256 {
-    H256::from_slice(v.as_slice()).expect("imposible")
+    H256::from_slice(v.as_slice()).expect("impossible")
 }
 
 pub fn to_ckb_byte32(v: &Byte32) -> ckb_types::packed::Byte32 {
@@ -92,62 +92,66 @@ pub fn to_ckb_h256(v: &ethereum_types::H256) -> H256 {
     H256::from_slice(v.as_bytes()).unwrap()
 }
 
-#[test]
-fn test_u128() {
-    let a = 100_u128;
-    assert_eq!(a, to_u128(&to_uint128(a)));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_u128() {
+        let a = 100_u128;
+        assert_eq!(a, to_u128(&to_uint128(a)));
+    }
 
-#[test]
-fn test_ckb_byte32() {
-    let a = Byte32::default();
-    assert_eq!(ckb_types::packed::Byte32::default(), to_ckb_byte32(&a));
-}
+    #[test]
+    fn test_ckb_byte32() {
+        let a = Byte32::default();
+        assert_eq!(ckb_types::packed::Byte32::default(), to_ckb_byte32(&a));
+    }
 
-#[test]
-fn test_axon_byte32() {
-    let c = ckb_types::packed::Byte32::default();
-    assert_eq!(Byte32::default().as_bytes(), to_axon_byte32(&c).as_bytes());
-}
+    #[test]
+    fn test_axon_byte32() {
+        let c = ckb_types::packed::Byte32::default();
+        assert_eq!(Byte32::default().as_bytes(), to_axon_byte32(&c).as_bytes());
+    }
 
-#[test]
-fn test_h256() {
-    let v: Vec<u8> = vec![
-        1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ];
-    assert_eq!(
-        H256::from_slice(&v).unwrap(),
-        to_h256(&CByte32::new_unchecked(v.into())),
-    );
-}
+    #[test]
+    fn test_h256() {
+        let v: Vec<u8> = vec![
+            1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ];
+        assert_eq!(
+            H256::from_slice(&v).unwrap(),
+            to_h256(&CByte32::new_unchecked(v.into())),
+        );
+    }
 
-#[test]
-fn test_eth_h160() {
-    let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    assert_eq!(
-        ethereum_types::H160::from_slice(&v),
-        to_eth_h160(&H160::from_slice(&v).unwrap()),
-    );
-}
+    #[test]
+    fn test_eth_h160() {
+        let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(
+            ethereum_types::H160::from_slice(&v),
+            to_eth_h160(&H160::from_slice(&v).unwrap()),
+        );
+    }
 
-#[test]
-fn test_ckb_h160() {
-    let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    assert_eq!(
-        H160::from_slice(&v).unwrap(),
-        to_ckb_h160(&ethereum_types::H160::from_slice(&v)),
-    );
-}
+    #[test]
+    fn test_ckb_h160() {
+        let v: Vec<u8> = vec![1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(
+            H160::from_slice(&v).unwrap(),
+            to_ckb_h160(&ethereum_types::H160::from_slice(&v)),
+        );
+    }
 
-#[test]
-fn test_ckb_h256() {
-    let v: Vec<u8> = vec![
-        1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ];
-    assert_eq!(
-        H256::from_slice(&v).unwrap(),
-        to_ckb_h256(&ethereum_types::H256::from_slice(&v)),
-    );
+    #[test]
+    fn test_ckb_h256() {
+        let v: Vec<u8> = vec![
+            1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ];
+        assert_eq!(
+            H256::from_slice(&v).unwrap(),
+            to_ckb_h256(&ethereum_types::H256::from_slice(&v)),
+        );
+    }
 }
