@@ -6,6 +6,8 @@ edition = "2021"
 
 [dependencies]
 clap = "4.2"
+tokio = { version = "1.28", features = ["macros", "rt"] }
+api = { path = "./api" }
 common = { path = "./common" }
 rpc-client = { path = "./rpc-client" }
 storage = { path = "./storage" }
