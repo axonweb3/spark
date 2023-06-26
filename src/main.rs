@@ -1,17 +1,22 @@
-use std::sync::Arc;
+mod config;
+
+use std::{env, sync::Arc};
 
 use api::{run_server, DefaultAPIAdapter};
+use config::SparkConfig;
 use storage::{SmtManager, TransactionHistory};
-
-const RDB_PATH: &str = "";
-const KV_PATH: &str = "./free-space/kvdb";
 
 #[tokio::main]
 async fn main() {
-    let rdb = Arc::new(TransactionHistory::new(RDB_PATH).await);
-    let kvdb = Arc::new(SmtManager::new(KV_PATH));
+    let args = env::args().nth(1).expect("Missing env variable");
+    let config: SparkConfig = config::parse_file(args).expect("Failed to parse config file");
+
+    let rdb = Arc::new(TransactionHistory::new(&config.rdb_url).await);
+    let kvdb = Arc::new(SmtManager::new(&config.kvdb_path));
     let api_adapter = Arc::new(DefaultAPIAdapter::new(rdb, kvdb));
-    let _handle = run_server(api_adapter).await.unwrap();
+    let _handle = run_server(api_adapter, config.rpc_listen_address)
+        .await
+        .unwrap();
 
     println!("Hello, world!");
 }
