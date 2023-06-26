@@ -56,6 +56,12 @@ where
             .await
     }
 
+    async fn get_operation_total(&self, addr: Address, operation: u32) -> Result<u64> {
+        self.relation_storage
+            .get_operation_total(addr, operation)
+            .await
+    }
+
     async fn get_stake_amount_by_epoch(
         &self,
         operation: u32,

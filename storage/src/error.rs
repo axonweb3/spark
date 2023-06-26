@@ -10,4 +10,7 @@ pub enum StorageError {
 
     #[error("Sql cursor error {0}")]
     SqlCursorError(DbErr),
+
+    #[error("Sql count error {0}")]
+    SqlCountError(DbErr),
 }

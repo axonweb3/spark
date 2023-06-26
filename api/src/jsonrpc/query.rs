@@ -9,8 +9,8 @@ use common::{
     types::{
         api::{
             AddressAmount, ChainState, HistoryEvent, HistoryTransactions, OperationStatus,
-            OperationType, RewardFrom, RewardHistory, RewardState, StakeAmount, StakeHistory,
-            StakeRate, StakeState, StakeTransaction,
+            OperationType, PaginatedResult, RewardFrom, RewardHistory, RewardState, StakeAmount,
+            StakeHistory, StakeRate, StakeState, StakeTransaction,
         },
         smt::Address,
     },
@@ -117,9 +117,15 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
         page_size: u64,
         event: HistoryEvent,
         history_type: OperationType,
-    ) -> RpcResult<Vec<StakeHistory>> {
+    ) -> RpcResult<PaginatedResult<StakeHistory>> {
         let offset = (page_number - 1) * page_size;
         let history_type = history_type as u32;
+
+        let total = self
+            .adapter
+            .get_operation_total(addr, history_type)
+            .await
+            .map_err(|e| ApiError::Adapter(e.to_string()))?;
         let res = self
             .adapter
             .get_operation_history(addr, history_type, offset, page_size)
@@ -140,7 +146,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             },
         );
 
-        let reses = res
+        let data = res
             .iter()
             .filter(|m| m.event == event_type)
             .cloned()
@@ -152,7 +158,8 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
                 transactions: txs.clone(),
             })
             .collect();
-        Ok(reses)
+        let result = PaginatedResult { total, data };
+        Ok(result)
     }
 
     async fn get_reward_history(

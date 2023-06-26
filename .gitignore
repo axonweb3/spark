@@ -10,7 +10,11 @@
 # database
 *.sqlite
 
+<<<<<<< HEAD
 free-space
 
 /devtools/tx-tests/src/config/priv_keys*.toml
 /devtools/tx-tests/src/config/type_ids*.toml
+=======
+free-space/
+>>>>>>> d68f095 (refactor: change run function)

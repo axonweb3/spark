@@ -97,7 +97,7 @@ pub struct StakeAmount {
 pub struct StakeRate {
     pub address:        String,
     pub stake_rate:     String,
-    pub minimum_amount: String
+    pub minimum_amount: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -112,6 +112,12 @@ pub struct StakeState {
     pub stake_amount:        u32,
     pub delegate_amount:     u32,
     pub withdrawable_amount: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PaginatedResult<T> {
+    pub total: u64,
+    pub data:  Vec<T>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
