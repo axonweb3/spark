@@ -11,3 +11,6 @@ mod error;
 
 #[cfg(test)]
 mod tests;
+
+pub use relation_db::TransactionHistory;
+pub use smt::SmtManager;

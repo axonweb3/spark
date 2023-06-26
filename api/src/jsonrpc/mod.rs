@@ -4,6 +4,7 @@ pub mod query;
 use crate::error::ApiError;
 use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
+
 use common::types::api::{
     AddressAmount, ChainState, HistoryEvent, OperationType, RewardHistory, RewardState,
     StakeAmount, StakeHistory, StakeRate, StakeState, StakeTransaction,
@@ -13,8 +14,10 @@ use common::types::Transaction;
 use common::{traits::api::APIAdapter, types::H256};
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
-use jsonrpsee::server::ServerBuilder;
-use std::{net::SocketAddr, sync::Arc};
+use jsonrpsee::server::{ServerBuilder, ServerHandle};
+use tokio::net::ToSocketAddrs;
+
+use std::sync::Arc;
 
 #[rpc(server)]
 pub trait AccountHistoryRpc {
@@ -110,10 +113,10 @@ pub trait OperationRpc {
     async fn send_transaction(&self, tx: Transaction) -> RpcResult<H256>;
 }
 
-#[allow(dead_code)]
-pub async fn mock_server<Adapter: APIAdapter + 'static>(
+pub async fn run_server<Adapter: APIAdapter + 'static>(
     adapter: Arc<Adapter>,
-) -> Result<SocketAddr, ApiError> {
+    url: impl ToSocketAddrs,
+) -> Result<ServerHandle, ApiError> {
     let mut module = StatusRpcModule::new(Arc::clone(&adapter)).into_rpc();
     let axon_rpc = AxonStatusRpc::new(Arc::clone(&adapter)).into_rpc();
     let op_rpc = OperationRpc::new(adapter).into_rpc();
@@ -121,16 +124,10 @@ pub async fn mock_server<Adapter: APIAdapter + 'static>(
     module.merge(op_rpc).unwrap();
     let server = ServerBuilder::new()
         .http_only()
-        .build("127.0.0.1:0".parse::<SocketAddr>().unwrap())
+        .build(url)
         .await
         .map_err(|e| ApiError::HttpServer(e.to_string()))?;
     println!("addr: {:?}", server.local_addr().unwrap());
-    // module.register_method("a_method", |_, _| "lo").unwrap();
 
-    let addr = server.local_addr().unwrap();
-    let handle = server.start(module).unwrap();
-
-    tokio::spawn(handle.stopped());
-
-    Ok(addr)
+    Ok(server.start(module).unwrap())
 }

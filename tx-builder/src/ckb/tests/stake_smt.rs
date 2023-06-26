@@ -13,7 +13,7 @@ mod tests {
 
     // #[tokio::test]
     async fn _stake_smt_tx() {
-        let smt_storage = SmtManager::new(_ROCKSDB_PATH.into());
+        let smt_storage = SmtManager::new(_ROCKSDB_PATH);
         let test_staker_key =
             h256!("0x13b08bb054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62");
         let xudt_args = h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");

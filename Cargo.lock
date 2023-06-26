@@ -3818,10 +3818,13 @@ dependencies = [
 name = "spark"
 version = "0.1.0"
 dependencies = [
- "clap 4.2.7",
+ "api",
  "common",
  "rpc-client",
+ "serde",
  "storage",
+ "tokio",
+ "toml 0.7.4",
  "tx-builder",
 ]
 

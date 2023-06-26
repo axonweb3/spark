@@ -1,6 +1,6 @@
 mod utils;
 
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, vec};
+use std::{collections::HashMap, fs, path::Path, sync::Arc, vec};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -35,9 +35,9 @@ pub struct SmtManager {
 
 /// SMT manager
 impl SmtManager {
-    pub fn new(path: PathBuf) -> Self {
-        if !path.is_dir() {
-            fs::create_dir_all(&path)
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        if !path.as_ref().is_dir() {
+            fs::create_dir_all(path.as_ref())
                 .map_err(StorageError::RocksDBCreationError)
                 .unwrap();
         }

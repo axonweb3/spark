@@ -1,8 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use jsonrpsee::http_client::HttpClientBuilder;
-
-use crate::{adapter::DefaultAPIAdapter, jsonrpc::mock_server};
+use crate::{adapter::DefaultAPIAdapter, jsonrpc::run_server};
 use common::{
     traits::query::TransactionStorage,
     types::{relation_db::transaction, H160},
@@ -65,10 +63,7 @@ async fn mock_jsonrpc_server() -> Result<()> {
     smt_path.push("stake");
     let smt_manager = SmtManager::new(smt_path);
     let adapter = DefaultAPIAdapter::new(Arc::new(relation_db), Arc::new(smt_manager));
-    let server_addr = mock_server(Arc::new(adapter)).await?;
-    let url = format!("http://{:?}", server_addr);
-    // println!("addr: {:?}", url);
-    let _client = HttpClientBuilder::default().build(url).unwrap();
+    let _ = run_server(Arc::new(adapter), "127.0.0.1:8000").await?;
 
     Ok(())
 }
