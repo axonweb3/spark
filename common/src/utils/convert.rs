@@ -2,10 +2,10 @@ use ckb_fixed_hash_core::H512;
 use ckb_types::packed::Byte32 as CByte32;
 use ckb_types::prelude::{Entity, Pack};
 use ckb_types::{H160, H256};
-use molecule::prelude::Byte;
+use molecule::prelude::{Builder, Byte};
 
 use axon_types::basic::{
-    Byte32, Byte65, Bytes, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64,
+    Byte32, Byte65, Bytes, BytesBuilder, Identity, IdentityOpt, Uint128, Uint16, Uint32, Uint64,
 };
 
 pub fn new_u128(v: &[u8]) -> u128 {
@@ -41,7 +41,9 @@ pub fn to_usize(v: Uint32) -> usize {
 }
 
 pub fn to_bytes(v: Vec<u8>) -> Bytes {
-    Bytes::new_unchecked(bytes::Bytes::from(v))
+    BytesBuilder::default()
+        .extend(v.into_iter().map(Into::into))
+        .build()
 }
 
 pub fn to_uint128(v: u128) -> Uint128 {
