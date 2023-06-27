@@ -13,7 +13,7 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::types::tx_builder::NetworkType;
-use common::utils::convert::{to_axon_byte32, to_identity, to_identity_opt};
+use common::utils::convert::{to_axon_byte32, to_identity};
 
 use crate::ckb::define::scripts::*;
 
@@ -171,8 +171,18 @@ pub fn metadata_type(network_type: &NetworkType, args: &H256) -> Script {
     }
 }
 
-pub fn stake_smt_type(network_type: &NetworkType, stake_smt_type_id: &H256) -> Script {
-    let args = Bytes::from(stake_smt_type_id.as_bytes().to_vec());
+pub fn stake_lock(
+    network_type: &NetworkType,
+    metadata_type_id: &H256,
+    staker_addr: &H160,
+) -> Script {
+    let metadata_type_hash = metadata_type(network_type, metadata_type_id).calc_script_hash();
+    let args = StakeArgs::new_builder()
+        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
+        .stake_addr(to_identity(staker_addr))
+        .build()
+        .as_bytes();
+
     match network_type {
         NetworkType::Mainnet => script!(
             &STAKE_LOCK_MAINNET.code_hash,
@@ -187,19 +197,8 @@ pub fn stake_smt_type(network_type: &NetworkType, stake_smt_type_id: &H256) -> S
     }
 }
 
-pub fn stake_lock(
-    network_type: &NetworkType,
-    metadata_type_id: &H256,
-    staker_addr: &H160,
-) -> Script {
-    // todo: metadata_type(network_type, metadata_type_id).calc_script_hash();
-    let metadata_type_hash = type_id_script(metadata_type_id).calc_script_hash();
-    let args = StakeArgs::new_builder()
-        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
-        .stake_addr(to_identity(staker_addr))
-        .build()
-        .as_bytes();
-
+pub fn stake_smt_type(network_type: &NetworkType, stake_smt_type_id: &H256) -> Script {
+    let args = Bytes::from(stake_smt_type_id.as_bytes().to_vec());
     match network_type {
         NetworkType::Mainnet => script!(
             &STAKE_SMT_TYPE_MAINNET.code_hash,
@@ -222,7 +221,7 @@ pub fn delegate_lock(
     let metadata_type_hash = metadata_type(network_type, metadata_type_id).calc_script_hash();
     let args = DelegateArgs::new_builder()
         .metadata_type_id(to_axon_byte32(&metadata_type_hash))
-        .delegator_addr(to_identity_opt(delegate_addr))
+        .delegator_addr(to_identity(delegate_addr))
         .build()
         .as_bytes();
 
@@ -245,13 +244,13 @@ pub fn delegate_smt_type(network_type: &NetworkType, delegate_smt_type_id: &H256
 
     match network_type {
         NetworkType::Mainnet => script!(
-            &DELEGATE_LOCK_MAINNET.code_hash,
-            DELEGATE_LOCK_MAINNET.hash_type,
+            &DELEGATE_SMT_TYPE_MAINNET.code_hash,
+            DELEGATE_SMT_TYPE_MAINNET.hash_type,
             args
         ),
         NetworkType::Testnet => script!(
-            &DELEGATE_LOCK_TESTNET.code_hash,
-            DELEGATE_LOCK_TESTNET.hash_type,
+            &DELEGATE_SMT_TYPE_TESTNET.code_hash,
+            DELEGATE_SMT_TYPE_TESTNET.hash_type,
             args
         ),
     }
@@ -283,13 +282,13 @@ pub fn reward_smt_type(network_type: &NetworkType, reward_smt_type_id: &H256) ->
     let args = Bytes::from(reward_smt_type_id.as_bytes().to_vec());
     match network_type {
         NetworkType::Mainnet => script!(
-            &WITHDRAW_LOCK_MAINNET.code_hash,
-            WITHDRAW_LOCK_MAINNET.hash_type,
+            &REWARD_SMT_TYPE_MAINNET.code_hash,
+            REWARD_SMT_TYPE_MAINNET.hash_type,
             args
         ),
         NetworkType::Testnet => script!(
-            &WITHDRAW_LOCK_TESTNET.code_hash,
-            WITHDRAW_LOCK_TESTNET.hash_type,
+            &REWARD_SMT_TYPE_TESTNET.code_hash,
+            REWARD_SMT_TYPE_TESTNET.hash_type,
             args
         ),
     }

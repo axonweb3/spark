@@ -1,9 +1,5 @@
 mod checkpoint;
-mod delegate;
-mod init;
-mod mint;
 mod omni;
 mod reward;
-mod stake;
 mod stake_smt;
 mod withdraw;

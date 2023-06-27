@@ -12,8 +12,9 @@ pub type TypeId = Privkey;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PrivKeys {
-    pub seeder_privkey:  Privkey,
-    pub staker_privkeys: Vec<Privkey>,
+    pub seeder_privkey:     Privkey,
+    pub staker_privkeys:    Vec<Privkey>,
+    pub delegator_privkeys: Vec<Privkey>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

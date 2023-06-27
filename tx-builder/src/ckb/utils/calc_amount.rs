@@ -15,6 +15,7 @@ pub struct ElectAmountCalculator<'a> {
     new_info:           ElectItem<'a>,
 }
 
+#[derive(Debug)]
 pub struct LastElectItem {
     pub amount:      Amount,
     pub is_increase: bool,
@@ -26,6 +27,7 @@ pub enum ElectItem<'a> {
     Delegate(&'a DelegateItem),
 }
 
+#[derive(Debug)]
 pub struct ActualAmount {
     pub wallet_amount:      Amount,
     pub total_elect_amount: Amount,

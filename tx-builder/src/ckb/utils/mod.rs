@@ -5,3 +5,4 @@ pub mod cell_dep;
 pub mod omni;
 pub mod script;
 pub mod tx;
+pub mod witness;

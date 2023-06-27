@@ -94,20 +94,17 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             // stake smt cell
             CellOutput::new_builder()
                 .lock(always_success_lock(&self.ckb.network_type))
-                .type_(Some(default_type_id()).pack())
-                // .type_(Some(stake_smt_type(&self.ckb.network_type, &H256::default())).pack())
+                .type_(Some(stake_smt_type(&self.ckb.network_type, &H256::default())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[4].len())?)?,
             // delegate smt cell
             CellOutput::new_builder()
                 .lock(always_success_lock(&self.ckb.network_type))
-                .type_(Some(default_type_id()).pack())
-                // .type_(Some(delegate_type(&self.ckb.network_type, &H256::default())).pack())
+                .type_(Some(delegate_smt_type(&self.ckb.network_type, &H256::default())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[5].len())?)?,
             // reward smt cell
             CellOutput::new_builder()
                 .lock(always_success_lock(&self.ckb.network_type))
                 .type_(Some(default_type_id()).pack())
-                // .type_(Some(reward_type(&self.ckb.network_type, &H256::default())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[6].len())?)?,
         ];
 
@@ -116,8 +113,8 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             secp256k1_lock_dep(&self.ckb.network_type),
             checkpoint_type_dep(&self.ckb.network_type),
             metadata_type_dep(&self.ckb.network_type),
-            // stake_smt_type_dep(&self.ckb.network_type),
-            // delegate_smt_type_dep(&self.ckb.network_type),
+            stake_smt_type_dep(&self.ckb.network_type),
+            delegate_smt_type_dep(&self.ckb.network_type),
             // reward_type_dep(&self.ckb.network_type),
         ];
 
@@ -225,8 +222,7 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             .output(4)
             .unwrap()
             .as_builder()
-            .type_(Some(type_id_script(&stake_smt_type_id)).pack())
-            // .type_(Some(stake_smt_type(&self.ckb.network_type, &stake_smt_type_id)).pack())
+            .type_(Some(stake_smt_type(&self.ckb.network_type, &stake_smt_type_id)).pack())
             .build();
 
         // delegate smt cell
@@ -235,8 +231,13 @@ impl<C: CkbRpc> InitTxBuilder<C> {
             .output(5)
             .unwrap()
             .as_builder()
-            // .type_(Some(delegate_type(&self.ckb.network_type, &metadata_type_id)).pack())
-            .type_(Some(type_id_script(&delegate_smt_type_id)).pack())
+            .type_(
+                Some(delegate_smt_type(
+                    &self.ckb.network_type,
+                    &delegate_smt_type_id,
+                ))
+                .pack(),
+            )
             .build();
 
         // reward smt cell
@@ -293,9 +294,9 @@ impl<C: CkbRpc> InitTxBuilder<C> {
                 METADATA_TYPE_TESTNET.code_hash.clone()
             },
             reward_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
-                REWARD_TYPE_MAINNET.code_hash.clone()
+                REWARD_SMT_TYPE_MAINNET.code_hash.clone()
             } else {
-                REWARD_TYPE_TESTNET.code_hash.clone()
+                REWARD_SMT_TYPE_TESTNET.code_hash.clone()
             },
             stake_code_hash: if self.ckb.network_type == NetworkType::Mainnet {
                 STAKE_SMT_TYPE_MAINNET.code_hash.clone()

@@ -1,10 +1,15 @@
 use axon_types::{
-    basic::{Byte65, Byte97},
-    delegate::{DelegateAtCellData as ADelegateAtCellData, DelegateInfoDeltas},
+    basic::{Byte32, Byte65, Byte97},
+    delegate::{
+        DelegateAtCellData as ADelegateAtCellData,
+        DelegateAtCellLockData as ADelegateAtCellLockData, DelegateInfoDeltas,
+        DelegateSmtCellData as ADelegateSmtCellData, StakerSmtRoot as AStakerSmtRoot,
+        StakerSmtRoots,
+    },
     metadata::{MetadataCellData as AMetadataCellData, MetadataList},
     stake::{
-        StakeAtCellData as AStakeAtCellData, StakeInfo as AStakeInfo, StakeInfos,
-        StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+        StakeAtCellData as AStakeAtCellData, StakeAtCellLockData as AStakeAtCellLockData,
+        StakeInfo as AStakeInfo, StakeInfos, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
     },
     withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
@@ -14,6 +19,7 @@ use axon_types::{
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Entity};
 
+use common::types::smt::Root as SmtRoot;
 use common::types::tx_builder::*;
 use common::utils::convert::*;
 
@@ -34,7 +40,16 @@ pub struct DelegateInfo {
 #[derive(Clone, Default)]
 pub struct StakerSmtRoot {
     pub staker: H160,
-    pub root:   H256,
+    pub root:   SmtRoot,
+}
+
+impl From<StakerSmtRoot> for AStakerSmtRoot {
+    fn from(value: StakerSmtRoot) -> Self {
+        AStakerSmtRoot::new_builder()
+            .staker(to_identity(&value.staker))
+            .root(Byte32::from_slice(value.root.as_slice()).unwrap())
+            .build()
+    }
 }
 
 #[derive(Clone, Default)]
@@ -42,6 +57,22 @@ pub struct DelegateSmtCellData {
     // pub version:          u8, // useless
     pub metadata_type_id: H256,
     pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
+}
+
+impl From<DelegateSmtCellData> for ADelegateSmtCellData {
+    fn from(value: DelegateSmtCellData) -> Self {
+        ADelegateSmtCellData::new_builder()
+            // .version(value.version.into()) // useless
+            .metadata_type_id(to_byte32(&value.metadata_type_id))
+            .smt_roots({
+                let mut list = StakerSmtRoots::new_builder();
+                for r in value.smt_roots.into_iter() {
+                    list = list.push(r.into());
+                }
+                list.build()
+            })
+            .build()
+    }
 }
 
 #[derive(Clone, Default)]
@@ -91,6 +122,19 @@ pub struct StakeSmtCellData {
 
 #[derive(Clone)]
 pub struct StakeAtCellData {
+    pub lock: StakeAtCellLockData,
+}
+
+impl From<StakeAtCellData> for AStakeAtCellData {
+    fn from(value: StakeAtCellData) -> Self {
+        AStakeAtCellData::new_builder()
+            .lock(value.lock.into())
+            .build()
+    }
+}
+
+#[derive(Clone)]
+pub struct StakeAtCellLockData {
     // pub version:          u8, // useless
     // pub l1_address:       H160, // useless
     // pub l2_address:       H160, // useless
@@ -100,9 +144,9 @@ pub struct StakeAtCellData {
     pub stake_info:  StakeItem,
 }
 
-impl From<StakeAtCellData> for AStakeAtCellData {
-    fn from(value: StakeAtCellData) -> Self {
-        AStakeAtCellData::new_builder()
+impl From<StakeAtCellLockData> for AStakeAtCellLockData {
+    fn from(value: StakeAtCellLockData) -> Self {
+        AStakeAtCellLockData::new_builder()
             .l1_pub_key(value.l1_pub_key)
             .bls_pub_key(value.bls_pub_key)
             .delta((&value.stake_info).into())
@@ -112,18 +156,31 @@ impl From<StakeAtCellData> for AStakeAtCellData {
 
 #[derive(Clone, Default)]
 pub struct DelegateAtCellData {
+    pub lock: DelegateAtCellLockData,
+}
+
+impl From<DelegateAtCellData> for ADelegateAtCellData {
+    fn from(value: DelegateAtCellData) -> Self {
+        ADelegateAtCellData::new_builder()
+            .lock(value.lock.into())
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct DelegateAtCellLockData {
     // pub version:          u8, // useless
     // pub l1_address:       H160, // useless
     // pub metadata_type_id: H256, // useless
     pub delegator_infos: Vec<DelegateItem>,
 }
 
-impl From<DelegateAtCellData> for ADelegateAtCellData {
-    fn from(value: DelegateAtCellData) -> Self {
+impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
+    fn from(value: DelegateAtCellLockData) -> Self {
         let infos = DelegateInfoDeltas::new_builder()
             .extend(value.delegator_infos.iter().map(Into::into))
             .build();
-        ADelegateAtCellData::new_builder()
+        ADelegateAtCellLockData::new_builder()
             // .version(value.version.into()) // useless
             // .l1_address(Identity::from_slice(value.l1_address.as_bytes()).unwrap()) // useless
             // .metadata_type_id(to_byte32(&value.metadata_type_id)) // useless
@@ -162,7 +219,7 @@ impl From<WithdrawInfo> for AWithdrawInfo {
     fn from(value: WithdrawInfo) -> Self {
         AWithdrawInfo::new_builder()
             .amount(to_uint128(value.amount))
-            .epoch(to_uint64(value.epoch))
+            .unlock_epoch(to_uint64(value.epoch))
             .build()
     }
 }

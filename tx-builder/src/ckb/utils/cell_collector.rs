@@ -152,7 +152,7 @@ pub async fn get_stake_cell(
     stake_lock: Script,
     xudt: Script,
 ) -> Result<Option<Cell>> {
-    get_special_token_cell(ckb_rpc, stake_lock, xudt).await
+    get_cell_by_scripts(ckb_rpc, stake_lock, xudt).await
 }
 
 pub async fn get_delegate_cell(
@@ -160,7 +160,7 @@ pub async fn get_delegate_cell(
     delegate_lock: Script,
     xudt: Script,
 ) -> Result<Option<Cell>> {
-    get_special_token_cell(ckb_rpc, delegate_lock, xudt).await
+    get_cell_by_scripts(ckb_rpc, delegate_lock, xudt).await
 }
 
 pub async fn get_withdraw_cell(
@@ -168,19 +168,32 @@ pub async fn get_withdraw_cell(
     withdraw_lock: Script,
     xudt: Script,
 ) -> Result<Option<Cell>> {
-    get_special_token_cell(ckb_rpc, withdraw_lock, xudt).await
+    get_cell_by_scripts(ckb_rpc, withdraw_lock, xudt).await
 }
 
-async fn get_special_token_cell(
+pub async fn get_delegate_requirement_cell(
+    ckb_rpc: &impl CkbRpc,
+    delegate_requirement_lock: Script,
+    delegate_requirement_type: Script,
+) -> Result<Option<Cell>> {
+    get_cell_by_scripts(
+        ckb_rpc,
+        delegate_requirement_lock,
+        delegate_requirement_type,
+    )
+    .await
+}
+
+async fn get_cell_by_scripts(
     ckb_rpc: &impl CkbRpc,
     lock: Script,
-    xudt: Script,
+    type_: Script,
 ) -> Result<Option<Cell>> {
     let cells = collect_cells(ckb_rpc, 1, SearchKey {
         script:               lock.into(),
         script_type:          ScriptType::Lock,
         filter:               Some(SearchKeyFilter {
-            script: Some(xudt.into()),
+            script: Some(type_.into()),
             ..Default::default()
         }),
         script_search_mode:   None,

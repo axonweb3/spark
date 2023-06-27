@@ -255,14 +255,14 @@ pub fn delegate_requriement_type_dep(network_type: &NetworkType) -> CellDep {
 pub fn reward_type_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
-            &REWARD_TYPE_MAINNET.tx_hash,
-            REWARD_TYPE_MAINNET.index,
-            REWARD_TYPE_MAINNET.dep_type
+            &REWARD_SMT_TYPE_MAINNET.tx_hash,
+            REWARD_SMT_TYPE_MAINNET.index,
+            REWARD_SMT_TYPE_MAINNET.dep_type
         ),
         NetworkType::Testnet => cell_dep!(
-            &REWARD_TYPE_TESTNET.tx_hash,
-            REWARD_TYPE_TESTNET.index,
-            REWARD_TYPE_TESTNET.dep_type
+            &REWARD_SMT_TYPE_TESTNET.tx_hash,
+            REWARD_SMT_TYPE_TESTNET.index,
+            REWARD_SMT_TYPE_TESTNET.dep_type
         ),
     }
 }

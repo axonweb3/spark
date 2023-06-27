@@ -102,7 +102,7 @@ where
         kicker_key: PrivateKey,
         ckb: CkbNetwork<C>,
         type_ids: CheckpointTypeIds,
-        latest_checkpoint_info: Checkpoint,
+        new_checkpoint: Checkpoint,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
@@ -122,7 +122,7 @@ pub trait IMetadataTxBuilder<PSmt> {
 }
 
 #[async_trait]
-pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
+pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage> {
     fn new(
         ckb: CkbNetwork<C>,
         kicker: PrivateKey,
@@ -137,12 +137,12 @@ pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
 }
 
 #[async_trait]
-pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage + Send + Sync> {
+pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage> {
     fn new(
         ckb: CkbNetwork<C>,
         kicker: PrivateKey,
         current_epoch: Epoch,
-        type_ids: DelegateTypeIds,
+        type_ids: DelegateSmtTypeIds,
         delegate_at_cells: Vec<Cell>,
         delegate_smt_storage: D,
     ) -> Self;

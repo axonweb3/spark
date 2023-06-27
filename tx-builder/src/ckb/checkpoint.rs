@@ -39,7 +39,7 @@ where
     kicker_key:             PrivateKey,
     ckb:                    CkbNetwork<C>,
     type_ids:               CheckpointTypeIds,
-    latest_checkpoint_info: Checkpoint,
+    new_checkpoint:         Checkpoint,
     checkpoint_type_script: Script,
 }
 
@@ -52,7 +52,7 @@ where
         kicker_key: PrivateKey,
         ckb: CkbNetwork<C>,
         type_ids: CheckpointTypeIds,
-        latest_checkpoint_info: Checkpoint,
+        new_checkpoint: Checkpoint,
     ) -> Self {
         let checkpoint_type_script =
             checkpoint_type(&ckb.network_type, &type_ids.checkpoint_type_id);
@@ -60,7 +60,7 @@ where
             kicker_key,
             ckb,
             type_ids,
-            latest_checkpoint_info,
+            new_checkpoint,
             checkpoint_type_script,
         }
     }
@@ -70,19 +70,15 @@ where
             get_unique_cell(&self.ckb.client, self.checkpoint_type_script.clone()).await?;
         self.check_occasion(last_checkpoint_cell.clone()).await?;
 
-        let checkpoint_lock = always_success_lock(&self.ckb.network_type);
-        let kicker_addr = omni_eth_address(self.kicker_key.clone())?;
-        let kick_token_lock = omni_eth_lock(&self.ckb.network_type, &kicker_addr);
-
-        let new_checkpoint_cell_data: CheckpointCellData = (&self.latest_checkpoint_info).into();
-        let outputs_data = vec![new_checkpoint_cell_data.as_bytes()];
-
         let inputs: Vec<ckb_types::packed::CellInput> = vec![CellInput::new_builder()
-            .previous_output(last_checkpoint_cell.clone().out_point.into())
+            .previous_output(last_checkpoint_cell.out_point.into())
             .build()];
 
+        let new_checkpoint_data: CheckpointCellData = (&self.new_checkpoint).into();
+        let outputs_data = vec![new_checkpoint_data.as_bytes()];
+
         let outputs = vec![CellOutput::new_builder()
-            .lock(checkpoint_lock.clone())
+            .lock(always_success_lock(&self.ckb.network_type))
             .type_(Some(self.checkpoint_type_script.clone()).pack())
             .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?];
 
@@ -111,12 +107,17 @@ where
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, kick_token_lock.clone(), tx).await?;
+        let kick_lock = omni_eth_lock(
+            &self.ckb.network_type,
+            &omni_eth_address(self.kicker_key.clone())?,
+        );
+
+        let tx = balance_tx(&self.ckb.client, kick_lock.clone(), tx).await?;
 
         let signer = omni_eth_signer(self.kicker_key.clone())?;
 
         let tx_view = signer.sign_tx(&tx, &ScriptGroup {
-            script:         kick_token_lock,
+            script:         kick_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![1],
             output_indices: vec![],
@@ -136,34 +137,32 @@ where
         );
         let last_epoch = to_u64(&last_checkpoint_cell_data.epoch());
         let last_period = to_u32(&last_checkpoint_cell_data.period());
-        match self.latest_checkpoint_info.epoch {
+        match self.new_checkpoint.epoch {
             latest_epoch if latest_epoch == last_epoch.saturating_add(1) => {
-                match self.latest_checkpoint_info.period {
+                match self.new_checkpoint.period {
                     0 => Ok(()),
                     _ => Err(CkbTxErr::NotCheckpointOccasion {
                         current_epoch:   last_epoch,
                         current_period:  last_period,
                         recorded_epoch:  latest_epoch,
-                        recorded_period: self.latest_checkpoint_info.period,
+                        recorded_period: self.new_checkpoint.period,
                     }),
                 }
             }
-            latest_epoch if latest_epoch == last_epoch => {
-                match self.latest_checkpoint_info.period {
-                    last_period if last_period == last_period.saturating_add(1) => Ok(()),
-                    _ => Err(CkbTxErr::NotCheckpointOccasion {
-                        current_epoch:   last_epoch,
-                        current_period:  last_period,
-                        recorded_epoch:  latest_epoch,
-                        recorded_period: last_period,
-                    }),
-                }
-            }
+            latest_epoch if latest_epoch == last_epoch => match self.new_checkpoint.period {
+                last_period if last_period == last_period.saturating_add(1) => Ok(()),
+                _ => Err(CkbTxErr::NotCheckpointOccasion {
+                    current_epoch:   last_epoch,
+                    current_period:  last_period,
+                    recorded_epoch:  latest_epoch,
+                    recorded_period: last_period,
+                }),
+            },
             _ => Err(CkbTxErr::NotCheckpointOccasion {
                 current_epoch:   last_epoch,
                 current_period:  last_period,
-                recorded_epoch:  self.latest_checkpoint_info.epoch,
-                recorded_period: self.latest_checkpoint_info.period,
+                recorded_epoch:  self.new_checkpoint.epoch,
+                recorded_period: self.new_checkpoint.period,
             }),
         }
     }

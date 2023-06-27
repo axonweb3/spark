@@ -50,7 +50,7 @@ pub async fn add_stake_tx(ckb: CkbNetwork<CkbRpcClient>) {
         ckb,
         StakeItem {
             is_increase:        true,
-            amount:             50,
+            amount:             1,
             inauguration_epoch: 2,
         },
         0,
@@ -66,7 +66,7 @@ pub async fn reedem_stake_tx(ckb: CkbNetwork<CkbRpcClient>) {
         ckb,
         StakeItem {
             is_increase:        false,
-            amount:             30,
+            amount:             3,
             inauguration_epoch: 2,
         },
         0,
@@ -79,7 +79,7 @@ async fn stake_tx(
     ckb: CkbNetwork<CkbRpcClient>,
     stake_item: StakeItem,
     current_epoch: u64,
-    first_stake: Option<FirstStakeInfo>,
+    first_stake_info: Option<FirstStakeInfo>,
 ) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
     let test_staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
@@ -88,6 +88,7 @@ async fn stake_tx(
         omni_eth_ckb_address(&ckb.network_type, test_staker_key.clone()).unwrap()
     );
 
+    let first_stake = first_stake_info.is_some();
     let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
@@ -103,7 +104,7 @@ async fn stake_tx(
         omni_eth_address(test_staker_key.clone()).unwrap(),
         current_epoch,
         stake_item,
-        first_stake,
+        first_stake_info,
     )
     .build_tx()
     .await
@@ -112,15 +113,29 @@ async fn stake_tx(
     let signer = omni_eth_signer(test_staker_key).unwrap();
     let script_groups = gen_script_group(&ckb.client, &tx).await.unwrap();
 
-    for group in script_groups.lock_groups.iter() {
-        println!("id: {:?}", group.1.input_indices);
-        tx = signer.sign_tx(&tx, group.1).unwrap();
+    if first_stake {
+        for group in script_groups.lock_groups.iter() {
+            tx = signer.sign_tx(&tx, group.1).unwrap();
+        }
+    } else {
+        let mut first_group = true;
+        for group in script_groups.lock_groups.iter() {
+            if !first_group {
+                println!("sign; not stake id: {:?}", group.1.input_indices);
+                tx = signer.sign_tx(&tx, group.1).unwrap();
+            } else {
+                println!("not sign; stake id: {:?}", group.1.input_indices);
+            }
+            first_group = false;
+        }
     }
 
     match send_tx(&ckb.client, &tx.data().into()).await {
         Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }
+
+    println!("\ntx: {}", tx);
 }
 
 fn hex_decode(src: &str) -> Vec<u8> {
