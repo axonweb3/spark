@@ -10,6 +10,6 @@
 # database
 *.sqlite
 
-free-space
 
 /devtools/tx-tests/src/config/priv_keys.toml
+free-space/
