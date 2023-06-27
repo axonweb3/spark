@@ -62,6 +62,21 @@ pub fn secp256k1_lock_dep(network_type: &NetworkType) -> CellDep {
     }
 }
 
+pub fn always_success_lock_dep(network_type: &NetworkType) -> CellDep {
+    match network_type {
+        NetworkType::Mainnet => cell_dep!(
+            &ALWAYS_SUCCESS_LOCK_MAINNET.tx_hash,
+            ALWAYS_SUCCESS_LOCK_MAINNET.index,
+            ALWAYS_SUCCESS_LOCK_MAINNET.dep_type
+        ),
+        NetworkType::Testnet => cell_dep!(
+            &ALWAYS_SUCCESS_LOCK_TESTNET.tx_hash,
+            ALWAYS_SUCCESS_LOCK_TESTNET.index,
+            ALWAYS_SUCCESS_LOCK_TESTNET.dep_type
+        ),
+    }
+}
+
 pub fn xudt_type_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(

@@ -75,8 +75,8 @@ pub struct StakeItem {
     pub inauguration_epoch: Epoch,
 }
 
-impl From<&StakeItem> for StakeInfoDelta {
-    fn from(stake: &StakeItem) -> Self {
+impl From<StakeItem> for StakeInfoDelta {
+    fn from(stake: StakeItem) -> Self {
         StakeInfoDelta::new_builder()
             .is_increase(Byte::new(stake.is_increase.into()))
             .amount(to_uint128(stake.amount))
@@ -111,8 +111,8 @@ impl DelegateItem {
     }
 }
 
-impl From<&DelegateItem> for DelegateInfoDelta {
-    fn from(delegate: &DelegateItem) -> Self {
+impl From<DelegateItem> for DelegateInfoDelta {
+    fn from(delegate: DelegateItem) -> Self {
         DelegateInfoDelta::new_builder()
             .staker(Identity::new_unchecked(
                 delegate.staker.as_bytes().to_owned().into(),
@@ -125,7 +125,7 @@ impl From<&DelegateItem> for DelegateInfoDelta {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Checkpoint {
     pub epoch:               Epoch,
     pub period:              u32,
@@ -137,8 +137,8 @@ pub struct Checkpoint {
     pub propose_count:       Vec<ProposeCount>,
 }
 
-impl From<&Checkpoint> for CheckpointCellData {
-    fn from(checkpoint: &Checkpoint) -> Self {
+impl From<Checkpoint> for CheckpointCellData {
+    fn from(checkpoint: Checkpoint) -> Self {
         CheckpointCellData::new_builder()
             .version(Byte::default())
             .epoch(to_uint64(checkpoint.epoch))
@@ -160,7 +160,7 @@ pub fn propose_counts(proposes: &[ProposeCount]) -> ProposeCounts {
     propose_count.build()
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Proof {
     pub number:     u64,
     pub round:      u64,

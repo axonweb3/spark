@@ -149,7 +149,7 @@ impl From<StakeAtCellLockData> for AStakeAtCellLockData {
         AStakeAtCellLockData::new_builder()
             .l1_pub_key(value.l1_pub_key)
             .bls_pub_key(value.bls_pub_key)
-            .delta((&value.stake_info).into())
+            .delta(value.stake_info.into())
             .build()
     }
 }
@@ -178,7 +178,7 @@ pub struct DelegateAtCellLockData {
 impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
     fn from(value: DelegateAtCellLockData) -> Self {
         let infos = DelegateInfoDeltas::new_builder()
-            .extend(value.delegator_infos.iter().map(Into::into))
+            .extend(value.delegator_infos.into_iter().map(Into::into))
             .build();
         ADelegateAtCellLockData::new_builder()
             // .version(value.version.into()) // useless

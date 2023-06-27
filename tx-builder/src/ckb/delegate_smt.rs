@@ -36,8 +36,8 @@ use crate::ckb::utils::{
         get_delegate_cell, get_delegate_requirement_cell, get_unique_cell, get_withdraw_cell,
     },
     cell_dep::{
-        checkpoint_cell_dep, delegate_lock_dep, delegate_smt_type_dep, metadata_cell_dep,
-        omni_lock_dep, secp256k1_lock_dep, withdraw_lock_dep, xudt_type_dep,
+        always_success_lock_dep, checkpoint_cell_dep, delegate_lock_dep, delegate_smt_type_dep,
+        metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, withdraw_lock_dep, xudt_type_dep,
     },
     omni::{omni_eth_address, omni_eth_witness_placeholder},
     script::{
@@ -111,6 +111,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateS
         let cell_deps = vec![
             secp256k1_lock_dep(&self.ckb.network_type),
             omni_lock_dep(&self.ckb.network_type),
+            always_success_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
             delegate_lock_dep(&self.ckb.network_type),
             delegate_smt_type_dep(&self.ckb.network_type),
@@ -259,11 +260,11 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
                         new_delegates.push(delegate.as_builder().amount(to_uint128(0)).build());
                 }
 
-                let new_delegate_data = old_delegate_data.lock().clone();
+                let inner_delegate_data = old_delegate_data.lock();
                 let new_delegate_data = old_delegate_data
                     .as_builder()
                     .lock(
-                        new_delegate_data
+                        inner_delegate_data
                             .as_builder()
                             .delegator_infos(new_delegates.build())
                             .build(),

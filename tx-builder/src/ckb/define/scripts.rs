@@ -76,17 +76,17 @@ lazy_static::lazy_static! {
     };
 
     // todo: main net
-    pub static ref ALWAYS_SUCCESS_MAINNET: Script = Script {
+    pub static ref ALWAYS_SUCCESS_LOCK_MAINNET: Script = Script {
         code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
         hash_type: ScriptHashType::Type,
         tx_hash: h256!("0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c"),
         index: 0,
         dep_type: DepType::Code,
     };
-    pub static ref ALWAYS_SUCCESS_TESTNET: Script = Script {
-        code_hash: h256!("0x00000000000000000000000000000000000000000000000000545950455f4944"),
+    pub static ref ALWAYS_SUCCESS_LOCK_TESTNET: Script = Script {
+        code_hash: h256!("0xd4edb0fa797f92bc0dcb8bcef036c55e3f591316ca4af6a5fb4cc4a5e67cb014"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x842380984bff8b2c7bbb8fd8886bd6784795f2f8ad140e4e2b41d771fa27314d"),
+        tx_hash: h256!("0x1f2d3579dcb8599e31ce71f3b471be7e1edd77c314c0942eb26d11c80d259ba9"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -171,7 +171,7 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
 
-    // todo
+    // todo: main net
     pub static ref DELEGATE_REQUIREMENT_TYPE_MAINNET: Script = Script {
         code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
         hash_type: ScriptHashType::Type,
@@ -180,9 +180,9 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
     pub static ref DELEGATE_REQUIREMENT_TYPE_TESTNET: Script = Script {
-        code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
+        code_hash: h256!("0x1122036fd7be9796625b60a22e045fe5d03ffb2d559e86098d896645f3f356b0"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        tx_hash: h256!("0x95876df71b1c631ba6cc1abb1e2d789cebef35837f223bfd56ad7b66bc8fcb0e"),
         index: 0,
         dep_type: DepType::Code,
     };

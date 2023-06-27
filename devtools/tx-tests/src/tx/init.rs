@@ -25,12 +25,14 @@ pub async fn init_tx(ckb: CkbNetwork<CkbRpcClient>) {
         Checkpoint {
             epoch: 0,
             period: 0,
+            latest_block_height: 10,
+            timestamp: 11111,
             ..Default::default()
         },
         Metadata {
-            epoch_len: 2,
-            period_len: 2,
-            quorum: 2,
+            epoch_len: 100,
+            period_len: 100,
+            quorum: 10,
             ..Default::default()
         },
     )
