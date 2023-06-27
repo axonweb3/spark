@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use common::types::tx_builder::NetworkType;
 use serde::{de, Deserialize};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -10,6 +11,7 @@ pub struct SparkConfig {
     pub rpc_listen_address: SocketAddr,
     pub rdb_url:            String,
     pub kvdb_path:          PathBuf,
+    pub network_type:       NetworkType,
 }
 
 /// Parse a config from reader.

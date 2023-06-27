@@ -5,15 +5,13 @@ use async_trait::async_trait;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput},
+    packed::{CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
 
 use common::types::axon_types::{
     basic::Byte32,
-    stake::{
-        StakeArgs, StakeAtCellData, StakeSmtCellData, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
-    },
+    stake::{StakeArgs, StakeAtCellData, StakeSmtCellData},
 };
 use common::types::tx_builder::{StakeItem, StakeSmtTypeIds, Staker as TxStaker};
 use common::{
@@ -36,7 +34,7 @@ use molecule::prelude::Builder;
 use crate::ckb::define::{
     constants::{INAUGURATION, TOKEN_BYTES},
     error::CkbTxErr,
-    types::{StakeInfo, StakeSmtUpdateInfo},
+    types::StakeInfo,
 };
 use crate::ckb::helper::{
     token_cell_data, AlwaysSuccess, Checkpoint, Metadata, OmniEth, Secp256k1, Stake, Tx, Withdraw,
@@ -88,13 +86,13 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
                 .build(),
         ];
 
-        let (root, cells, statistics) = self.collect().await?;
+        let (new_smt_root, cells, statistics, smt_witness) = self.collect().await?;
 
         let old_stake_smt_cell_bytes = stake_smt_cell.output_data.unwrap().into_bytes();
         let old_stake_smt_cell_data = StakeSmtCellData::new_unchecked(old_stake_smt_cell_bytes);
         let new_stake_smt_cell_data = old_stake_smt_cell_data
             .as_builder()
-            .smt_root(Byte32::from_slice(root.as_slice()).unwrap())
+            .smt_root(Byte32::from_slice(new_smt_root.as_slice()).unwrap())
             .build()
             .as_bytes();
 
@@ -131,7 +129,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
 
         // todo
         let mut witnesses = vec![
-            OmniEth::witness_placeholder().as_bytes(), // Stake smt cell lock
+            smt_witness.as_bytes(),                    // Stake smt cell lock
             OmniEth::witness_placeholder().as_bytes(), // Stake AT cell lock, may not be needed
             OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
@@ -283,7 +281,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         self.stake_smt_storage.get_top_root().await
     }
 
-    async fn collect(&self) -> Result<(Root, HashMap<TxStaker, Cell>, Statistics)> {
+    async fn collect(&self) -> Result<(Root, HashMap<TxStaker, Cell>, Statistics, WitnessArgs)> {
         let old_smt = self
             .stake_smt_storage
             .get_sub_leaves(self.current_epoch + INAUGURATION)
@@ -375,26 +373,31 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .stake_smt_storage
             .generate_sub_proof(
                 self.current_epoch + INAUGURATION,
-                new_smt.into_keys().collect(),
+                new_smt.clone().into_keys().collect(),
             )
             .await?;
 
-        let _stake_smt_witness = AStakeSmtUpdateInfo::from(StakeSmtUpdateInfo {
-            all_stake_infos: old_smt
-                .iter()
-                .map(|(k, v)| StakeInfo {
-                    addr:   k.0.into(),
-                    amount: v.to_owned(),
+        let stake_smt_witness = Stake::smt_witness(
+            new_smt
+                .into_iter()
+                .map(|(addr, amount)| StakeInfo {
+                    addr: ckb_types::H160(addr.0),
+                    amount,
                 })
                 .collect(),
             old_epoch_proof,
             new_epoch_proof,
-        });
+        );
 
-        Ok((new_root, inputs_stake_cells, Statistics {
-            non_top_stakers,
-            withdraw_amounts,
-        }))
+        Ok((
+            new_root,
+            inputs_stake_cells,
+            Statistics {
+                non_top_stakers,
+                withdraw_amounts,
+            },
+            stake_smt_witness,
+        ))
     }
 
     fn collect_non_top_stakers(

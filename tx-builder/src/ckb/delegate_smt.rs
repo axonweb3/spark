@@ -5,9 +5,10 @@ use async_trait::async_trait;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput},
+    packed::{CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
+use molecule::prelude::Builder;
 
 use common::traits::{
     ckb_rpc_client::CkbRpc, smt::DelegateSmtStorage, tx_builder::IDelegateSmtTxBuilder,
@@ -16,15 +17,15 @@ use common::types::axon_types::delegate::{
     DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
     DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
 };
-use common::types::smt::{Delegator as SmtDelegator, Staker as SmtStaker};
+use common::types::smt::Delegator as SmtDelegator;
 use common::types::tx_builder::{
     Amount, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt, InStakeSmt,
     NonTopDelegators, PrivateKey, Staker as TxStaker,
 };
 use common::types::{ckb_rpc_client::Cell, smt::UserAmount};
-use common::utils::convert::{new_u128, to_uint128, to_usize};
-use molecule::prelude::Builder;
+use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_uint128, to_usize};
 
+use crate::ckb::define::types::{DelegateInfo, StakeGroupInfo};
 use crate::ckb::define::{
     constants::{INAUGURATION, TOKEN_BYTES},
     error::CkbTxErr,
@@ -80,7 +81,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
                 .build(),
         ];
 
-        let (root, statistics) = self.collect().await?;
+        let (root, statistics, smt_witness) = self.collect().await?;
 
         let mut outputs = vec![
             // delegate smt cell
@@ -110,7 +111,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
 
         // todo
         let witnesses = vec![
-            OmniEth::witness_placeholder().as_bytes(), // Delegate AT cell lock
+            smt_witness.as_bytes(),                    // Delegate AT cell lock
             OmniEth::witness_placeholder().as_bytes(), // Withdraw AT cell lock
             OmniEth::witness_placeholder().as_bytes(), // AT cell lock
             OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
@@ -286,27 +287,35 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         (total_delegate_amount, delegate_data)
     }
 
-    async fn collect(&mut self) -> Result<(Bytes, Statistics)> {
+    async fn collect(&mut self) -> Result<(Bytes, Statistics, WitnessArgs)> {
         let mut delegates = HashMap::new();
         self.collect_cell_delegates(&mut delegates)?;
 
         let mut non_top_delegators = HashMap::new();
         let mut withdraw_amounts = HashMap::new();
         let mut new_roots = vec![];
+        let mut delegate_infos = vec![];
 
         for (staker, delegators) in delegates.iter() {
             let old_smt = self
                 .delegate_smt_storage
-                .get_sub_leaves(
+                .get_sub_leaves(self.current_epoch + INAUGURATION, to_eth_h160(staker))
+                .await?;
+
+            // get the old epoch proof for witness
+            let old_epoch_proof = self
+                .delegate_smt_storage
+                .generate_sub_proof(
+                    to_eth_h160(staker),
                     self.current_epoch + INAUGURATION,
-                    SmtStaker::from_slice(staker.as_bytes()),
+                    old_smt.clone().into_keys().collect(),
                 )
                 .await?;
 
             let mut new_smt = old_smt.clone();
 
             for (delegator, delegate) in delegators.iter() {
-                let smt_delegator = SmtDelegator::from_slice(delegator.as_bytes());
+                let smt_delegator = to_eth_h160(delegator);
                 if new_smt.contains_key(&smt_delegator) {
                     let origin_amount = new_smt.get(&smt_delegator).unwrap().to_owned();
                     if delegate.is_increase {
@@ -343,6 +352,30 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             )
             .await?;
 
+            // get the new epoch proof for witness
+            let new_epoch_proof = self
+                .delegate_smt_storage
+                .generate_sub_proof(
+                    to_eth_h160(staker),
+                    self.current_epoch + INAUGURATION,
+                    new_smt.clone().into_keys().collect(),
+                )
+                .await?;
+
+            delegate_infos.push(StakeGroupInfo {
+                staker:                   staker.clone(),
+                delegate_old_epoch_proof: old_epoch_proof,
+                delegate_new_epoch_proof: new_epoch_proof,
+                delegate_infos:           new_smt
+                    .clone()
+                    .into_iter()
+                    .map(|(addr, amount)| DelegateInfo {
+                        delegator_addr: to_ckb_h160(&addr),
+                        amount,
+                    })
+                    .collect(),
+            });
+
             new_roots.push(self.update_delegate_smt(staker.clone(), new_smt).await?);
         }
 
@@ -356,6 +389,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 non_top_delegators,
                 withdraw_amounts,
             },
+            Delegate::smt_witness(delegate_infos),
         ))
     }
 
@@ -482,7 +516,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             })
             .collect();
 
-        let smt_staker = SmtStaker::from_slice(staker.as_bytes());
+        let smt_staker = to_eth_h160(&staker);
 
         self.delegate_smt_storage
             .insert(

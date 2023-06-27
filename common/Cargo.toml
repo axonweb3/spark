@@ -16,7 +16,7 @@ ckb-types = "0.108"
 dashmap = "5.4"
 derive_more = "0.99"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
-faster-hex = "0.6"
+faster-hex = "0.8"
 lazy_static = "1.4"
 molecule = "0.7"
 parking_lot = "0.12"
