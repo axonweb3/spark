@@ -1,6 +1,7 @@
 pub mod api;
 pub mod axon_rpc_client;
 pub mod ckb_rpc_client;
+pub mod primitive;
 pub mod relation_db;
 pub mod smt;
 pub mod tx_builder;

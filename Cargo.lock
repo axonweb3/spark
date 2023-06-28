@@ -314,9 +314,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "axon-tools"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "945cf176886c0eefa5e85565124fb3e23c5078adfb3eab6baeb6263d78ef0d3f"
+dependencies = [
+ "bit-vec",
+ "blst",
+ "bytes",
+ "cita_trie",
+ "ethereum-types",
+ "faster-hex",
+ "rlp",
+ "rlp-derive",
+ "serde",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=8677b51#8677b5188b29df8146fe1b532980220a83e8e215"
+source = "git+https://github.com/axonweb3/axon-contract?rev=5f783b0#5f783b0b858362361556fdca51c304fdd762e24e"
 dependencies = [
  "molecule",
  "molecule2",
@@ -626,6 +644,17 @@ dependencies = [
  "num-traits",
  "serde",
  "winapi",
+]
+
+[[package]]
+name = "cita_trie"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afe7baab47f510f52ca8dc9c0eb9082020c627c7f22285bea30edc3511f7ee29"
+dependencies = [
+ "hasher",
+ "parking_lot 0.12.1",
+ "rlp",
 ]
 
 [[package]]
@@ -1130,11 +1159,14 @@ dependencies = [
  "molecule",
  "parking_lot 0.12.1",
  "rand 0.8.5",
+ "rlp",
+ "rlp-derive",
  "sea-orm",
  "serde",
  "serde_json",
  "sparse-merkle-tree",
  "thiserror",
+ "tiny-keccak",
  "tokio",
 ]
 
@@ -1760,6 +1792,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
  "ahash 0.8.3",
+]
+
+[[package]]
+name = "hasher"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbba678b6567f27ce22870d951f4208e1dc2fef64993bd4521b1d497ef8a3aa"
+dependencies = [
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -2433,7 +2474,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=8677b51#8677b5188b29df8146fe1b532980220a83e8e215"
+source = "git+https://github.com/axonweb3/axon-contract?rev=5f783b0#5f783b0b858362361556fdca51c304fdd762e24e"
 
 [[package]]
 name = "native-tls"
@@ -3222,6 +3263,17 @@ checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
  "bytes",
  "rustc-hex",
+]
+
+[[package]]
+name = "rlp-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e33d7b2abe0c340d8797fe2907d3f20d3b5ea5908683618bfe80df7f621f672a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4375,6 +4427,7 @@ name = "tx-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axon-tools",
  "axon-types",
  "bytes",
  "ckb-sdk",
@@ -4382,6 +4435,7 @@ dependencies = [
  "clap 4.2.7",
  "common",
  "faster-hex",
+ "hex",
  "kicker",
  "molecule",
  "ophelia",
@@ -4389,6 +4443,7 @@ dependencies = [
  "rpc-client",
  "serde",
  "serde_derive",
+ "serde_json",
  "storage",
  "stringreader",
  "tokio",

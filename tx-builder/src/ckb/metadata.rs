@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use async_trait::async_trait;
 use axon_types::{
-    delegate::DelegateAtCellData as ADelegateAtCellData,
+    basic::Byte65, delegate::DelegateAtCellData as ADelegateAtCellData,
     metadata::MetadataCellData as AMetadataCellData,
     withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
@@ -272,7 +272,7 @@ where
                     // todo: fetch validators' blspubkey pubkey to build metadata
                     bls_pub_key:    bytes::Bytes::default(),
                     // todo: fetch validators' blspubkey pubkey to build metadata
-                    pub_key:        bytes::Bytes::default(),
+                    pub_key:        Byte65::default(),
                     address:        v.staker.0.into(),
                     // todo
                     propose_weight: 0,
@@ -413,14 +413,15 @@ where
             total_amount += amount;
             let mut withdraw_data = WithdrawAtCellData::default();
             if withdraw_data
+                .lock
                 .withdraw_infos
                 .last()
                 .map(|v| v.epoch == self.last_checkpoint.epoch)
                 .unwrap_or_default()
             {
-                withdraw_data.withdraw_infos.last_mut().unwrap().amount += amount;
+                withdraw_data.lock.withdraw_infos.last_mut().unwrap().amount += amount;
             } else {
-                withdraw_data.withdraw_infos.push(WithdrawInfo {
+                withdraw_data.lock.withdraw_infos.push(WithdrawInfo {
                     amount,
                     epoch: self.last_checkpoint.epoch,
                 })

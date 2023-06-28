@@ -1,1 +1,1 @@
-The testing of the transaction has been moved to `devtools/tx-tests/`
+The testing of transactions has been moved to `devtools/tx-tests/`

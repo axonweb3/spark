@@ -1,3 +1,27 @@
+# Configure private key
+
+Create file `devtools/tx-tests/src/config/type_ids.toml`
+```
+touch devtools/tx-tests/src/config/type_ids.toml
+```
+
+Then fill the content as follows.
+```
+seeder_privkey = "0x111111b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e61"
+
+staker_privkeys = [
+    "0x222222b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60",
+    "0x333333b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62",
+    "0x444444b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e63",
+]
+
+delegator_privkeys = [
+    "0x222222b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60",
+    "0x333333b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e62",
+    "0x444444b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e63",
+]
+```
+
 # Run
 ```
 cargo run -- -i  // init tx

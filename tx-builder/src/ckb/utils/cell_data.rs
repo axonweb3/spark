@@ -52,7 +52,7 @@ pub fn update_withdraw_data(
     let mut new_withdraw_infos = AWithdrawInfos::new_builder();
     let mut inserted = false;
 
-    for item in withdraw_data.withdraw_infos() {
+    for item in withdraw_data.lock().withdraw_infos() {
         let epoch = to_u64(&item.unlock_epoch());
         new_withdraw_infos = new_withdraw_infos.push(if epoch == inaugration_epoch {
             inserted = true;
@@ -73,11 +73,18 @@ pub fn update_withdraw_data(
         }));
     }
 
+    let inner_withdraw_data = withdraw_data.lock();
+
     token_cell_data(
         total_withdraw_amount,
         withdraw_data
             .as_builder()
-            .withdraw_infos(new_withdraw_infos.build())
+            .lock(
+                inner_withdraw_data
+                    .as_builder()
+                    .withdraw_infos(new_withdraw_infos.build())
+                    .build(),
+            )
             .build()
             .as_bytes(),
     )

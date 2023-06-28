@@ -1,6 +1,6 @@
 use ckb_sdk::unlock::ScriptSigner;
 use common::traits::tx_builder::ICheckpointTxBuilder;
-use common::types::tx_builder::{Checkpoint, CheckpointTypeIds, CkbNetwork};
+use common::types::tx_builder::{Checkpoint, CheckpointProof, CheckpointTypeIds, CkbNetwork};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::checkpoint::CheckpointTxBuilder;
 use tx_builder::ckb::utils::omni::{omni_eth_ckb_address, omni_eth_signer};
@@ -8,6 +8,7 @@ use tx_builder::ckb::utils::tx::{gen_script_group, send_tx};
 
 use crate::config::parse_file;
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
+use crate::mock::{mock_axon_proof, mock_axon_proposal};
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
 pub async fn checkpoint_tx(ckb: CkbNetwork<CkbRpcClient>) {
@@ -29,13 +30,17 @@ pub async fn checkpoint_tx(ckb: CkbNetwork<CkbRpcClient>) {
             metadata_type_id,
             checkpoint_type_id,
         },
-        2,
+        100,
         Checkpoint {
-            epoch: 1,
+            epoch: 0,
             period: 1,
             latest_block_height: 10,
             timestamp: 11111,
             ..Default::default()
+        },
+        CheckpointProof {
+            proof:    mock_axon_proof(),
+            proposal: mock_axon_proposal(),
         },
     )
     .await

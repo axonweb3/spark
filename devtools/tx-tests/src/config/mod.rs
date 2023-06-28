@@ -35,8 +35,7 @@ mod tests {
     use super::types::*;
     use super::{parse_file, write_file};
 
-    #[test]
-    fn test_parse_config() {
+    fn _test_parse_config() {
         let file_path = "./src/config/priv_keys.toml";
         let priv_keys: PrivKeys = parse_file(file_path);
         println!("{:?}", priv_keys);

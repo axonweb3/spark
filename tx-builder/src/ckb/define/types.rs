@@ -1,5 +1,5 @@
 use axon_types::{
-    basic::{Byte32, Byte65, Byte97},
+    basic::{Byte32, Byte48, Byte65},
     delegate::{
         DelegateAtCellData as ADelegateAtCellData,
         DelegateAtCellLockData as ADelegateAtCellLockData, DelegateInfoDeltas,
@@ -12,7 +12,8 @@ use axon_types::{
         StakeInfo as AStakeInfo, StakeInfos, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
     },
     withdraw::{
-        WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
+        WithdrawAtCellData as AWithdrawAtCellData,
+        WithdrawAtCellLockData as AWithdrawAtCellLockData, WithdrawInfo as AWithdrawInfo,
         WithdrawInfos as AWithdrawInfos,
     },
 };
@@ -140,7 +141,7 @@ pub struct StakeAtCellLockData {
     // pub l2_address:       H160, // useless
     // pub metadata_type_id: H256, // useless
     pub l1_pub_key:  Byte65,
-    pub bls_pub_key: Byte97,
+    pub bls_pub_key: Byte48,
     pub stake_info:  StakeItem,
 }
 
@@ -191,17 +192,30 @@ impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
 
 #[derive(Clone, Default)]
 pub struct WithdrawAtCellData {
+    pub lock: WithdrawAtCellLockData,
+}
+
+impl From<WithdrawAtCellData> for AWithdrawAtCellData {
+    fn from(value: WithdrawAtCellData) -> Self {
+        AWithdrawAtCellData::new_builder()
+            .lock(value.lock.into())
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct WithdrawAtCellLockData {
     // pub version:          u8, // useless
     // pub metadata_type_id: H256, // useless
     pub withdraw_infos: Vec<WithdrawInfo>,
 }
 
-impl From<WithdrawAtCellData> for AWithdrawAtCellData {
-    fn from(value: WithdrawAtCellData) -> Self {
+impl From<WithdrawAtCellLockData> for AWithdrawAtCellLockData {
+    fn from(value: WithdrawAtCellLockData) -> Self {
         let infos: AWithdrawInfos = AWithdrawInfos::new_builder()
             .extend(value.withdraw_infos.into_iter().map(Into::into))
             .build();
-        AWithdrawAtCellData::new_builder()
+        AWithdrawAtCellLockData::new_builder()
             // .version(value.version.into()) // useless
             // .metadata_type_id(to_byte32(&value.metadata_type_id)) // useless
             .withdraw_infos(infos)
@@ -242,7 +256,7 @@ impl From<MetadataCellData> for AMetadataCellData {
             .type_ids((v.type_ids).into())
             .metadata({
                 let mut list = MetadataList::new_builder();
-                for m in v.metadata.iter() {
+                for m in v.metadata.into_iter() {
                     list = list.push(m.into());
                 }
                 list.build()
