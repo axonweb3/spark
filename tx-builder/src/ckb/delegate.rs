@@ -402,14 +402,14 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
                 )?;
 
                 updated_delegates = updated_delegates.push(
-                    (&DelegateItem {
+                    DelegateItem {
                         staker:             delegate.staker.clone(),
                         total_amount:       actual_info.total_elect_amount,
                         is_increase:        actual_info.is_increase,
                         amount:             actual_info.amount,
                         inauguration_epoch: delegate.inauguration_epoch,
-                    })
-                        .into(),
+                    }
+                    .into(),
                 );
             } else {
                 if delegate.is_increase {
@@ -417,7 +417,7 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
                 }
                 let mut delegate = delegate.to_owned();
                 delegate.total_amount = delegate.amount;
-                updated_delegates = updated_delegates.push((&delegate).into());
+                updated_delegates = updated_delegates.push(delegate.into());
             }
         }
 

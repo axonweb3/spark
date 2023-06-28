@@ -62,13 +62,13 @@ pub fn sighash_lock(pubkey_hash: &Bytes) -> Script {
 pub fn always_success_lock(network_type: &NetworkType) -> Script {
     match network_type {
         NetworkType::Mainnet => script!(
-            &ALWAYS_SUCCESS_MAINNET.code_hash,
-            ALWAYS_SUCCESS_MAINNET.hash_type,
+            &ALWAYS_SUCCESS_LOCK_MAINNET.code_hash,
+            ALWAYS_SUCCESS_LOCK_MAINNET.hash_type,
             bytes::Bytes::default()
         ),
         NetworkType::Testnet => script!(
-            &ALWAYS_SUCCESS_TESTNET.code_hash,
-            ALWAYS_SUCCESS_TESTNET.hash_type,
+            &ALWAYS_SUCCESS_LOCK_TESTNET.code_hash,
+            ALWAYS_SUCCESS_LOCK_TESTNET.hash_type,
             bytes::Bytes::default()
         ),
     }

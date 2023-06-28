@@ -101,13 +101,13 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
             script:         seeder_lock.clone(),
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![1],
-            output_indices: vec![0],
+            output_indices: vec![],
         })?;
         let tx = signer.sign_tx(&tx, &ScriptGroup {
             script:         seeder_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![2],
-            output_indices: vec![0],
+            output_indices: vec![],
         })?;
 
         Ok(tx)

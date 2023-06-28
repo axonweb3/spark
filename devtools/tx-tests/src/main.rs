@@ -42,6 +42,13 @@ async fn main() {
                 .num_args(1)
                 .default_value("")
                 .help("test delegate tx"),
+        )
+        .arg(
+            clap::Arg::new("checkpoint")
+                .short('c')
+                .required(false)
+                .num_args(0)
+                .help("test checkpoint tx"),
         );
 
     let matches = cmd.get_matches();
@@ -49,6 +56,7 @@ async fn main() {
     let mint = matches.get_one::<bool>("mint").unwrap().to_owned();
     let stake = matches.get_one::<String>("stake").unwrap().as_str();
     let delegate = matches.get_one::<String>("delegate").unwrap().as_str();
+    let checkpoint = matches.get_one::<bool>("checkpoint").unwrap().to_owned();
 
     let ckb = CkbNetwork {
         network_type: NetworkType::Testnet,
@@ -79,5 +87,9 @@ async fn main() {
             "redeem" => reedem_delegate_tx(ckb.clone()).await,
             _ => unimplemented!(),
         }
+    }
+
+    if checkpoint {
+        checkpoint_tx(ckb.clone()).await;
     }
 }

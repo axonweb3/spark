@@ -102,6 +102,7 @@ where
         kicker_key: PrivateKey,
         ckb: CkbNetwork<C>,
         type_ids: CheckpointTypeIds,
+        epoch_len: u64,
         new_checkpoint: Checkpoint,
     ) -> Self;
 

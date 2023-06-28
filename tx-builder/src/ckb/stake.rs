@@ -328,12 +328,12 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
                         inner_stake_data
                             .as_builder()
                             .delta(
-                                (&StakeItem {
+                                StakeItem {
                                     is_increase:        actual_info.is_increase,
                                     amount:             actual_info.amount,
                                     inauguration_epoch: self.stake.inauguration_epoch,
-                                })
-                                    .into(),
+                                }
+                                .into(),
                             )
                             .build(),
                     )

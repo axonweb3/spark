@@ -43,8 +43,8 @@ use crate::ckb::utils::{
     cell_collector::{get_stake_cell, get_unique_cell, get_withdraw_cell},
     cell_data::{stake_item, token_cell_data, update_withdraw_data},
     cell_dep::{
-        checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, stake_lock_dep,
-        stake_smt_type_dep, withdraw_lock_dep, xudt_type_dep,
+        always_success_lock_dep, checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep,
+        secp256k1_lock_dep, stake_lock_dep, stake_smt_type_dep, withdraw_lock_dep, xudt_type_dep,
     },
     omni::{omni_eth_address, omni_eth_witness_placeholder},
     script::{
@@ -133,6 +133,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
+            always_success_lock_dep(&self.ckb.network_type),
             stake_lock_dep(&self.ckb.network_type),
             stake_smt_type_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
@@ -149,6 +150,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             .await?,
         ];
 
+        // todo
         let mut witnesses = vec![
             omni_eth_witness_placeholder().as_bytes(), // Stake smt cell lock
             omni_eth_witness_placeholder().as_bytes(), // Stake AT cell lock, may not be needed
@@ -241,16 +243,21 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
                     (old_total_stake_amount, None)
                 };
 
+            let inner_stake_data = old_stake_data.lock();
             let new_stake_data = old_stake_data
-                .lock()
                 .as_builder()
-                .delta(
-                    (&StakeItem {
-                        is_increase:        false,
-                        amount:             0,
-                        inauguration_epoch: 0,
-                    })
-                        .into(),
+                .lock(
+                    inner_stake_data
+                        .as_builder()
+                        .delta(
+                            StakeItem {
+                                is_increase:        false,
+                                amount:             0,
+                                inauguration_epoch: 0,
+                            }
+                            .into(),
+                        )
+                        .build(),
                 )
                 .build()
                 .as_bytes();

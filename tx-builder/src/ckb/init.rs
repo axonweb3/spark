@@ -20,7 +20,7 @@ use molecule::prelude::Builder;
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IInitTxBuilder;
 use common::types::tx_builder::*;
-use common::utils::convert::to_h256;
+use common::utils::convert::{to_axon_byte32, to_h256};
 
 use crate::ckb::define::constants::START_EPOCH;
 use crate::ckb::define::scripts::*;
@@ -139,7 +139,7 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
             script:         seeder_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![0],
-            output_indices: vec![0],
+            output_indices: vec![],
         })?;
 
         Ok((tx, type_id_args))
@@ -148,14 +148,13 @@ impl<C: CkbRpc> IInitTxBuilder<C> for InitTxBuilder<C> {
 
 impl<C: CkbRpc> InitTxBuilder<C> {
     fn build_data(&self) -> Vec<Bytes> {
-        let checkpoint: CheckpointCellData = (&self.checkpoint).into();
         vec![
             // issue cell data
             InfoCellData::new_simple(0, 0, H256::default()).pack(),
             // selection cell data
             Bytes::default(),
             // checkpoint cell data
-            checkpoint.as_bytes(),
+            CheckpointCellData::new_builder().build().as_bytes(),
             // metadata cell data
             AMetadataCellData::from(MetadataCellData {
                 metadata: vec![self.metadata.clone()],
@@ -273,6 +272,17 @@ impl<C: CkbRpc> InitTxBuilder<C> {
         )
         .pack()
         .pack();
+
+        // checkpoint cell data
+        let checkpoint: CheckpointCellData = self.checkpoint.clone().into();
+        outputs_data[2] = checkpoint
+            .as_builder()
+            .metadata_type_id(to_axon_byte32(
+                &metadata_type(&self.ckb.network_type, &metadata_type_id).calc_script_hash(),
+            ))
+            .build()
+            .as_bytes()
+            .pack();
 
         let type_ids = TypeIds {
             issue_type_id,
