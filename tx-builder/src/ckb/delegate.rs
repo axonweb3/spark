@@ -2,8 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::delegate::*;
-use axon_types::withdraw::WithdrawAtCellData;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -13,6 +11,8 @@ use ckb_types::{
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IDelegateTxBuilder;
+use common::types::axon_types::delegate::*;
+use common::types::axon_types::withdraw::WithdrawAtCellData;
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{
     Amount, CkbNetwork, DelegateItem, Epoch, EthAddress, StakeTypeIds,

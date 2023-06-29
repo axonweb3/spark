@@ -1,7 +1,7 @@
-use axon_types::delegate::DelegateInfoDelta;
-use axon_types::stake::StakeInfoDelta;
 use ckb_types::bytes::Bytes;
 
+use common::types::axon_types::delegate::DelegateInfoDelta;
+use common::types::axon_types::stake::StakeInfoDelta;
 use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
 use common::utils::convert::*;
 

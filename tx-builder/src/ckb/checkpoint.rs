@@ -1,7 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::basic::Bytes as ABytes;
-use axon_types::checkpoint::{CheckpointCellData, CheckpointWitness};
 use bytes::Bytes;
 use ckb_sdk::{unlock::ScriptSigner, ScriptGroup, ScriptGroupType};
 use ckb_types::{
@@ -11,6 +9,8 @@ use ckb_types::{
 };
 use common::{
     traits::{ckb_rpc_client::CkbRpc, tx_builder::ICheckpointTxBuilder},
+    types::axon_types::basic::Bytes as ABytes,
+    types::axon_types::checkpoint::{CheckpointCellData, CheckpointWitness},
     types::tx_builder::{CheckpointProof, CheckpointTypeIds, CkbNetwork},
 };
 use common::{

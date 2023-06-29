@@ -2,12 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{
-    basic::Byte32,
-    stake::{
-        StakeArgs, StakeAtCellData, StakeSmtCellData, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
-    },
-};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -15,6 +9,12 @@ use ckb_types::{
     prelude::{Entity, Pack},
 };
 
+use common::types::axon_types::{
+    basic::Byte32,
+    stake::{
+        StakeArgs, StakeAtCellData, StakeSmtCellData, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+    },
+};
 use common::types::tx_builder::{StakeItem, StakeSmtTypeIds, Staker as TxStaker};
 use common::{
     traits::smt::StakeSmtStorage,

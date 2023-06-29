@@ -1,10 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{
-    checkpoint::CheckpointCellData, delegate::DelegateSmtCellData,
-    metadata::MetadataCellData as AMetadataCellData, reward::RewardSmtCellData,
-    stake::StakeSmtCellData,
-};
 use ckb_sdk::unlock::{InfoCellData, ScriptSigner};
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::H160;
@@ -19,6 +14,11 @@ use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IInitTxBuilder;
+use common::types::axon_types::{
+    checkpoint::CheckpointCellData, delegate::DelegateSmtCellData,
+    metadata::MetadataCellData as AMetadataCellData, reward::RewardSmtCellData,
+    stake::StakeSmtCellData,
+};
 use common::types::tx_builder::*;
 use common::utils::convert::{to_axon_byte32, to_h256};
 

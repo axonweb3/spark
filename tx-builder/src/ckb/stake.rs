@@ -1,9 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{
-    delegate::DelegateCellData, stake::StakeAtCellData as AStakeAtCellData,
-    withdraw::WithdrawAtCellData,
-};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -14,6 +10,10 @@ use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IStakeTxBuilder;
+use common::types::axon_types::{
+    delegate::DelegateCellData, stake::StakeAtCellData as AStakeAtCellData,
+    withdraw::WithdrawAtCellData,
+};
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
 use common::utils::convert::*;

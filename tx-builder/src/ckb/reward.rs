@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{basic::Byte32, delegate::DelegateRequirement, reward::RewardSmtCellData};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -14,6 +13,9 @@ use common::traits::smt::{
     DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage,
 };
 use common::traits::tx_builder::IRewardTxBuilder;
+use common::types::axon_types::{
+    basic::Byte32, delegate::DelegateRequirement, reward::RewardSmtCellData,
+};
 use common::types::ckb_rpc_client::{ScriptType, SearchKey, SearchKeyFilter};
 use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, RewardInfo, RewardTypeIds};
 use common::{
@@ -90,7 +92,9 @@ where
         let mut cell_deps = vec![
             omni_lock_dep(&self.ckb.network_type),
             secp256k1_lock_dep(&self.ckb.network_type),
+            always_success_lock_dep(&self.ckb.network_type),
             xudt_type_dep(&self.ckb.network_type),
+            reward_smt_type_dep(&self.ckb.network_type),
             checkpoint_cell_dep(
                 &self.ckb.client,
                 &self.ckb.network_type,
@@ -117,8 +121,8 @@ where
             .await?,
         ];
 
-        // Build outputs data.
-        // Add each staker's delegate requrement cell dep.
+        // 1. Build outputs data.
+        // 2. Add each staker's delegate requrement cell dep.
         let outputs_data = self
             .build_data(token_amount.unwrap_or(0), &mut cell_deps)
             .await?;

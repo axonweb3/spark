@@ -267,7 +267,7 @@ pub fn delegate_requriement_type_dep(network_type: &NetworkType) -> CellDep {
     }
 }
 
-pub fn reward_type_dep(network_type: &NetworkType) -> CellDep {
+pub fn reward_smt_type_dep(network_type: &NetworkType) -> CellDep {
     match network_type {
         NetworkType::Mainnet => cell_dep!(
             &REWARD_SMT_TYPE_MAINNET.tx_hash,

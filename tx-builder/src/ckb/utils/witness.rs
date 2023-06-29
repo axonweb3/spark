@@ -1,8 +1,9 @@
-use axon_types::delegate::DelegateAtWitness;
-use axon_types::stake::StakeAtWitness;
 use ckb_types::packed::WitnessArgs;
 use ckb_types::prelude::{Builder, Pack};
 use molecule::prelude::Entity;
+
+use common::types::axon_types::delegate::DelegateAtWitness;
+use common::types::axon_types::stake::StakeAtWitness;
 
 // todo: eth sig placeholder
 pub fn stake_witness_placeholder(mode: u8) -> WitnessArgs {

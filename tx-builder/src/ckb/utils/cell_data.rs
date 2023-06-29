@@ -1,13 +1,13 @@
-use axon_types::delegate::DelegateInfoDelta;
-use axon_types::stake::StakeInfoDelta;
-use axon_types::withdraw::{
-    WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
-    WithdrawInfos as AWithdrawInfos,
-};
 use bytes::Bytes;
 use ckb_types::prelude::{Builder, Entity};
 
 use common::types::{
+    axon_types::delegate::DelegateInfoDelta,
+    axon_types::stake::StakeInfoDelta,
+    axon_types::withdraw::{
+        WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
+        WithdrawInfos as AWithdrawInfos,
+    },
     ckb_rpc_client::Cell,
     tx_builder::{DelegateItem, Epoch, StakeItem},
 };

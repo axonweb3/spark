@@ -1,8 +1,4 @@
 use anyhow::Result;
-use axon_types::delegate::DelegateArgs;
-use axon_types::selection::SelectionLockArgs;
-use axon_types::stake::StakeArgs;
-use axon_types::withdraw::WithdrawArgs;
 use bytes::Bytes;
 use ckb_hash::new_blake2b;
 use ckb_sdk::constants::{SIGHASH_TYPE_HASH, TYPE_ID_CODE_HASH};
@@ -12,6 +8,10 @@ use ckb_types::packed::{Byte32, CellInput, Script};
 use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
+use common::types::axon_types::delegate::{DelegateArgs, DelegateRequirementArgs};
+use common::types::axon_types::selection::SelectionLockArgs;
+use common::types::axon_types::stake::StakeArgs;
+use common::types::axon_types::withdraw::WithdrawArgs;
 use common::types::tx_builder::NetworkType;
 use common::utils::convert::{to_axon_byte32, to_identity};
 
@@ -297,12 +297,15 @@ pub fn reward_smt_type(network_type: &NetworkType, reward_smt_type_id: &H256) ->
 pub fn delegate_requirement_type(
     network_type: &NetworkType,
     metadata_type_id: &H256,
-    staker_addr: &H160,
+    _staker_addr: &H160,
 ) -> Script {
-    // todo: args
-    let args = metadata_type_id.as_bytes().to_vec();
-    args.to_vec().extend(staker_addr.as_bytes().to_vec());
-    let args = Bytes::from(args);
+    let metadata_type_hash = metadata_type(network_type, metadata_type_id).calc_script_hash();
+
+    let args = DelegateRequirementArgs::new_builder()
+        .metadata_type_id(to_axon_byte32(&metadata_type_hash))
+        // .requirement_type_id(to_byte32(&requirement_type_id))
+        .build()
+        .as_bytes();
 
     match network_type {
         NetworkType::Mainnet => script!(
