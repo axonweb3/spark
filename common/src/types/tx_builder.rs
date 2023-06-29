@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::types::axon_rpc_client::ProposeCount as EthProposeCount;
 use axon_types::{
-    basic::{Byte20, Byte32, Byte65, Byte97, Identity},
+    basic::{Byte20, Byte32, Byte48, Byte65, Identity},
     checkpoint::{CheckpointCellData, ProposeCount as AProposeCount, ProposeCounts},
     delegate::{DelegateInfoDelta, DelegateRequirement as ADelegateRequirement},
     metadata::{
@@ -12,12 +11,12 @@ use axon_types::{
 };
 use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
-use serde::{Deserialize, Serialize};
+use rlp::Encodable;
+use rlp_derive::{RlpDecodable, RlpEncodable};
 
 use crate::traits::ckb_rpc_client::CkbRpc;
+use crate::types::primitive::Hasher;
 use crate::utils::convert::*;
-
-use crate::types::axon_rpc_client::Proof as EthProof;
 
 pub type Amount = u128;
 pub type Epoch = u64;
@@ -47,7 +46,7 @@ pub enum NetworkType {
 
 pub struct FirstStakeInfo {
     pub l1_pub_key:  Byte65,
-    pub bls_pub_key: Byte97,
+    pub bls_pub_key: Byte48,
     pub delegate:    DelegateRequirement,
 }
 
@@ -133,7 +132,6 @@ pub struct Checkpoint {
     pub latest_block_height: u64,
     pub latest_block_hash:   H256,
     pub timestamp:           u64,
-    pub proof:               Proof,
     pub propose_count:       Vec<ProposeCount>,
 }
 
@@ -147,48 +145,46 @@ impl From<Checkpoint> for CheckpointCellData {
             .latest_block_height(to_uint64(checkpoint.latest_block_height))
             .latest_block_hash(Byte32::from_slice(checkpoint.latest_block_hash.as_bytes()).unwrap())
             .timestamp(to_uint64(checkpoint.timestamp))
-            .propose_count(propose_counts(&checkpoint.propose_count))
+            .propose_count({
+                let mut list = ProposeCounts::new_builder();
+                for p in checkpoint.propose_count.into_iter() {
+                    list = list.push(p.into());
+                }
+                list.build()
+            })
             .build()
     }
 }
 
-pub fn propose_counts(proposes: &[ProposeCount]) -> ProposeCounts {
-    let mut propose_count = ProposeCounts::new_builder();
-    for propose in proposes.iter() {
-        propose_count = propose_count.push(propose.into());
-    }
-    propose_count.build()
+#[derive(Default)]
+pub struct CheckpointProof {
+    pub proof:    Proof,
+    pub proposal: Proposal,
 }
 
-#[derive(Default, Clone)]
+#[derive(RlpEncodable, RlpDecodable, Default, Clone)]
 pub struct Proof {
     pub number:     u64,
     pub round:      u64,
-    pub block_hash: H256,
+    pub block_hash: ethereum_types::H256,
     pub signature:  bytes::Bytes,
     pub bitmap:     bytes::Bytes,
 }
 
-impl From<&EthProof> for Proof {
-    fn from(eth_proof: &EthProof) -> Self {
-        Self {
-            number:     eth_proof.number,
-            round:      eth_proof.round,
-            block_hash: to_ckb_h256(&eth_proof.block_hash),
-            signature:  eth_proof.signature.clone(),
-            bitmap:     eth_proof.bitmap.clone(),
-        }
+impl Proof {
+    pub fn bytes(&self) -> bytes::Bytes {
+        self.rlp_bytes().into()
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ProposeCount {
     pub proposer: H160,
     pub count:    u32,
 }
 
-impl From<&ProposeCount> for AProposeCount {
-    fn from(propose: &ProposeCount) -> Self {
+impl From<ProposeCount> for AProposeCount {
+    fn from(propose: ProposeCount) -> Self {
         AProposeCount::new_builder()
             .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
             .count(to_uint32(propose.count))
@@ -196,12 +192,30 @@ impl From<&ProposeCount> for AProposeCount {
     }
 }
 
-impl From<&EthProposeCount> for ProposeCount {
-    fn from(propose: &EthProposeCount) -> Self {
-        Self {
-            proposer: to_ckb_h160(&propose.address),
-            count:    propose.count.try_into().unwrap(),
-        }
+type Hash = ethereum_types::H256;
+
+#[derive(RlpEncodable, RlpDecodable, Default)]
+pub struct Proposal {
+    pub prev_hash:                ethereum_types::H256,
+    pub proposer:                 ethereum_types::H160,
+    pub prev_state_root:          ethereum_types::H256,
+    pub transactions_root:        ethereum_types::H256,
+    pub signed_txs_hash:          ethereum_types::H256,
+    pub timestamp:                u64,
+    pub number:                   u64,
+    pub gas_limit:                ethereum_types::U256,
+    pub extra_data:               bytes::Bytes,
+    pub mixed_hash:               Option<ethereum_types::H256>,
+    pub base_fee_per_gas:         ethereum_types::U256,
+    pub proof:                    Proof,
+    pub chain_id:                 u64,
+    pub call_system_script_count: u32,
+    pub tx_hashes:                Vec<Hash>,
+}
+
+impl Proposal {
+    pub fn hash(&self) -> H256 {
+        Hasher::digest(self.rlp_bytes().freeze())
     }
 }
 
@@ -223,21 +237,21 @@ pub struct Metadata {
     pub block_height:    u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Validator {
     pub bls_pub_key:    bytes::Bytes,
-    pub pub_key:        bytes::Bytes,
+    pub pub_key:        Byte65,
     pub address:        H160,
     pub propose_weight: u32,
     pub vote_weight:    u32,
     pub propose_count:  u64,
 }
 
-impl From<&Validator> for AValidator {
-    fn from(validator: &Validator) -> Self {
+impl From<Validator> for AValidator {
+    fn from(validator: Validator) -> Self {
         AValidator::new_builder()
-            .bls_pub_key(Byte97::from_slice(&validator.bls_pub_key).unwrap())
-            .pub_key(Byte65::from_slice(&validator.pub_key).unwrap())
+            .bls_pub_key(Byte48::from_slice(&validator.bls_pub_key).unwrap())
+            .pub_key(validator.pub_key)
             .address(Identity::from_slice(validator.address.as_bytes()).unwrap())
             .propose_weight(to_uint32(validator.propose_weight))
             .vote_weight(to_uint32(validator.vote_weight))
@@ -325,8 +339,8 @@ impl From<TypeIds> for ATypeIds {
     }
 }
 
-impl From<&Metadata> for AMetadata {
-    fn from(metadata: &Metadata) -> Self {
+impl From<Metadata> for AMetadata {
+    fn from(metadata: Metadata) -> Self {
         AMetadata::new_builder()
             .epoch_len(to_uint32(metadata.epoch_len))
             .period_len(to_uint32(metadata.period_len))
@@ -334,7 +348,13 @@ impl From<&Metadata> for AMetadata {
             .gas_limit(to_uint64(metadata.gas_limit))
             .gas_price(to_uint64(metadata.gas_price))
             .interval(to_uint32(metadata.interval))
-            .validators(gen_validators(&metadata.validators))
+            .validators({
+                let mut list = ValidatorList::new_builder();
+                for v in metadata.validators.into_iter() {
+                    list = list.push(v.into());
+                }
+                list.build()
+            })
             .propose_ratio(to_uint32(metadata.propose_ratio))
             .prevote_ratio(to_uint32(metadata.prevote_ratio))
             .precommit_ratio(to_uint32(metadata.precommit_ratio))
@@ -344,14 +364,6 @@ impl From<&Metadata> for AMetadata {
             .block_height(to_uint64(metadata.block_height))
             .build()
     }
-}
-
-fn gen_validators(validators: &[Validator]) -> ValidatorList {
-    let mut validator_list = ValidatorList::new_builder();
-    for validator in validators.iter() {
-        validator_list = validator_list.push(validator.into());
-    }
-    validator_list.build()
 }
 
 pub struct RewardInfo {

@@ -116,9 +116,9 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
     pub static ref CHECKPOINT_TYPE_TESTNET: Script = Script {
-        code_hash: h256!("0xfe18e5fde2ca0d863fc9888aed7e3d667249d719542d1dd78aa77de0938c2a83"),
+        code_hash: h256!("0x442d5c2eb01e14db2b0acb136dd2cdda1c3515fc4085898a47dd773ca1c3d019"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x5baf58a0fb4a815512c6df804d4b26dd03cc5e76860816004a07ff10ed2f07e5"),
+        tx_hash: h256!("0xd7d86574fcbc1bb2d0cfada3b9a39991a7399d8b33c980e5a68299f2d6360d82"),
         index: 0,
         dep_type: DepType::Code,
     };

@@ -170,13 +170,12 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
     ) -> CkbTxResult<Vec<Bytes>> {
         let mut total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
 
-        let cell_withdraws =
-            WithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
+        let withdraw_data = WithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
 
         let mut output_withdraw_infos = WithdrawInfos::new_builder();
         let mut unlock_amount = 0;
 
-        for withdraw_info in cell_withdraws.withdraw_infos() {
+        for withdraw_info in withdraw_data.lock().withdraw_infos() {
             let epoch = to_u64(&withdraw_info.unlock_epoch());
             if epoch <= self.current_epoch {
                 unlock_amount += to_u128(&withdraw_info.amount());
@@ -188,12 +187,20 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
         wallet_amount += unlock_amount;
         total_withdraw_amount -= unlock_amount;
 
+        let inner_withdraw_data = withdraw_data.lock();
+
         Ok(vec![
             // withdraw AT cell data
             token_cell_data(
                 total_withdraw_amount,
-                WithdrawAtCellData::new_builder()
-                    .withdraw_infos(output_withdraw_infos.build())
+                withdraw_data
+                    .as_builder()
+                    .lock(
+                        inner_withdraw_data
+                            .as_builder()
+                            .withdraw_infos(output_withdraw_infos.build())
+                            .build(),
+                    )
                     .build()
                     .as_bytes(),
             ),

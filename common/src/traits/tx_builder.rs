@@ -104,6 +104,7 @@ where
         type_ids: CheckpointTypeIds,
         epoch_len: u64,
         new_checkpoint: Checkpoint,
+        proof: CheckpointProof,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;

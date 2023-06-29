@@ -7,6 +7,7 @@ use tx_builder::ckb::utils::tx::send_tx;
 
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::config::{parse_file, write_file};
+use crate::mock::mock_axon_validators;
 
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
@@ -33,6 +34,7 @@ pub async fn init_tx(ckb: CkbNetwork<CkbRpcClient>) {
             epoch_len: 100,
             period_len: 100,
             quorum: 10,
+            validators: mock_axon_validators(),
             ..Default::default()
         },
     )

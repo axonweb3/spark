@@ -1,4 +1,4 @@
-use axon_types::basic::{Byte65, Byte97};
+use axon_types::basic::{Byte48, Byte65};
 use bytes::Bytes;
 use ckb_sdk::unlock::ScriptSigner;
 use molecule::prelude::Entity;
@@ -156,13 +156,13 @@ fn hex_decode(src: &str) -> Vec<u8> {
     ret
 }
 
-fn gen_pubkey() -> (Byte65, Byte97) {
+fn gen_pubkey() -> (Byte65, Byte48) {
     let pub_key =
         hex_decode("ac85bbb40347b6e06ac2dc2da1f75eece029cdc0ed2d456c457d27e288bfbfbcd4c5c19716e9b250134a0e76ce50fa22");
     let bls_public_key: BlsPublicKey = BlsPublicKey::try_from(pub_key.as_ref()).unwrap();
     (
         Byte65::new_unchecked(Bytes::from(pub_key)),
-        Byte97::new_unchecked(bls_public_key.to_bytes()),
+        Byte48::new_unchecked(bls_public_key.to_bytes()),
     )
 }
 

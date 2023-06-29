@@ -1,16 +1,17 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::checkpoint::CheckpointCellData;
+use axon_types::basic::Bytes as ABytes;
+use axon_types::checkpoint::{CheckpointCellData, CheckpointWitness};
 use bytes::Bytes;
 use ckb_sdk::{unlock::ScriptSigner, ScriptGroup, ScriptGroupType};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput},
+    packed::{CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
 use common::{
     traits::{ckb_rpc_client::CkbRpc, tx_builder::ICheckpointTxBuilder},
-    types::tx_builder::{CheckpointTypeIds, CkbNetwork},
+    types::tx_builder::{CheckpointProof, CheckpointTypeIds, CkbNetwork},
 };
 use common::{
     types::tx_builder::{Checkpoint, PrivateKey},
@@ -41,6 +42,7 @@ where
     type_ids:       CheckpointTypeIds,
     epoch_len:      u64,
     new_checkpoint: Checkpoint,
+    proof:          CheckpointProof,
 }
 
 #[async_trait]
@@ -54,6 +56,7 @@ where
         type_ids: CheckpointTypeIds,
         epoch_len: u64,
         new_checkpoint: Checkpoint,
+        proof: CheckpointProof,
     ) -> Self {
         Self {
             kicker_key,
@@ -61,6 +64,7 @@ where
             type_ids,
             epoch_len,
             new_checkpoint,
+            proof,
         }
     }
 
@@ -112,7 +116,21 @@ where
         ];
 
         let witnesses = vec![
-            Bytes::default(), // todo
+            WitnessArgs::new_builder()
+                .input_type(
+                    Some(
+                        CheckpointWitness::new_builder()
+                            .proof(ABytes::new_unchecked(self.proof.proof.bytes()))
+                            .proposal(ABytes::new_unchecked(Bytes::from(
+                                self.proof.proposal.hash().as_bytes().to_owned(),
+                            )))
+                            .build()
+                            .as_bytes(),
+                    )
+                    .pack(),
+                )
+                .build()
+                .as_bytes(),
             omni_eth_witness_placeholder().as_bytes(),
         ];
 
@@ -160,7 +178,7 @@ where
                 Ok(())
             }
         } else if self.new_checkpoint.period != last_period + 1
-            || self.new_checkpoint.epoch != last_epoch + 1
+            || self.new_checkpoint.epoch != last_epoch
         {
             Err(CkbTxErr::NotCheckpointOccasion {
                 current_epoch:   last_epoch,

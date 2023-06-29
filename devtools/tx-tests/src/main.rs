@@ -1,4 +1,5 @@
 mod config;
+mod mock;
 mod tx;
 
 use common::types::tx_builder::*;
