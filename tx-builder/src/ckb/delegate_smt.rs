@@ -2,10 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::delegate::{
-    DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
-    DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
-};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -15,6 +11,10 @@ use ckb_types::{
 
 use common::traits::{
     ckb_rpc_client::CkbRpc, smt::DelegateSmtStorage, tx_builder::IDelegateSmtTxBuilder,
+};
+use common::types::axon_types::delegate::{
+    DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
+    DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
 };
 use common::types::smt::{Delegator as SmtDelegator, Staker as SmtStaker};
 use common::types::tx_builder::{

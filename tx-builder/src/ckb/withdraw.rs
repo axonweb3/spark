@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::withdraw::*;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -10,6 +9,7 @@ use ckb_types::{
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IWithdrawTxBuilder;
+use common::types::axon_types::withdraw::*;
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;

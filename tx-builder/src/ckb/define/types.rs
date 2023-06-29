@@ -1,4 +1,7 @@
-use axon_types::{
+use ckb_types::{H160, H256};
+use molecule::prelude::{Builder, Entity};
+
+use common::types::axon_types::{
     basic::{Byte32, Byte48, Byte65},
     delegate::{
         DelegateAtCellData as ADelegateAtCellData,
@@ -17,9 +20,6 @@ use axon_types::{
         WithdrawInfos as AWithdrawInfos,
     },
 };
-use ckb_types::{H160, H256};
-use molecule::prelude::{Builder, Entity};
-
 use common::types::smt::Root as SmtRoot;
 use common::types::tx_builder::*;
 use common::utils::convert::*;

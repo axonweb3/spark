@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=5f783b0#5f783b0b858362361556fdca51c304fdd762e24e"
+source = "git+https://github.com/axonweb3/axon-contract?rev=0c3f0db#0c3f0db37fb6d3f33ee08434498723d01f12ef68"
 dependencies = [
  "molecule",
  "molecule2",
@@ -2474,7 +2474,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=5f783b0#5f783b0b858362361556fdca51c304fdd762e24e"
+source = "git+https://github.com/axonweb3/axon-contract?rev=0c3f0db#0c3f0db37fb6d3f33ee08434498723d01f12ef68"
 
 [[package]]
 name = "native-tls"
@@ -4398,7 +4398,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "axon-types",
  "bytes",
  "ckb-crypto",
  "ckb-fixed-hash-core 0.109.0",
@@ -4428,7 +4427,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axon-tools",
- "axon-types",
  "bytes",
  "ckb-sdk",
  "ckb-types",

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::issue::IssueCellData;
 use ckb_sdk::unlock::ScriptSigner;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
@@ -14,6 +13,7 @@ use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IMintTxBuilder;
+use common::types::axon_types::issue::IssueCellData;
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
 use common::utils::convert::{to_u128, to_uint128};

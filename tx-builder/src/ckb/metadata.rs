@@ -2,11 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axon_types::{
-    basic::Byte65, delegate::DelegateAtCellData as ADelegateAtCellData,
-    metadata::MetadataCellData as AMetadataCellData,
-    withdraw::WithdrawAtCellData as AWithdrawAtCellData,
-};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellInput, CellOutput, Script},
@@ -16,6 +11,11 @@ use ckb_types::{
 use common::traits::{
     smt::{DelegateSmtStorage, ProposalSmtStorage, StakeSmtStorage},
     tx_builder::IMetadataTxBuilder,
+};
+use common::types::axon_types::{
+    basic::Byte65, delegate::DelegateAtCellData as ADelegateAtCellData,
+    metadata::MetadataCellData as AMetadataCellData,
+    withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
 use common::types::tx_builder::*;
 use ethereum_types::H160;

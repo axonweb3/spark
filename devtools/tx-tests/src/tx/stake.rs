@@ -1,4 +1,3 @@
-use axon_types::basic::{Byte48, Byte65};
 use bytes::Bytes;
 use ckb_sdk::unlock::ScriptSigner;
 use molecule::prelude::Entity;
@@ -7,6 +6,7 @@ use ophelia_blst::BlsPublicKey;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use common::traits::tx_builder::IStakeTxBuilder;
+use common::types::axon_types::basic::{Byte48, Byte65};
 use common::types::tx_builder::{
     CkbNetwork, DelegateRequirement, FirstStakeInfo, StakeItem, StakeTypeIds,
 };
