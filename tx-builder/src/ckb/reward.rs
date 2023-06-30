@@ -16,8 +16,7 @@ use common::traits::tx_builder::IRewardTxBuilder;
 use common::types::axon_types::{
     basic::Byte32, delegate::DelegateRequirement, reward::RewardSmtCellData,
 };
-use common::types::ckb_rpc_client::{ScriptType, SearchKey, SearchKeyFilter};
-use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, RewardInfo, RewardTypeIds};
+use common::types::tx_builder::{Amount, Epoch, EthAddress, RewardInfo, RewardTypeIds};
 use common::{
     traits::ckb_rpc_client::CkbRpc,
     utils::convert::{to_ckb_h160, to_eth_h160},
@@ -25,20 +24,16 @@ use common::{
 
 use crate::ckb::define::constants::INAUGURATION;
 use crate::ckb::define::error::CkbTxErr;
-use crate::ckb::utils::{
-    cell_collector::{collect_cells, collect_xudt, get_unique_cell},
-    cell_dep::*,
-    omni::*,
-    script::*,
-    tx::balance_tx,
+use crate::ckb::helper::{
+    AlwaysSuccess, Checkpoint, Delegate, Metadata, OmniEth, Reward, Secp256k1, Stake, Tx, Xudt,
 };
 
-pub struct RewardTxBuilder<C, S>
+pub struct RewardTxBuilder<'a, C, S>
 where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
-    ckb:           CkbNetwork<C>,
+    ckb:           &'a C,
     type_ids:      RewardTypeIds,
     smt:           S,
     info:          RewardInfo,
@@ -49,21 +44,21 @@ where
 }
 
 #[async_trait]
-impl<C, S> IRewardTxBuilder<C, S> for RewardTxBuilder<C, S>
+impl<'a, C, S> IRewardTxBuilder<'a, C, S> for RewardTxBuilder<'a, C, S>
 where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: RewardTypeIds,
         smt: S,
         info: RewardInfo,
         user: EthAddress,
         current_epoch: Epoch,
     ) -> Self {
-        let token_lock = omni_eth_lock(&ckb.network_type, &user);
-        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+        let token_lock = OmniEth::lock(&user);
+        let xudt = Xudt::type_(&type_ids.xudt_owner.pack());
 
         Self {
             ckb,
@@ -79,9 +74,8 @@ where
 
     async fn build_tx(&self) -> Result<TransactionView> {
         // reward smt cell
-        let reward_smt_type =
-            reward_smt_type(&self.ckb.network_type, &self.type_ids.reward_smt_type_id);
-        let reward_smt_cell = get_unique_cell(&self.ckb.client, reward_smt_type.clone()).await?;
+        let reward_smt_type = Reward::smt_type(&self.type_ids.reward_smt_type_id);
+        let reward_smt_cell = Reward::get_cell(self.ckb, reward_smt_type.clone()).await?;
         let mut inputs = vec![CellInput::new_builder()
             .previous_output(reward_smt_cell.out_point.into())
             .build()];
@@ -90,35 +84,15 @@ where
         let token_amount = self.add_token_to_intpus(&mut inputs).await?;
 
         let mut cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            always_success_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            reward_smt_type_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
-            stake_smt_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
-            delegate_smt_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            AlwaysSuccess::lock_dep(),
+            Xudt::type_dep(),
+            Reward::smt_type_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+            Stake::smt_cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+            Delegate::smt_cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
         // 1. Build outputs data.
@@ -130,7 +104,7 @@ where
         let outputs = vec![
             // reward smt cell
             CellOutput::new_builder()
-                .lock(always_success_lock(&self.ckb.network_type))
+                .lock(AlwaysSuccess::lock())
                 .type_(Some(reward_smt_type).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // AT cell
@@ -142,9 +116,9 @@ where
 
         let mut witnesses = vec![bytes::Bytes::default()]; // todo: reward smt cell lock
         if token_amount.is_some() {
-            witnesses.push(omni_eth_witness_placeholder().as_bytes()); // AT cell lock
+            witnesses.push(OmniEth::witness_placeholder().as_bytes()); // AT cell lock
         }
-        witnesses.push(omni_eth_witness_placeholder().as_bytes()); // capacity provider lock
+        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
 
         let tx = TransactionBuilder::default()
             .inputs(inputs)
@@ -154,25 +128,22 @@ where
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
 }
 
-impl<C, S> RewardTxBuilder<C, S>
+impl<'a, C, S> RewardTxBuilder<'a, C, S>
 where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
     async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Option<Amount>> {
-        let (token_cells, amount) = collect_xudt(
-            &self.ckb.client,
-            self.token_lock.clone(),
-            self.xudt.clone(),
-            1,
-        )
-        .await?;
+        let (token_cells, amount) =
+            Xudt::collect(self.ckb, self.token_lock.clone(), self.xudt.clone(), 1).await?;
 
         if token_cells.is_empty() {
             return Ok(None);
@@ -308,39 +279,19 @@ where
     }
 
     async fn commission_rate(&self, staker: &H160, cell_deps: &mut Vec<CellDep>) -> Result<u8> {
-        let delegate_requirement_cell = collect_cells(&self.ckb.client, 1, SearchKey {
-            script:               delegate_requirement_type(
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-                staker,
-            )
-            .into(),
-            script_type:          ScriptType::Type,
-            filter:               Some(SearchKeyFilter {
-                script: Some(self.token_lock.clone().into()),
-                ..Default::default()
-            }),
-            script_search_mode:   None,
-            with_data:            Some(true),
-            group_by_transaction: None,
-        })
+        let delegate_requirement_cell = Delegate::get_requirement_cell(
+            self.ckb,
+            Delegate::requirement_type(&self.type_ids.metadata_type_id, staker),
+        )
         .await?;
-
-        if delegate_requirement_cell.is_empty() {
-            return Err(CkbTxErr::CellNotFound("DelegateRequiremnt".to_owned()).into());
-        }
 
         cell_deps.push(
             CellDep::new_builder()
-                .out_point(delegate_requirement_cell[0].out_point.clone().into())
+                .out_point(delegate_requirement_cell.out_point.clone().into())
                 .build(),
         );
 
-        let data = delegate_requirement_cell[0]
-            .output_data
-            .clone()
-            .unwrap()
-            .into_bytes();
+        let data = delegate_requirement_cell.output_data.unwrap().into_bytes();
         let delegate_requirement = DelegateRequirement::new_unchecked(data);
 
         Ok(delegate_requirement.commission_rate().into())

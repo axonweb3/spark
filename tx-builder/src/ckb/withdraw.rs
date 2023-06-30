@@ -11,24 +11,19 @@ use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IWithdrawTxBuilder;
 use common::types::axon_types::withdraw::*;
 use common::types::ckb_rpc_client::Cell;
-use common::types::tx_builder::{Amount, CkbNetwork, Epoch, EthAddress, StakeTypeIds};
+use common::types::tx_builder::{Amount, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;
 
 use crate::ckb::define::constants::TOKEN_BYTES;
 use crate::ckb::define::error::CkbTxResult;
-use crate::ckb::utils::{
-    cell_collector::{collect_xudt, get_withdraw_cell},
-    cell_data::*,
-    cell_dep::*,
-    omni::*,
-    script::*,
-    tx::balance_tx,
+use crate::ckb::helper::{
+    token_cell_data, Checkpoint, Metadata, OmniEth, Secp256k1, Tx, Withdraw, Xudt,
 };
 
 use super::define::error::CkbTxErr;
 
-pub struct WithdrawTxBuilder<C: CkbRpc> {
-    ckb:           CkbNetwork<C>,
+pub struct WithdrawTxBuilder<'a, C: CkbRpc> {
+    ckb:           &'a C,
     type_ids:      StakeTypeIds,
     current_epoch: Epoch,
     withdraw_lock: Script,
@@ -37,16 +32,11 @@ pub struct WithdrawTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
-    fn new(
-        ckb: CkbNetwork<C>,
-        type_ids: StakeTypeIds,
-        user: EthAddress,
-        current_epoch: Epoch,
-    ) -> Self {
-        let withdraw_lock = withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &user);
-        let token_lock = omni_eth_lock(&ckb.network_type, &user);
-        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+impl<'a, C: CkbRpc> IWithdrawTxBuilder<'a, C> for WithdrawTxBuilder<'a, C> {
+    fn new(ckb: &'a C, type_ids: StakeTypeIds, user: EthAddress, current_epoch: Epoch) -> Self {
+        let withdraw_lock = Withdraw::lock(&type_ids.metadata_type_id, &user);
+        let token_lock = OmniEth::lock(&user);
+        let xudt = Xudt::type_(&type_ids.xudt_owner.pack());
 
         Self {
             ckb,
@@ -86,28 +76,18 @@ impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
         ];
 
         let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            withdraw_lock_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            Withdraw::lock_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // withdraw AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // withdraw AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -118,20 +98,18 @@ impl<C: CkbRpc> IWithdrawTxBuilder<C> for WithdrawTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
 }
 
-impl<C: CkbRpc> WithdrawTxBuilder<C> {
+impl<'a, C: CkbRpc> WithdrawTxBuilder<'a, C> {
     async fn get_withdraw_cell(&self) -> Result<Cell> {
-        let withdraw_cell = get_withdraw_cell(
-            &self.ckb.client,
-            self.withdraw_lock.clone(),
-            self.xudt.clone(),
-        )
-        .await?;
+        let withdraw_cell =
+            Withdraw::get_cell(self.ckb, self.withdraw_lock.clone(), self.xudt.clone()).await?;
 
         if withdraw_cell.is_none() {
             return Err(CkbTxErr::CellNotFound("Withdraw".to_owned()).into());
@@ -141,13 +119,8 @@ impl<C: CkbRpc> WithdrawTxBuilder<C> {
     }
 
     async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
-        let (token_cells, amount) = collect_xudt(
-            &self.ckb.client,
-            self.token_lock.clone(),
-            self.xudt.clone(),
-            1,
-        )
-        .await?;
+        let (token_cells, amount) =
+            Xudt::collect(self.ckb, self.token_lock.clone(), self.xudt.clone(), 1).await?;
 
         if token_cells.is_empty() {
             return Err(CkbTxErr::CellNotFound("AT".to_owned()).into());

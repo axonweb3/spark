@@ -11,9 +11,9 @@ use crate::types::ckb_rpc_client::Cell;
 use crate::types::tx_builder::*;
 
 #[async_trait]
-pub trait IInitTxBuilder<C: CkbRpc> {
+pub trait IInitTxBuilder<'a, C: CkbRpc> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
@@ -24,9 +24,9 @@ pub trait IInitTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IMintTxBuilder<C: CkbRpc> {
+pub trait IMintTxBuilder<'a, C: CkbRpc> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         seeder_key: PrivateKey,
         stakers: Vec<(StakerEthAddr, Amount)>,
         selection_type_id: H256,
@@ -37,9 +37,9 @@ pub trait IMintTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IStakeTxBuilder<C: CkbRpc> {
+pub trait IStakeTxBuilder<'a, C: CkbRpc> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: StakeTypeIds,
         staker: EthAddress,
         current_epoch: Epoch,
@@ -51,9 +51,9 @@ pub trait IStakeTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IDelegateTxBuilder<C: CkbRpc> {
+pub trait IDelegateTxBuilder<'a, C: CkbRpc> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: StakeTypeIds,
         delegator: EthAddress,
         current_epoch: Epoch,
@@ -64,25 +64,20 @@ pub trait IDelegateTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-pub trait IWithdrawTxBuilder<C: CkbRpc> {
-    fn new(
-        ckb: CkbNetwork<C>,
-        type_ids: StakeTypeIds,
-        user: EthAddress,
-        current_epoch: Epoch,
-    ) -> Self;
+pub trait IWithdrawTxBuilder<'a, C: CkbRpc> {
+    fn new(ckb: &'a C, type_ids: StakeTypeIds, user: EthAddress, current_epoch: Epoch) -> Self;
 
     async fn build_tx(&self) -> Result<TransactionView>;
 }
 
 #[async_trait]
-pub trait IRewardTxBuilder<C, S>
+pub trait IRewardTxBuilder<'a, C, S>
 where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: RewardTypeIds,
         smt: S,
         info: RewardInfo,
@@ -94,13 +89,13 @@ where
 }
 
 #[async_trait]
-pub trait ICheckpointTxBuilder<C>
+pub trait ICheckpointTxBuilder<'a, C>
 where
     C: CkbRpc,
 {
     async fn new(
+        ckb: &'a C,
         kicker_key: PrivateKey,
-        ckb: CkbNetwork<C>,
         type_ids: CheckpointTypeIds,
         epoch_len: u64,
         new_checkpoint: Checkpoint,
@@ -111,8 +106,9 @@ where
 }
 
 #[async_trait]
-pub trait IMetadataTxBuilder<PSmt> {
+pub trait IMetadataTxBuilder<'a, C, PSmt> {
     fn new(
+        ckb: &'a C,
         kicker: PrivateKey,
         quorum: u16,
         last_metadata: Metadata,
@@ -124,9 +120,9 @@ pub trait IMetadataTxBuilder<PSmt> {
 }
 
 #[async_trait]
-pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage> {
+pub trait IStakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
@@ -139,9 +135,9 @@ pub trait IStakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage> {
 }
 
 #[async_trait]
-pub trait IDelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage> {
+pub trait IDelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: DelegateSmtTypeIds,

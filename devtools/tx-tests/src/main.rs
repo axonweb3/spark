@@ -2,7 +2,6 @@ mod config;
 mod mock;
 mod tx;
 
-use common::types::tx_builder::*;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::tx::*;
@@ -59,38 +58,35 @@ async fn main() {
     let delegate = matches.get_one::<String>("delegate").unwrap().as_str();
     let checkpoint = matches.get_one::<bool>("checkpoint").unwrap().to_owned();
 
-    let ckb = CkbNetwork {
-        network_type: NetworkType::Testnet,
-        client:       CkbRpcClient::new("https://testnet.ckb.dev"),
-    };
+    let ckb = CkbRpcClient::new("https://testnet.ckb.dev");
 
     if init {
-        init_tx(ckb.clone()).await;
+        init_tx(&ckb).await;
     }
 
     if mint {
-        mint_tx(ckb.clone()).await;
+        mint_tx(&ckb).await;
     }
 
     if !stake.is_empty() {
         match stake {
-            "first" => first_stake_tx(ckb.clone()).await,
-            "add" => add_stake_tx(ckb.clone()).await,
-            "redeem" => reedem_stake_tx(ckb.clone()).await,
+            "first" => first_stake_tx(&ckb).await,
+            "add" => add_stake_tx(&ckb).await,
+            "redeem" => reedem_stake_tx(&ckb).await,
             _ => unimplemented!(),
         }
     }
 
     if !delegate.is_empty() {
         match delegate {
-            "first" => first_delegate_tx(ckb.clone()).await,
-            "add" => add_delegate_tx(ckb.clone()).await,
-            "redeem" => reedem_delegate_tx(ckb.clone()).await,
+            "first" => first_delegate_tx(&ckb).await,
+            "add" => add_delegate_tx(&ckb).await,
+            "redeem" => reedem_delegate_tx(&ckb).await,
             _ => unimplemented!(),
         }
     }
 
     if checkpoint {
-        checkpoint_tx(ckb.clone()).await;
+        checkpoint_tx(&ckb).await;
     }
 }

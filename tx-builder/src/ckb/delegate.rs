@@ -14,9 +14,7 @@ use common::traits::tx_builder::IDelegateTxBuilder;
 use common::types::axon_types::delegate::*;
 use common::types::axon_types::withdraw::WithdrawAtCellData;
 use common::types::ckb_rpc_client::Cell;
-use common::types::tx_builder::{
-    Amount, CkbNetwork, DelegateItem, Epoch, EthAddress, StakeTypeIds,
-};
+use common::types::tx_builder::{Amount, DelegateItem, Epoch, EthAddress, StakeTypeIds};
 use common::utils::convert::*;
 
 use crate::ckb::define::constants::{INAUGURATION, TOKEN_BYTES};
@@ -24,19 +22,13 @@ use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
 use crate::ckb::define::types::{
     DelegateAtCellData as TDelegateAtCellData, DelegateAtCellLockData as TDelegateAtCellLockData,
 };
-use crate::ckb::utils::{
-    calc_amount::*,
-    cell_collector::{collect_xudt, get_delegate_cell, get_withdraw_cell},
-    cell_data::*,
-    cell_dep::*,
-    omni::*,
-    script::*,
-    tx::balance_tx,
-    witness::delegate_witness_placeholder,
+use crate::ckb::helper::{
+    amount_calculator::*, token_cell_data, Checkpoint, Delegate, Metadata, OmniEth, Secp256k1, Tx,
+    Withdraw, Xudt,
 };
 
-pub struct DelegateTxBuilder<C: CkbRpc> {
-    ckb:           CkbNetwork<C>,
+pub struct DelegateTxBuilder<'a, C: CkbRpc> {
+    ckb:           &'a C,
     type_ids:      StakeTypeIds,
     current_epoch: Epoch,
     delegators:    Vec<DelegateItem>,
@@ -47,20 +39,18 @@ pub struct DelegateTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-impl<C: CkbRpc> IDelegateTxBuilder<C> for DelegateTxBuilder<C> {
+impl<'a, C: CkbRpc> IDelegateTxBuilder<'a, C> for DelegateTxBuilder<'a, C> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: StakeTypeIds,
         delegator: EthAddress,
         current_epoch: Epoch,
         delegators: Vec<DelegateItem>,
     ) -> Self {
-        let delegate_lock =
-            delegate_lock(&ckb.network_type, &type_ids.metadata_type_id, &delegator);
-        let withdraw_lock =
-            withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &delegator);
-        let token_lock = omni_eth_lock(&ckb.network_type, &delegator);
-        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+        let delegate_lock = Delegate::lock(&type_ids.metadata_type_id, &delegator);
+        let withdraw_lock = Withdraw::lock(&type_ids.metadata_type_id, &delegator);
+        let token_lock = OmniEth::lock(&delegator);
+        let xudt = Xudt::type_(&type_ids.xudt_owner.pack());
 
         Self {
             ckb,
@@ -85,12 +75,8 @@ impl<C: CkbRpc> IDelegateTxBuilder<C> for DelegateTxBuilder<C> {
             }
         }
 
-        let delegate_cell = get_delegate_cell(
-            &self.ckb.client,
-            self.delegate_lock.clone(),
-            self.xudt.clone(),
-        )
-        .await?;
+        let delegate_cell =
+            Delegate::get_cell(self.ckb, self.delegate_lock.clone(), self.xudt.clone()).await?;
 
         if delegate_cell.is_none() {
             self.build_first_delegate_tx().await
@@ -101,7 +87,7 @@ impl<C: CkbRpc> IDelegateTxBuilder<C> for DelegateTxBuilder<C> {
     }
 }
 
-impl<C: CkbRpc> DelegateTxBuilder<C> {
+impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
     async fn build_first_delegate_tx(&self) -> Result<TransactionView> {
         let mut inputs = vec![];
 
@@ -126,15 +112,11 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
         self.add_withdraw_to_outputs(&mut outputs, &mut outputs_data)
             .await?;
 
-        let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-        ];
+        let cell_deps = vec![OmniEth::lock_dep(), Secp256k1::lock_dep(), Xudt::type_dep()];
 
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -145,7 +127,9 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
@@ -175,28 +159,18 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
         ];
 
         let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            delegate_lock_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            Delegate::lock_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
         let witnesses = vec![
-            delegate_witness_placeholder(0u8).as_bytes(), // delegate AT cell lock, todo
-            omni_eth_witness_placeholder().as_bytes(),    // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(),    // capacity provider lock
+            Delegate::witness_placeholder(0u8).as_bytes(), // delegate AT cell lock, todo
+            OmniEth::witness_placeholder().as_bytes(),     // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(),     // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -207,7 +181,9 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
@@ -232,8 +208,8 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
             }
         };
 
-        let (token_cells, amount) = collect_xudt(
-            &self.ckb.client,
+        let (token_cells, amount) = Xudt::collect(
+            self.ckb,
             self.token_lock.clone(),
             self.xudt.clone(),
             expected_amount,
@@ -261,12 +237,8 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
     ) -> Result<()> {
-        let withdraw_cell = get_withdraw_cell(
-            &self.ckb.client,
-            self.withdraw_lock.clone(),
-            self.xudt.clone(),
-        )
-        .await?;
+        let withdraw_cell =
+            Withdraw::get_cell(self.ckb, self.withdraw_lock.clone(), self.xudt.clone()).await?;
 
         if withdraw_cell.is_none() {
             outputs_data.push(token_cell_data(0, WithdrawAtCellData::default().as_bytes()));
@@ -435,7 +407,7 @@ impl<C: CkbRpc> DelegateTxBuilder<C> {
         let mut updated_delegates = updated_delegates;
 
         for delegate in cell_delegates.delegator_infos() {
-            let delta = delegate_item(&delegate);
+            let delta = Delegate::item(&delegate);
             if !new_stakers.contains(&delta.staker)
                 && (delta.total_amount != 0 || delta.amount != 0)
             {

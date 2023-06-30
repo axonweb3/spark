@@ -14,7 +14,6 @@ use molecule::prelude::{Builder, Byte, Entity};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 
-use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::types::primitive::Hasher;
 use crate::utils::convert::*;
 
@@ -31,12 +30,6 @@ pub type InStakeSmt = bool;
 pub type InDelegateSmt = bool;
 pub type NonTopStakers = HashMap<Staker, InStakeSmt>;
 pub type NonTopDelegators = HashMap<Delegator, HashMap<Staker, InDelegateSmt>>;
-
-#[derive(Clone)]
-pub struct CkbNetwork<C: CkbRpc> {
-    pub network_type: NetworkType,
-    pub client:       C,
-}
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum NetworkType {

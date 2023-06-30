@@ -1,14 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use ckb_sdk::unlock::ScriptSigner;
     use ckb_types::h256;
 
     use common::traits::tx_builder::IWithdrawTxBuilder;
-    use common::types::tx_builder::{CkbNetwork, Epoch, NetworkType, StakeTypeIds};
+    use common::types::tx_builder::{Epoch, StakeTypeIds};
     use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
-    use crate::ckb::utils::omni::{omni_eth_address, omni_eth_ckb_address, omni_eth_signer};
-    use crate::ckb::utils::tx::{gen_script_group, send_tx};
+    use crate::ckb::helper::ckb::{OmniEth, Tx};
     use crate::ckb::withdraw::WithdrawTxBuilder;
 
     // #[tokio::test]
@@ -31,16 +29,13 @@ mod tests {
             h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
-        let staker_eth_addr = omni_eth_address(test_staker_key.clone()).unwrap();
-        let staker_ckb_addr =
-            omni_eth_ckb_address(&NetworkType::Testnet, test_staker_key.clone()).unwrap();
+        let omni_eth = OmniEth::new(test_staker_key.clone());
+        let staker_eth_addr = omni_eth.address().unwrap();
+        let staker_ckb_addr = omni_eth.ckb_address().unwrap();
         println!("staker addr: {}", staker_ckb_addr);
 
-        let mut tx = WithdrawTxBuilder::new(
-            CkbNetwork {
-                network_type: NetworkType::Testnet,
-                client:       ckb_client.clone(),
-            },
+        let tx = WithdrawTxBuilder::new(
+            &ckb_client,
             StakeTypeIds {
                 metadata_type_id,
                 checkpoint_type_id,
@@ -55,16 +50,17 @@ mod tests {
 
         println!("tx: {}", tx);
 
-        let signer = omni_eth_signer(test_staker_key).unwrap();
+        let mut tx = Tx::new(&ckb_client, tx);
 
-        let script_groups = gen_script_group(&ckb_client, &tx).await.unwrap();
+        let script_groups = tx.gen_script_group().await.unwrap();
+        let signer = omni_eth.signer().unwrap();
 
         for group in script_groups.lock_groups.iter() {
             println!("id: {:?}", group.1.input_indices);
-            tx = signer.sign_tx(&tx, group.1).unwrap();
+            tx.sign(&signer, group.1).unwrap();
         }
 
-        match send_tx(&ckb_client, &tx.data().into()).await {
+        match tx.send().await {
             Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
             Err(e) => println!("{}", e),
         }

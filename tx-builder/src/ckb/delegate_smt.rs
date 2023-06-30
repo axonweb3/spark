@@ -18,8 +18,8 @@ use common::types::axon_types::delegate::{
 };
 use common::types::smt::{Delegator as SmtDelegator, Staker as SmtStaker};
 use common::types::tx_builder::{
-    Amount, CkbNetwork, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt,
-    InStakeSmt, NonTopDelegators, PrivateKey, Staker as TxStaker,
+    Amount, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt, InStakeSmt,
+    NonTopDelegators, PrivateKey, Staker as TxStaker,
 };
 use common::types::{ckb_rpc_client::Cell, smt::UserAmount};
 use common::utils::convert::{new_u128, to_uint128, to_usize};
@@ -30,25 +30,13 @@ use crate::ckb::define::{
     error::CkbTxErr,
     types::{DelegateAtCellLockData, DelegateSmtCellData, StakerSmtRoot},
 };
-use crate::ckb::utils::cell_data::{delegate_item, token_cell_data, update_withdraw_data};
-use crate::ckb::utils::{
-    cell_collector::{
-        get_delegate_cell, get_delegate_requirement_cell, get_unique_cell, get_withdraw_cell,
-    },
-    cell_dep::{
-        always_success_lock_dep, checkpoint_cell_dep, delegate_lock_dep, delegate_smt_type_dep,
-        metadata_cell_dep, omni_lock_dep, secp256k1_lock_dep, withdraw_lock_dep, xudt_type_dep,
-    },
-    omni::{omni_eth_address, omni_eth_witness_placeholder},
-    script::{
-        always_success_lock, delegate_lock, delegate_requirement_type, delegate_smt_type,
-        omni_eth_lock, withdraw_lock, xudt_type,
-    },
-    tx::balance_tx,
+use crate::ckb::helper::{
+    token_cell_data, AlwaysSuccess, Checkpoint, Delegate, Metadata, OmniEth, Secp256k1, Tx,
+    Withdraw, Xudt,
 };
 
-pub struct DelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage> {
-    ckb:                   CkbNetwork<C>,
+pub struct DelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
+    ckb:                   &'a C,
     kicker:                PrivateKey,
     current_epoch:         Epoch,
     type_ids:              DelegateSmtTypeIds,
@@ -58,9 +46,11 @@ pub struct DelegateSmtTxBuilder<C: CkbRpc, D: DelegateSmtStorage> {
 }
 
 #[async_trait]
-impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateSmtTxBuilder<C, D> {
+impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
+    for DelegateSmtTxBuilder<'a, C, D>
+{
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: DelegateSmtTypeIds,
@@ -79,11 +69,9 @@ impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateS
     }
 
     async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)> {
-        let delegate_smt_type =
-            delegate_smt_type(&self.ckb.network_type, &self.type_ids.delegate_smt_type_id);
+        let delegate_smt_type = Delegate::smt_type(&self.type_ids.delegate_smt_type_id);
 
-        let delegate_smt_cell =
-            get_unique_cell(&self.ckb.client, delegate_smt_type.clone()).await?;
+        let delegate_smt_cell = Delegate::get_smt_cell(self.ckb, delegate_smt_type.clone()).await?;
 
         let mut inputs = vec![
             // delegate smt cell
@@ -97,7 +85,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateS
         let mut outputs = vec![
             // delegate smt cell
             CellOutput::new_builder()
-                .lock(always_success_lock(&self.ckb.network_type))
+                .lock(AlwaysSuccess::lock())
                 .type_(Some(delegate_smt_type).pack())
                 .build_exact_capacity(Capacity::bytes(root.len())?)?,
         ];
@@ -109,33 +97,23 @@ impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateS
             .await?;
 
         let cell_deps = vec![
-            secp256k1_lock_dep(&self.ckb.network_type),
-            omni_lock_dep(&self.ckb.network_type),
-            always_success_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            delegate_lock_dep(&self.ckb.network_type),
-            delegate_smt_type_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
-            withdraw_lock_dep(&self.ckb.network_type),
+            Secp256k1::lock_dep(),
+            OmniEth::lock_dep(),
+            AlwaysSuccess::lock_dep(),
+            Xudt::type_dep(),
+            Delegate::lock_dep(),
+            Delegate::smt_type_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+            Withdraw::lock_dep(),
         ];
 
         // todo
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // Delegate AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // Withdraw AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // Delegate AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // Withdraw AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -146,9 +124,9 @@ impl<C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<C, D> for DelegateS
             .witnesses(witnesses.pack())
             .build();
 
-        let kicker_addr = omni_eth_address(self.kicker.clone())?;
-        let kicker_lock = omni_eth_lock(&self.ckb.network_type, &kicker_addr);
-        let tx = balance_tx(&self.ckb.client, kicker_lock, tx).await?;
+        let omni_eth = OmniEth::new(self.kicker.clone());
+        let kicker_lock = OmniEth::lock(&omni_eth.address()?);
+        let tx = Tx::new(self.ckb, tx).balance(kicker_lock).await?;
 
         // todo: sign tx
 
@@ -161,7 +139,7 @@ struct Statistics {
     pub non_top_delegators: HashMap<Delegator, HashMap<TxStaker, InDelegateSmt>>,
 }
 
-impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
+impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
     async fn fill_tx(
         &self,
         statistics: &Statistics,
@@ -169,7 +147,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
     ) -> Result<()> {
-        let xudt = xudt_type(&self.ckb.network_type, &self.type_ids.xudt_owner.pack());
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
         for (delegator, delegate_cell) in self.inputs_delegate_cells.iter() {
             // inputs: delegate AT cell
@@ -182,18 +160,14 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
             let (old_total_delegate_amount, old_delegate_data) =
                 self.parse_delegate_data(delegate_cell);
 
-            let withdraw_lock = withdraw_lock(
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-                delegator,
-            );
+            let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, delegator);
 
             let (new_delegate_data, new_withdraw_data) = if statistics
                 .withdraw_amounts
                 .contains_key(delegator)
             {
                 let old_withdraw_cell =
-                    get_withdraw_cell(&self.ckb.client, withdraw_lock.clone(), xudt.clone())
+                    Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
                         .await?
                         .unwrap();
 
@@ -212,7 +186,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
                 let mut delegator_infos: Vec<DelegateItem> = Vec::new();
 
                 for delegate in old_delegate_data.lock().delegator_infos() {
-                    let mut delegate_item = delegate_item(&delegate);
+                    let mut delegate_item = Delegate::item(&delegate);
 
                     delegator_infos.push(if withdraw_amounts.contains_key(&delegate_item.staker) {
                         let withdraw_amount = withdraw_amounts
@@ -246,7 +220,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
                         old_total_delegate_amount - total_withdraw_amount,
                         new_delegate_data,
                     ),
-                    Some(update_withdraw_data(
+                    Some(Withdraw::update_cell_data(
                         old_withdraw_cell,
                         self.current_epoch + INAUGURATION,
                         total_withdraw_amount,
@@ -281,11 +255,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
             // outputs: delegate AT cell
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(delegate_lock(
-                        &self.ckb.network_type,
-                        &self.type_ids.metadata_type_id,
-                        delegator,
-                    ))
+                    .lock(Delegate::lock(&self.type_ids.metadata_type_id, delegator))
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(new_delegate_data.len())?)?,
             );
@@ -407,7 +377,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
             let mut expired = false;
 
             for info in delegate_infos.into_iter() {
-                let item = delegate_item(&info);
+                let item = Delegate::item(&info);
                 if item.inauguration_epoch < self.current_epoch + INAUGURATION {
                     expired = true;
                     break;
@@ -454,7 +424,7 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
 
         let delete_count = all_delegates.len() - maximum_delegators;
         let deleted_delegators = &all_delegates[..delete_count];
-        let xudt = xudt_type(&self.ckb.network_type, &self.type_ids.xudt_owner.pack());
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
         for (delegator, amount) in deleted_delegators {
             new_smt.remove(delegator);
@@ -474,13 +444,9 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
                     .insert(staker.clone(), *amount);
 
                 if !self.inputs_delegate_cells.contains_key(&tx_delegator) {
-                    let cell = get_delegate_cell(
-                        &self.ckb.client,
-                        delegate_lock(
-                            &self.ckb.network_type,
-                            &self.type_ids.metadata_type_id,
-                            &tx_delegator,
-                        ),
+                    let cell = Delegate::get_cell(
+                        self.ckb,
+                        Delegate::lock(&self.type_ids.metadata_type_id, &tx_delegator),
                         xudt.clone(),
                     )
                     .await?
@@ -533,26 +499,14 @@ impl<C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<C, D> {
     }
 
     async fn get_maximum_delegators(&self, staker: &TxStaker) -> Result<usize> {
-        let delegate_requirement_cell = get_delegate_requirement_cell(
-            &self.ckb.client,
-            omni_eth_lock(&self.ckb.network_type, staker),
-            delegate_requirement_type(
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-                staker,
-            ),
+        let delegate_requirement_cell = Delegate::get_requirement_cell(
+            self.ckb,
+            Delegate::requirement_type(&self.type_ids.metadata_type_id, staker),
         )
         .await?;
 
-        if delegate_requirement_cell.is_none() {
-            return Err(CkbTxErr::CellNotFound("DelegateRequirement".to_owned()).into());
-        }
-
-        let delegate_requirement_cell_bytes = delegate_requirement_cell
-            .unwrap()
-            .output_data
-            .unwrap()
-            .into_bytes();
+        let delegate_requirement_cell_bytes =
+            delegate_requirement_cell.output_data.unwrap().into_bytes();
         let delegate_cell_info = DelegateCellData::new_unchecked(delegate_requirement_cell_bytes);
         let maximum_delegators = to_usize(
             delegate_cell_info
