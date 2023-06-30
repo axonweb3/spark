@@ -7,14 +7,12 @@ mod tests {
     use ckb_types::h256;
 
     use common::traits::tx_builder::IRewardTxBuilder;
-    use common::types::tx_builder::{CkbNetwork, Epoch, NetworkType, RewardInfo, RewardTypeIds};
+    use common::types::tx_builder::{Epoch, RewardInfo, RewardTypeIds};
     use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
     use storage::smt::SmtManager;
 
+    use crate::ckb::helper::ckb::{OmniEth, Tx};
     use crate::ckb::reward::RewardTxBuilder;
-    use crate::ckb::utils::omni::{omni_eth_address, omni_eth_ckb_address, omni_eth_signer};
-    use crate::ckb::utils::script::omni_eth_lock;
-    use crate::ckb::utils::tx::send_tx;
 
     // #[tokio::test]
     async fn _reward_tx(current_epoch: Epoch) {
@@ -33,21 +31,18 @@ mod tests {
             h256!("0xfdaf95d57c615deaed3d7307d3f649b88d50a51f592a428f3815768e5ae3eab3");
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
-        let staker_eth_addr = omni_eth_address(test_staker_key.clone()).unwrap();
-        let staker_ckb_addr =
-            omni_eth_ckb_address(&NetworkType::Testnet, test_staker_key.clone()).unwrap();
+        let omni_eth = OmniEth::new(test_staker_key.clone());
+        let staker_eth_addr = omni_eth.address().unwrap();
+        let staker_ckb_addr = omni_eth.ckb_address().unwrap();
         println!("staker addr: {}", staker_ckb_addr);
 
-        let staker_lock = omni_eth_lock(&NetworkType::Testnet, &staker_eth_addr);
+        let staker_lock = OmniEth::lock(&staker_eth_addr);
 
         let path = PathBuf::from("./free-space/smt");
         let smt = SmtManager::new(path);
 
         let tx = RewardTxBuilder::new(
-            CkbNetwork {
-                network_type: NetworkType::Testnet,
-                client:       ckb_client.clone(),
-            },
+            &ckb_client,
             RewardTypeIds {
                 metadata_type_id,
                 checkpoint_type_id,
@@ -71,7 +66,7 @@ mod tests {
 
         println!("tx: {}", tx);
 
-        let signer = omni_eth_signer(test_staker_key).unwrap();
+        let signer = omni_eth.signer().unwrap();
         let tx = signer
             .sign_tx(&tx, &ScriptGroup {
                 script:         staker_lock.clone(),
@@ -89,7 +84,7 @@ mod tests {
             })
             .unwrap();
 
-        match send_tx(&ckb_client, &tx.data().into()).await {
+        match Tx::new(&ckb_client, tx).send().await {
             Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
             Err(e) => println!("{}", e),
         }

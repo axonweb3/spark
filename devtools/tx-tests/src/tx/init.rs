@@ -1,9 +1,8 @@
 use common::traits::tx_builder::IInitTxBuilder;
-use common::types::tx_builder::{Checkpoint, CkbNetwork, Metadata};
+use common::types::tx_builder::{Checkpoint, Metadata};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::init::InitTxBuilder;
-use tx_builder::ckb::utils::omni::omni_eth_ckb_address;
-use tx_builder::ckb::utils::tx::send_tx;
 
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::config::{parse_file, write_file};
@@ -11,16 +10,14 @@ use crate::mock::mock_axon_validators;
 
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
-pub async fn init_tx(ckb: CkbNetwork<CkbRpcClient>) {
+pub async fn init_tx(ckb: &CkbRpcClient) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
     let test_seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
-    println!(
-        "seeder ckb addres: {}\n",
-        omni_eth_ckb_address(&ckb.network_type, test_seeder_key.clone()).unwrap()
-    );
+    let omni_eth = OmniEth::new(test_seeder_key.clone());
+    println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let (tx, type_id_args) = InitTxBuilder::new(
-        ckb.clone(),
+        ckb,
         test_seeder_key,
         10000,
         Checkpoint {
@@ -42,7 +39,9 @@ pub async fn init_tx(ckb: CkbNetwork<CkbRpcClient>) {
     .await
     .unwrap();
 
-    match send_tx(&ckb.client, &tx.data().into()).await {
+    let tx = Tx::new(ckb, tx);
+
+    match tx.send().await {
         Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }

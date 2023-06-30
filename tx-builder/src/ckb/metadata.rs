@@ -9,6 +9,7 @@ use ckb_types::{
 };
 
 use common::traits::{
+    ckb_rpc_client::CkbRpc,
     smt::{DelegateSmtStorage, ProposalSmtStorage, StakeSmtStorage},
     tx_builder::IMetadataTxBuilder,
 };
@@ -22,7 +23,8 @@ use ethereum_types::H160;
 
 use crate::ckb::define::types::*;
 
-pub struct MetadataSmtTxBuilder<PSmt> {
+pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
+    _ckb:            &'a C,
     _kicker:         PrivateKey,
     quorum:          u16,
     last_checkpoint: Checkpoint,
@@ -31,11 +33,12 @@ pub struct MetadataSmtTxBuilder<PSmt> {
 }
 
 #[async_trait]
-impl<PSmt> IMetadataTxBuilder<PSmt> for MetadataSmtTxBuilder<PSmt>
+impl<'a, C: CkbRpc, PSmt> IMetadataTxBuilder<'a, C, PSmt> for MetadataSmtTxBuilder<'a, C, PSmt>
 where
     PSmt: ProposalSmtStorage + StakeSmtStorage + DelegateSmtStorage + Send + 'static + Sync,
 {
     fn new(
+        _ckb: &'a C,
         _kicker: PrivateKey,
         quorum: u16,
         last_metadata: Metadata,
@@ -43,6 +46,7 @@ where
         smt: PSmt,
     ) -> Self {
         Self {
+            _ckb,
             _kicker,
             quorum,
             last_checkpoint,

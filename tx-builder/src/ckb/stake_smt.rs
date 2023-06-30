@@ -20,7 +20,7 @@ use common::{
     traits::smt::StakeSmtStorage,
     types::{
         ckb_rpc_client::Cell,
-        tx_builder::{Amount, CkbNetwork, Epoch, InStakeSmt, NonTopStakers, PrivateKey},
+        tx_builder::{Amount, Epoch, InStakeSmt, NonTopStakers, PrivateKey},
     },
 };
 use common::{
@@ -38,23 +38,13 @@ use crate::ckb::define::{
     error::CkbTxErr,
     types::{StakeInfo, StakeSmtUpdateInfo},
 };
-
-use crate::ckb::utils::{
-    cell_collector::{get_stake_cell, get_unique_cell, get_withdraw_cell},
-    cell_data::{stake_item, token_cell_data, update_withdraw_data},
-    cell_dep::{
-        always_success_lock_dep, checkpoint_cell_dep, metadata_cell_dep, omni_lock_dep,
-        secp256k1_lock_dep, stake_lock_dep, stake_smt_type_dep, withdraw_lock_dep, xudt_type_dep,
-    },
-    omni::{omni_eth_address, omni_eth_witness_placeholder},
-    script::{
-        always_success_lock, omni_eth_lock, stake_lock, stake_smt_type, withdraw_lock, xudt_type,
-    },
-    tx::balance_tx,
+use crate::ckb::helper::{
+    token_cell_data, AlwaysSuccess, Checkpoint, Metadata, OmniEth, Secp256k1, Stake, Tx, Withdraw,
+    Xudt,
 };
 
-pub struct StakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
-    ckb:               CkbNetwork<C>,
+pub struct StakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
+    ckb:               &'a C,
     kicker:            PrivateKey,
     current_epoch:     Epoch,
     quorum:            u16,
@@ -64,11 +54,11 @@ pub struct StakeSmtTxBuilder<C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
 }
 
 #[async_trait]
-impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
-    for StakeSmtTxBuilder<C, S>
+impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, S>
+    for StakeSmtTxBuilder<'a, C, S>
 {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
@@ -88,9 +78,8 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
     }
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)> {
-        let stake_smt_type =
-            stake_smt_type(&self.ckb.network_type, &self.type_ids.stake_smt_type_id);
-        let stake_smt_cell = get_unique_cell(&self.ckb.client, stake_smt_type.clone()).await?;
+        let stake_smt_type = Stake::smt_type(&self.type_ids.stake_smt_type_id);
+        let stake_smt_cell = Stake::get_smt_cell(self.ckb, stake_smt_type.clone()).await?;
 
         let mut inputs = vec![
             // stake smt cell
@@ -112,7 +101,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
         let mut outputs = vec![
             // stake smt cell
             CellOutput::new_builder()
-                .lock(always_success_lock(&self.ckb.network_type))
+                .lock(AlwaysSuccess::lock())
                 .type_(Some(stake_smt_type).pack())
                 .build_exact_capacity(Capacity::bytes(new_stake_smt_cell_data.len())?)?,
         ];
@@ -130,36 +119,26 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
         .await?;
 
         let mut cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            always_success_lock_dep(&self.ckb.network_type),
-            stake_lock_dep(&self.ckb.network_type),
-            stake_smt_type_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            AlwaysSuccess::lock_dep(),
+            Stake::lock_dep(),
+            Stake::smt_type_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
         // todo
         let mut witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // Stake smt cell lock
-            omni_eth_witness_placeholder().as_bytes(), // Stake AT cell lock, may not be needed
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // Stake smt cell lock
+            OmniEth::witness_placeholder().as_bytes(), // Stake AT cell lock, may not be needed
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         if !statistics.withdraw_amounts.is_empty() {
-            cell_deps.push(withdraw_lock_dep(&self.ckb.network_type));
-            witnesses.push(omni_eth_witness_placeholder().as_bytes()); // Withdraw AT cell lock
+            cell_deps.push(Withdraw::lock_dep());
+            witnesses.push(OmniEth::witness_placeholder().as_bytes()); // Withdraw AT cell lock
         }
 
         let tx = TransactionBuilder::default()
@@ -170,11 +149,8 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<C, S>
             .witnesses(witnesses.pack())
             .build();
 
-        let kicker_lock = omni_eth_lock(
-            &self.ckb.network_type,
-            &omni_eth_address(self.kicker.clone())?,
-        );
-        let tx = balance_tx(&self.ckb.client, kicker_lock, tx).await?;
+        let kicker_lock = OmniEth::lock(&OmniEth::new(self.kicker.clone()).address()?);
+        let tx = Tx::new(self.ckb, tx).balance(kicker_lock).await?;
 
         // todo: sign tx
 
@@ -187,7 +163,7 @@ struct Statistics {
     pub withdraw_amounts: HashMap<TxStaker, Amount>,
 }
 
-impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
+impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S> {
     // todo: witness?
     async fn fill_tx(
         &self,
@@ -197,7 +173,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
     ) -> Result<()> {
-        let xudt = xudt_type(&self.ckb.network_type, &self.type_ids.xudt_owner.pack());
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
         for (staker, stake_cell) in inputs_stake_cells.iter() {
             // inputs: stake AT cell
             inputs.push(
@@ -208,11 +184,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
 
             let (old_total_stake_amount, old_stake_data) = self.parse_stake_data(stake_cell);
 
-            let withdraw_lock = withdraw_lock(
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-                staker,
-            );
+            let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, staker);
 
             let (new_total_stake_amount, withdraw_data) =
                 if statistics.withdraw_amounts.contains_key(staker) {
@@ -220,7 +192,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
                         statistics.withdraw_amounts.get(staker).unwrap().to_owned();
 
                     let old_withdraw_cell =
-                        get_withdraw_cell(&self.ckb.client, withdraw_lock.clone(), xudt.clone())
+                        Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
                             .await?
                             .unwrap();
 
@@ -233,7 +205,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
 
                     (
                         old_total_stake_amount - withdraw_amount,
-                        Some(update_withdraw_data(
+                        Some(Withdraw::update_cell_data(
                             old_withdraw_cell,
                             self.current_epoch + INAUGURATION,
                             withdraw_amount,
@@ -266,11 +238,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             outputs_data.push(token_cell_data(new_total_stake_amount, new_stake_data));
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(stake_lock(
-                        &self.ckb.network_type,
-                        &self.type_ids.metadata_type_id,
-                        staker,
-                    ))
+                    .lock(Stake::lock(&self.type_ids.metadata_type_id, staker))
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(outputs_data.last().unwrap().len())?)?,
             );
@@ -321,7 +289,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             .get_sub_leaves(self.current_epoch + INAUGURATION)
             .await?;
 
-        let xudt = xudt_type(&self.ckb.network_type, &self.type_ids.xudt_owner.pack());
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
         let mut new_smt = old_smt.clone();
         let mut withdraw_amounts = HashMap::new(); // records all the stakers' withdraw amounts
@@ -336,7 +304,7 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
             .unwrap();
 
             let (_, stake_data) = self.parse_stake_data(&cell);
-            let stake_delta = stake_item(&stake_data.lock().delta());
+            let stake_delta = Stake::item(&stake_data.lock().delta());
 
             if stake_delta.inauguration_epoch < self.current_epoch + INAUGURATION {
                 continue;
@@ -376,13 +344,9 @@ impl<C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<C, S> {
                 // staker's stake cell needs to be updated. So the cell should be put to the
                 // inputs.
                 if !inputs_stake_cells.contains_key(staker) {
-                    let stake_cell = get_stake_cell(
-                        &self.ckb.client,
-                        stake_lock(
-                            &self.ckb.network_type,
-                            &self.type_ids.metadata_type_id,
-                            staker,
-                        ),
+                    let stake_cell = Stake::get_cell(
+                        self.ckb,
+                        Stake::lock(&self.type_ids.metadata_type_id, staker),
                         xudt.clone(),
                     )
                     .await?

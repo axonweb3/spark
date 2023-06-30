@@ -21,19 +21,13 @@ use common::utils::convert::*;
 use crate::ckb::define::constants::*;
 use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
 use crate::ckb::define::types::{StakeAtCellData, StakeAtCellLockData};
-use crate::ckb::utils::{
-    calc_amount::*,
-    cell_collector::{collect_xudt, get_stake_cell, get_withdraw_cell},
-    cell_data::*,
-    cell_dep::*,
-    omni::*,
-    script::*,
-    tx::balance_tx,
-    witness::stake_witness_placeholder,
+use crate::ckb::helper::{
+    amount_calculator::*, token_cell_data, Checkpoint, Metadata, OmniEth, Secp256k1, Stake, Tx,
+    Withdraw, Xudt,
 };
 
-pub struct StakeTxBuilder<C: CkbRpc> {
-    ckb:              CkbNetwork<C>,
+pub struct StakeTxBuilder<'a, C: CkbRpc> {
+    ckb:              &'a C,
     type_ids:         StakeTypeIds,
     current_epoch:    Epoch,
     stake:            StakeItem,
@@ -45,19 +39,19 @@ pub struct StakeTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
+impl<'a, C: CkbRpc> IStakeTxBuilder<'a, C> for StakeTxBuilder<'a, C> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         type_ids: StakeTypeIds,
         staker: EthAddress,
         current_epoch: Epoch,
         stake_item: StakeItem,
         first_stake_info: Option<FirstStakeInfo>,
     ) -> Self {
-        let stake_lock = stake_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
-        let withdraw_lock = withdraw_lock(&ckb.network_type, &type_ids.metadata_type_id, &staker);
-        let token_lock = omni_eth_lock(&ckb.network_type, &staker);
-        let xudt = xudt_type(&ckb.network_type, &type_ids.xudt_owner.pack());
+        let stake_lock = Stake::lock(&type_ids.metadata_type_id, &staker);
+        let withdraw_lock = Withdraw::lock(&type_ids.metadata_type_id, &staker);
+        let token_lock = OmniEth::lock(&staker);
+        let xudt = Xudt::type_(&type_ids.xudt_owner.pack());
 
         Self {
             ckb,
@@ -82,7 +76,7 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
         }
 
         let stake_cell =
-            get_stake_cell(&self.ckb.client, self.stake_lock.clone(), self.xudt.clone()).await?;
+            Stake::get_cell(self.ckb, self.stake_lock.clone(), self.xudt.clone()).await?;
         if stake_cell.is_none() {
             self.build_first_stake_tx().await
         } else {
@@ -91,7 +85,7 @@ impl<C: CkbRpc> IStakeTxBuilder<C> for StakeTxBuilder<C> {
     }
 }
 
-impl<C: CkbRpc> StakeTxBuilder<C> {
+impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
     async fn build_first_stake_tx(&self) -> Result<TransactionView> {
         let mut inputs = vec![];
 
@@ -121,15 +115,11 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         self.add_withdraw_to_outputs(&mut outputs, &mut outputs_data)
             .await?;
 
-        let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-        ];
+        let cell_deps = vec![OmniEth::lock_dep(), Secp256k1::lock_dep(), Xudt::type_dep()];
 
         let witnesses = vec![
-            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -140,7 +130,9 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
@@ -171,28 +163,19 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         ];
 
         let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            stake_lock_dep(&self.ckb.network_type),
-            checkpoint_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.checkpoint_type_id,
-            )
-            .await?,
-            metadata_cell_dep(
-                &self.ckb.client,
-                &self.ckb.network_type,
-                &self.type_ids.metadata_type_id,
-            )
-            .await?,
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            Stake::lock_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
         let witnesses = vec![
-            stake_witness_placeholder(0u8).as_bytes(), // stake AT cell lock, todo
-            omni_eth_witness_placeholder().as_bytes(), // AT cell lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            Stake::witness_placeholder(0u8).as_bytes(), // stake AT cell lock, todo
+            OmniEth::witness_placeholder().as_bytes(),  // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(),  // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -203,14 +186,16 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, self.token_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx)
+            .balance(self.token_lock.clone())
+            .await?;
 
         Ok(tx)
     }
 
     async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
-        let (token_cells, amount) = collect_xudt(
-            &self.ckb.client,
+        let (token_cells, amount) = Xudt::collect(
+            self.ckb,
             self.token_lock.clone(),
             self.xudt.clone(),
             self.stake.amount,
@@ -238,12 +223,8 @@ impl<C: CkbRpc> StakeTxBuilder<C> {
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
     ) -> Result<()> {
-        let withdraw_cell = get_withdraw_cell(
-            &self.ckb.client,
-            self.withdraw_lock.clone(),
-            self.xudt.clone(),
-        )
-        .await?;
+        let withdraw_cell =
+            Withdraw::get_cell(self.ckb, self.withdraw_lock.clone(), self.xudt.clone()).await?;
 
         if withdraw_cell.is_none() {
             outputs_data.push(token_cell_data(0, WithdrawAtCellData::default().as_bytes()));

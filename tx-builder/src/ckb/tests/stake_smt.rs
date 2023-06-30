@@ -3,7 +3,7 @@ mod tests {
     use ckb_types::h256;
 
     use common::traits::tx_builder::IStakeSmtTxBuilder;
-    use common::types::tx_builder::{CkbNetwork, NetworkType, StakeSmtTypeIds};
+    use common::types::tx_builder::StakeSmtTypeIds;
     use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
     use storage::smt::SmtManager;
 
@@ -26,10 +26,7 @@ mod tests {
         let ckb_client = CkbRpcClient::new("https://testnet.ckb.dev");
 
         let (tx, _) = StakeSmtTxBuilder::new(
-            CkbNetwork {
-                network_type: NetworkType::Testnet,
-                client:       ckb_client.clone(),
-            },
+            &ckb_client,
             test_staker_key,
             1,
             StakeSmtTypeIds {

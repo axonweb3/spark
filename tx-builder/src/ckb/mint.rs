@@ -19,14 +19,10 @@ use common::types::tx_builder::*;
 use common::utils::convert::{to_u128, to_uint128};
 
 use crate::ckb::define::error::CkbTxErr;
-use crate::ckb::utils::cell_collector::get_unique_cell;
-use crate::ckb::utils::cell_dep::*;
-use crate::ckb::utils::omni::*;
-use crate::ckb::utils::script::*;
-use crate::ckb::utils::tx::balance_tx;
+use crate::ckb::helper::{Issue, OmniEth, Secp256k1, Selection, Tx, Xudt};
 
-pub struct MintTxBuilder<C: CkbRpc> {
-    ckb:               CkbNetwork<C>,
+pub struct MintTxBuilder<'a, C: CkbRpc> {
+    ckb:               &'a C,
     seeder_key:        PrivateKey,
     stakers:           Vec<(StakerEthAddr, Amount)>,
     selection_type_id: H256,
@@ -34,9 +30,9 @@ pub struct MintTxBuilder<C: CkbRpc> {
 }
 
 #[async_trait]
-impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
+impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
     fn new(
-        ckb: CkbNetwork<C>,
+        ckb: &'a C,
         seeder_key: PrivateKey,
         stakers: Vec<(StakerEthAddr, Amount)>,
         selection_type_id: H256,
@@ -52,13 +48,11 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
     }
 
     async fn build_tx(&self) -> Result<TransactionView> {
-        let seeder = omni_eth_address(self.seeder_key.clone())?;
-        let seeder_lock = omni_eth_lock(&self.ckb.network_type, &seeder);
+        let omni_eth = OmniEth::new(self.seeder_key.clone());
+        let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 
-        let selection_cell =
-            get_unique_cell(&self.ckb.client, type_id_script(&self.selection_type_id)).await?;
-        let issue_cell =
-            get_unique_cell(&self.ckb.client, type_id_script(&self.issue_type_id)).await?;
+        let selection_cell = Selection::get_cell(self.ckb, &self.selection_type_id).await?;
+        let issue_cell = Issue::get_cell(self.ckb, &self.issue_type_id).await?;
 
         let inputs = vec![
             // selection cell
@@ -74,16 +68,16 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
         let (outputs, outputs_data) = self.fill_outputs(selection_cell, issue_cell)?;
 
         let cell_deps = vec![
-            omni_lock_dep(&self.ckb.network_type),
-            secp256k1_lock_dep(&self.ckb.network_type),
-            xudt_type_dep(&self.ckb.network_type),
-            selection_lock_dep(&self.ckb.network_type),
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            Selection::lock_dep(),
         ];
 
         let witnesses = vec![
             Bytes::default(),                          // selection lock
-            omni_eth_witness_placeholder().as_bytes(), // issue lock
-            omni_eth_witness_placeholder().as_bytes(), // capacity provider lock
+            OmniEth::witness_placeholder().as_bytes(), // issue lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -94,9 +88,9 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = balance_tx(&self.ckb.client, seeder_lock.clone(), tx).await?;
+        let tx = Tx::new(self.ckb, tx).balance(seeder_lock.clone()).await?;
 
-        let signer = omni_eth_signer(self.seeder_key.clone())?;
+        let signer = OmniEth::new(self.seeder_key.clone()).signer()?;
         let tx = signer.sign_tx(&tx, &ScriptGroup {
             script:         seeder_lock.clone(),
             group_type:     ScriptGroupType::Lock,
@@ -114,7 +108,7 @@ impl<C: CkbRpc> IMintTxBuilder<C> for MintTxBuilder<C> {
     }
 }
 
-impl<C: CkbRpc> MintTxBuilder<C> {
+impl<'a, C: CkbRpc> MintTxBuilder<'a, C> {
     fn fill_outputs(
         &self,
         selection_cell: Cell,
@@ -124,7 +118,7 @@ impl<C: CkbRpc> MintTxBuilder<C> {
         let mut outputs = vec![];
 
         let selection_lock: Script = selection_cell.output.lock.clone().into();
-        let xudt = xudt_type(&self.ckb.network_type, &selection_lock.calc_script_hash());
+        let xudt = Xudt::type_(&selection_lock.calc_script_hash());
 
         let issue_data = IssueCellData::new_unchecked(issue_cell.output_data.unwrap().into_bytes());
 
@@ -137,7 +131,7 @@ impl<C: CkbRpc> MintTxBuilder<C> {
             outputs_data.push(amount.pack().as_bytes());
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(omni_eth_lock(&self.ckb.network_type, staker))
+                    .lock(OmniEth::lock(staker))
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(16)?)?,
             );
