@@ -6,8 +6,8 @@ use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
 
 use common::types::api::{
-    AddressAmount, ChainState, HistoryEvent, OperationType, RewardHistory, RewardState,
-    StakeAmount, StakeHistory, StakeRate, StakeState, StakeTransaction,
+    AddressAmount, ChainState, HistoryEvent, OperationType, PaginatedResult, RewardHistory,
+    RewardState, StakeAmount, StakeHistory, StakeRate, StakeState, StakeTransaction,
 };
 use common::types::smt::Address;
 use common::types::Transaction;
@@ -38,7 +38,7 @@ pub trait AccountHistoryRpc {
         page_size: u64,
         enent: HistoryEvent,
         operation_type: OperationType,
-    ) -> RpcResult<Vec<StakeHistory>>;
+    ) -> RpcResult<PaginatedResult<StakeHistory>>;
 
     #[method(name = "getRewardHistory")]
     async fn get_reward_history(

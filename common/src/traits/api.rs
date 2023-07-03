@@ -20,6 +20,8 @@ pub trait APIAdapter: Send + Sync {
         limit: u64,
     ) -> Result<Vec<Model>>;
 
+    async fn get_operation_total(&self, addr: Address, operation: u32) -> Result<u64>;
+
     async fn get_stake_amount_by_epoch(
         &self,
         operation: u32,

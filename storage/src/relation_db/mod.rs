@@ -9,7 +9,7 @@ use common::types::{
 use migration::{Migrator, MigratorTrait};
 pub use sea_orm::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, CursorTrait, Database, DbConn, EntityTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, CursorTrait, Database, DbConn, EntityTrait, QueryFilter, PaginatorTrait,
 };
 
 pub async fn establish_connection(database_url: &str) -> Result<DbConn> {
@@ -74,6 +74,18 @@ impl TransactionStorage for TransactionHistory {
         match cursor.all(&self.db).await {
             Ok(records) => Ok(records),
             Err(e) => Err(StorageError::SqlCursorError(e).into()),
+        }
+    }
+
+    async fn get_operation_total(&self, addr: Address, operation: u32) -> Result<u64> {
+        let count = transaction::Entity::find()
+            .filter(transaction::Column::Address.eq(addr.to_string()))
+            .filter(transaction::Column::Operation.eq(operation))
+            .count(&self.db);
+
+        match count.await {
+            Ok(total) => Ok(total),
+            Err(e) => Err(StorageError::SqlCountError(e).into()),
         }
     }
 

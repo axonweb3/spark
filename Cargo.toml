@@ -11,8 +11,10 @@ rpc-client = { path = "./rpc-client" }
 storage = { path = "./storage" }
 tx-builder = { path = "./tx-builder" }
 
+backtrace = "0.3"
+log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.28", features = ["macros", "rt"] }
+tokio = { version = "1.28", features = ["macros", "signal", "rt"] }
 toml = "0.7"
 
 [workspace]

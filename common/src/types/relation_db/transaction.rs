@@ -4,7 +4,7 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Deserialize, Serialize)]
-#[sea_orm(table_name = "transaction")]
+#[sea_orm(table_name = "transaction_")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id:                  u32,
@@ -18,7 +18,7 @@ pub struct Model {
     pub delegate_amount:     u32,
     pub withdrawable_amount: u32,
     pub stake_rate:          String,
-    pub delegate_rate:       String,
+    pub minimum_amount:      u32,
     pub epoch:               u32,
     pub status:              u32,
 }

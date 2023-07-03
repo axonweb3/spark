@@ -1,4 +1,4 @@
 private_key = ""
-rpc_listening_address = "127.0.0.1:8000"
-rdb_url = ""
+rpc_listen_address = "127.0.0.1:8000"
+rdb_url = "sqlite:./free-space/spark.db"
 kvdb_path = "free-space/db"
