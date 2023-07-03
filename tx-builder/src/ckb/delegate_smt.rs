@@ -163,95 +163,95 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, delegator);
 
-            let (new_delegate_data, new_withdraw_data) = if statistics
-                .withdraw_amounts
-                .contains_key(delegator)
-            {
-                let old_withdraw_cell =
-                    Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
-                        .await?
-                        .unwrap();
+            let (new_delegate_data, new_withdraw_data) =
+                if statistics.withdraw_amounts.contains_key(delegator) {
+                    let old_withdraw_cell =
+                        Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
+                            .await?
+                            .unwrap();
 
-                // inputs: withdraw AT cell
-                inputs.push(
-                    CellInput::new_builder()
-                        .previous_output(old_withdraw_cell.out_point.clone().into())
-                        .build(),
-                );
-
-                let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
-
-                let total_withdraw_amount = withdraw_amounts
-                    .values()
-                    .fold(0_u128, |acc, x| acc + x.to_owned());
-                let mut delegator_infos: Vec<DelegateItem> = Vec::new();
-
-                for delegate in old_delegate_data.lock().delegator_infos() {
-                    let mut delegate_item = Delegate::item(&delegate);
-
-                    delegator_infos.push(if withdraw_amounts.contains_key(&delegate_item.staker) {
-                        let withdraw_amount = withdraw_amounts
-                            .get(&delegate_item.staker)
-                            .unwrap()
-                            .to_owned();
-                        if delegate_item.total_amount < withdraw_amount {
-                            return Err(CkbTxErr::ExceedTotalAmount {
-                                total_amount: delegate_item.total_amount,
-                                new_amount:   withdraw_amount,
-                            }
-                            .into());
-                        }
-                        delegate_item.total_amount -= withdraw_amount;
-                        delegate_item
-                    } else {
-                        delegate_item
-                    });
-                }
-
-                let new_delegate_data = old_delegate_data
-                    .as_builder()
-                    .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
-                        delegator_infos,
-                    }))
-                    .build()
-                    .as_bytes();
-
-                (
-                    token_cell_data(
-                        old_total_delegate_amount - total_withdraw_amount,
-                        new_delegate_data,
-                    ),
-                    Some(Withdraw::update_cell_data(
-                        old_withdraw_cell,
-                        self.current_epoch + INAUGURATION,
-                        total_withdraw_amount,
-                    )),
-                )
-            } else {
-                let mut new_delegates = DelegateInfoDeltas::new_builder();
-
-                for delegate in old_delegate_data.lock().delegator_infos() {
-                    new_delegates =
-                        new_delegates.push(delegate.as_builder().amount(to_uint128(0)).build());
-                }
-
-                let inner_delegate_data = old_delegate_data.lock();
-                let new_delegate_data = old_delegate_data
-                    .as_builder()
-                    .lock(
-                        inner_delegate_data
-                            .as_builder()
-                            .delegator_infos(new_delegates.build())
+                    // inputs: withdraw AT cell
+                    inputs.push(
+                        CellInput::new_builder()
+                            .previous_output(old_withdraw_cell.out_point.clone().into())
                             .build(),
-                    )
-                    .build()
-                    .as_bytes();
+                    );
 
-                (
-                    token_cell_data(old_total_delegate_amount.to_owned(), new_delegate_data),
-                    None,
-                )
-            };
+                    let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
+                    let mut delegator_infos: Vec<DelegateItem> = Vec::new();
+
+                    for delegate in old_delegate_data.lock().delegator_infos() {
+                        let mut delegate_item = Delegate::item(&delegate);
+                        delegate_item.amount = 0;
+
+                        if withdraw_amounts.contains_key(&delegate_item.staker) {
+                            let withdraw_amount = withdraw_amounts
+                                .get(&delegate_item.staker)
+                                .unwrap()
+                                .to_owned();
+                            if delegate_item.total_amount < withdraw_amount {
+                                return Err(CkbTxErr::ExceedTotalAmount {
+                                    total_amount: delegate_item.total_amount,
+                                    new_amount:   withdraw_amount,
+                                }
+                                .into());
+                            }
+                            delegate_item.total_amount -= withdraw_amount;
+                        }
+
+                        if delegate_item.total_amount > 0 {
+                            delegator_infos.push(delegate_item);
+                        }
+                    }
+
+                    let new_delegate_data = old_delegate_data
+                        .as_builder()
+                        .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
+                            delegator_infos,
+                        }))
+                        .build()
+                        .as_bytes();
+
+                    let total_withdraw_amount = withdraw_amounts
+                        .values()
+                        .fold(0_u128, |acc, x| acc + x.to_owned());
+
+                    (
+                        token_cell_data(
+                            old_total_delegate_amount - total_withdraw_amount,
+                            new_delegate_data,
+                        ),
+                        Some(Withdraw::update_cell_data(
+                            old_withdraw_cell,
+                            self.current_epoch + INAUGURATION,
+                            total_withdraw_amount,
+                        )),
+                    )
+                } else {
+                    let mut new_delegates = DelegateInfoDeltas::new_builder();
+
+                    for delegate in old_delegate_data.lock().delegator_infos() {
+                        new_delegates =
+                            new_delegates.push(delegate.as_builder().amount(to_uint128(0)).build());
+                    }
+
+                    let inner_delegate_data = old_delegate_data.lock();
+                    let new_delegate_data = old_delegate_data
+                        .as_builder()
+                        .lock(
+                            inner_delegate_data
+                                .as_builder()
+                                .delegator_infos(new_delegates.build())
+                                .build(),
+                        )
+                        .build()
+                        .as_bytes();
+
+                    (
+                        token_cell_data(old_total_delegate_amount.to_owned(), new_delegate_data),
+                        None,
+                    )
+                };
 
             // outputs: delegate AT cell
             outputs.push(

@@ -7,14 +7,6 @@ use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::axon_types::withdraw::WithdrawArgs;
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::NetworkType;
-use common::utils::convert::*;
-
-use crate::ckb::define::scripts::*;
-use crate::ckb::helper::ckb::cell_collector::get_cell_by_scripts;
-use crate::ckb::helper::metadata::Metadata;
-use crate::ckb::NETWORK_TYPE;
-use crate::{cell_dep, out_point, script};
-
 use common::types::{
     axon_types::withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData, WithdrawInfo as AWithdrawInfo,
@@ -22,10 +14,16 @@ use common::types::{
     },
     tx_builder::Epoch,
 };
+use common::utils::convert::*;
 
 use crate::ckb::define::constants::TOKEN_BYTES;
+use crate::ckb::define::scripts::*;
 use crate::ckb::define::types::WithdrawInfo;
+use crate::ckb::helper::ckb::cell_collector::get_cell_by_scripts;
+use crate::ckb::helper::metadata::Metadata;
 use crate::ckb::helper::token_cell_data;
+use crate::ckb::NETWORK_TYPE;
+use crate::{cell_dep, out_point, script};
 
 pub struct Withdraw;
 

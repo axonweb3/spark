@@ -75,7 +75,7 @@ impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
         ];
 
         let witnesses = vec![
-            Bytes::default(),                          // selection lock
+            Bytes::default(),                          // selection lock & type
             OmniEth::witness_placeholder().as_bytes(), // issue lock
             OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];

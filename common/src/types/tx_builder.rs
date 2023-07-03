@@ -320,6 +320,7 @@ pub struct StakeTypeIds {
 
 #[derive(Clone, Default, Debug)]
 pub struct RewardTypeIds {
+    pub selection_type_id:    H256,
     pub metadata_type_id:     H256,
     pub checkpoint_type_id:   H256,
     pub reward_smt_type_id:   H256,
@@ -415,4 +416,5 @@ pub struct RewardInfo {
     pub base_reward:               Amount,
     pub half_reward_cycle:         Epoch,
     pub theoretical_propose_count: u64,
+    pub epoch_count:               u64,
 }

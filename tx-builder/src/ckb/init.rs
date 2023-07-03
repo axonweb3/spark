@@ -15,16 +15,18 @@ use molecule::prelude::Builder;
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::traits::tx_builder::IInitTxBuilder;
 use common::types::axon_types::{
-    checkpoint::CheckpointCellData, delegate::DelegateSmtCellData,
-    metadata::MetadataCellData as AMetadataCellData, reward::RewardSmtCellData,
-    stake::StakeSmtCellData,
+    checkpoint::CheckpointCellData, delegate::DelegateSmtCellData as ADelegateSmtCellData,
+    metadata::MetadataCellData as AMetadataCellData,
+    reward::RewardSmtCellData as ARewardSmtCellData, stake::StakeSmtCellData as AStakeSmtCellData,
 };
 use common::types::tx_builder::*;
 use common::utils::convert::{to_axon_byte32, to_h256};
 
 use crate::ckb::define::constants::START_EPOCH;
 use crate::ckb::define::scripts::*;
-use crate::ckb::define::types::MetadataCellData;
+use crate::ckb::define::types::{
+    DelegateSmtCellData, MetadataCellData, RewardSmtCellData, StakeSmtCellData,
+};
 use crate::ckb::helper::{
     AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Secp256k1,
     Selection, Stake, Tx, TypeId, Xudt,
@@ -108,7 +110,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             HMetadata::type_dep(),
             Stake::smt_type_dep(),
             Delegate::smt_type_dep(),
-            // reward_type_dep(&**network_type),
+            // Reward::smt_type_dep(),
         ];
 
         let witnesses = vec![
@@ -124,7 +126,6 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             .build();
 
         let tx = Tx::new(self.ckb, tx).balance(seeder_lock.clone()).await?;
-        println!("{}", tx);
 
         let (tx, type_id_args) = self.modify_outputs(tx, omni_eth.address()?)?;
 
@@ -156,11 +157,11 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             })
             .as_bytes(),
             // stake smt cell data
-            StakeSmtCellData::default().as_bytes(),
+            AStakeSmtCellData::default().as_bytes(),
             // delegate smt cell data
-            DelegateSmtCellData::default().as_bytes(),
+            ADelegateSmtCellData::default().as_bytes(),
             // reward smt cell data
-            RewardSmtCellData::default().as_bytes(),
+            ARewardSmtCellData::default().as_bytes(),
         ]
     }
 
@@ -273,7 +274,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             issue_type_id,
             selection_type_id,
             checkpoint_type_id,
-            metadata_type_id,
+            metadata_type_id: metadata_type_id.clone(),
             reward_smt_type_id,
             stake_smt_type_id,
             delegate_smt_type_id,
@@ -317,6 +318,30 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             propose_count_smt_root: H256::default(),
             metadata:               vec![self.metadata.clone()],
             type_ids:               type_ids.clone(),
+        })
+        .as_bytes()
+        .pack();
+
+        // stake smt cell data
+        outputs_data[4] = AStakeSmtCellData::from(StakeSmtCellData {
+            metadata_type_id: metadata_type_id.clone(),
+            ..Default::default()
+        })
+        .as_bytes()
+        .pack();
+
+        // delegate smt cell data
+        outputs_data[5] = ADelegateSmtCellData::from(DelegateSmtCellData {
+            metadata_type_id: metadata_type_id.clone(),
+            ..Default::default()
+        })
+        .as_bytes()
+        .pack();
+
+        // reward smt cell data
+        outputs_data[6] = ARewardSmtCellData::from(RewardSmtCellData {
+            metadata_type_id,
+            ..Default::default()
         })
         .as_bytes()
         .pack();
