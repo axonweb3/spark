@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fmt::{self, Formatter};
+use std::str::FromStr;
 
 use axon_types::{
     basic::{Byte20, Byte32, Byte48, Byte65, Identity},
@@ -13,6 +15,7 @@ use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Byte, Entity};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 
 use crate::types::primitive::Hasher;
 use crate::utils::convert::*;
@@ -31,10 +34,59 @@ pub type InDelegateSmt = bool;
 pub type NonTopStakers = HashMap<Staker, InStakeSmt>;
 pub type NonTopDelegators = HashMap<Delegator, HashMap<Staker, InDelegateSmt>>;
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NetworkType {
     Mainnet,
     Testnet,
+}
+
+impl<'a> Deserialize<'a> for NetworkType {
+    fn deserialize<D>(deserializer: D) -> Result<NetworkType, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        deserializer.deserialize_any(NetworkTypeVisitor)
+    }
+}
+
+struct NetworkTypeVisitor;
+
+impl<'a> Visitor<'a> for NetworkTypeVisitor {
+    type Value = NetworkType;
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match v {
+            "mainnet" | "Mainnet" => Ok(NetworkType::Mainnet),
+            "testnet" | "Testnet" => Ok(NetworkType::Testnet),
+            _ => Err(de::Error::custom(format!("invalid network type: {}", v))),
+        }
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        self.visit_str(v.as_str())
+    }
+
+    fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+        formatter.write_str("mainnet or testnet")
+    }
+}
+
+impl FromStr for NetworkType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mainnet" => Ok(NetworkType::Mainnet),
+            "testnet" => Ok(NetworkType::Testnet),
+            _ => Err(format!("invalid network type: {}", s)),
+        }
+    }
 }
 
 pub struct FirstStakeInfo {

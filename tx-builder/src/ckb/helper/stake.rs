@@ -5,12 +5,15 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::types::axon_types::stake::{StakeArgs, StakeAtWitness, StakeInfoDelta};
+use common::types::axon_types::stake::{
+    StakeArgs, StakeAtWitness, StakeInfoBuilder, StakeInfoDelta, StakeInfos, StakeSmtUpdateInfo,
+    StakeSmtWitness,
+};
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{NetworkType, StakeItem};
 use common::utils::convert::*;
 
-use crate::ckb::define::scripts::*;
+use crate::ckb::define::{scripts::*, types::StakeInfo};
 use crate::ckb::helper::ckb::cell_collector::{get_cell_by_scripts, get_cell_by_type};
 use crate::ckb::helper::metadata::Metadata;
 use crate::ckb::helper::unique_cell_dep;
@@ -118,5 +121,32 @@ impl Stake {
 
     pub async fn get_smt_cell(ckb_rpc: &impl CkbRpc, delegate_smt_type: Script) -> Result<Cell> {
         get_cell_by_type(ckb_rpc, delegate_smt_type).await
+    }
+
+    pub fn smt_witness(
+        all_stake_infos: Vec<StakeInfo>,
+        old_proof: Vec<u8>,
+        new_proof: Vec<u8>,
+    ) -> WitnessArgs {
+        let stake_infos = StakeInfos::new_builder()
+            .extend(all_stake_infos.into_iter().map(|s| {
+                StakeInfoBuilder::default()
+                    .addr(to_identity(&s.addr))
+                    .amount(to_uint128(s.amount))
+                    .build()
+            }))
+            .build();
+        let updates = StakeSmtUpdateInfo::new_builder()
+            .all_stake_infos(stake_infos)
+            .old_epoch_proof(to_bytes(old_proof))
+            .new_epoch_proof(to_bytes(new_proof))
+            .build();
+        let input_type = StakeSmtWitness::new_builder()
+            .mode(0.into())
+            .update_info(updates)
+            .build();
+        WitnessArgs::new_builder()
+            .input_type(Some(input_type.as_bytes()).pack())
+            .build()
     }
 }

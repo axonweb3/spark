@@ -5,11 +5,13 @@ use std::{env, sync::Arc};
 use api::{run_server, DefaultAPIAdapter};
 use config::SparkConfig;
 use storage::{SmtManager, TransactionHistory};
+use tx_builder::set_network_type;
 
 #[tokio::main]
 async fn main() {
     let args = env::args().nth(1).expect("Missing env variable");
     let config: SparkConfig = config::parse_file(args).expect("Failed to parse config file");
+    set_network_type(config.network_type);
 
     let rdb = Arc::new(TransactionHistory::new(&config.rdb_url).await);
     let kvdb = Arc::new(SmtManager::new(&config.kvdb_path));

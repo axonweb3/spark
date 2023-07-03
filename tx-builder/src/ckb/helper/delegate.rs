@@ -6,13 +6,15 @@ use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::axon_types::delegate::{
-    DelegateArgs, DelegateAtWitness, DelegateInfoDelta, DelegateRequirementArgs,
+    DelegateArgs, DelegateAtWitness, DelegateInfo, DelegateInfoDelta, DelegateInfos,
+    DelegateRequirementArgs, DelegateSmtUpdateInfo, DelegateSmtWitness, StakeGroupInfoBuilder,
+    StakeGroupInfos,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{DelegateItem, NetworkType};
 use common::utils::convert::*;
 
-use crate::ckb::define::scripts::*;
+use crate::ckb::define::{scripts::*, types::StakeGroupInfo};
 use crate::ckb::helper::ckb::cell_collector::{get_cell_by_scripts, get_cell_by_type};
 use crate::ckb::helper::metadata::Metadata;
 use crate::ckb::helper::unique_cell_dep;
@@ -169,5 +171,39 @@ impl Delegate {
 
     pub async fn get_smt_cell(ckb_rpc: &impl CkbRpc, delegate_smt_type: Script) -> Result<Cell> {
         get_cell_by_type(ckb_rpc, delegate_smt_type).await
+    }
+
+    pub fn smt_witness(all_delegate_infos: Vec<StakeGroupInfo>) -> WitnessArgs {
+        let delegate_update_infos = DelegateSmtUpdateInfo::new_builder()
+            .all_stake_group_infos(
+                StakeGroupInfos::new_builder()
+                    .extend(all_delegate_infos.into_iter().map(|i| {
+                        StakeGroupInfoBuilder::default()
+                            .staker(to_identity(&i.staker))
+                            .delegate_new_epoch_proof(to_bytes(i.delegate_new_epoch_proof))
+                            .delegate_old_epoch_proof(to_bytes(i.delegate_old_epoch_proof))
+                            .delegate_infos(
+                                DelegateInfos::new_builder()
+                                    .extend(i.delegate_infos.into_iter().map(|d| {
+                                        DelegateInfo::new_builder()
+                                            .delegator_addr(to_identity(&d.delegator_addr))
+                                            .amount(to_uint128(d.amount))
+                                            .build()
+                                    }))
+                                    .build(),
+                            )
+                            .build()
+                    }))
+                    .build(),
+            )
+            .build();
+
+        let input_type = DelegateSmtWitness::new_builder()
+            .mode(0.into())
+            .update_info(delegate_update_infos)
+            .build();
+        WitnessArgs::new_builder()
+            .input_type(Some(input_type.as_bytes()).pack())
+            .build()
     }
 }
