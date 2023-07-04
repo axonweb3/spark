@@ -42,15 +42,13 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
     /// Add a CKB change cell to the output of the transaction.
     pub async fn balance(mut self, capacity_provider: Script) -> Result<TransactionView> {
         let outputs_capacity = self.add_ckb_to_outputs(capacity_provider.clone())?;
-        println!("1: {}\n", self.tx);
 
         let inputs_capacity = self
             .add_ckb_to_intputs(capacity_provider.clone(), outputs_capacity)
             .await?;
-        println!("2: {}\n", self.tx);
 
         self.change_ckb(inputs_capacity, outputs_capacity)?;
-        println!("3: {}\n", self.tx);
+
         Ok(self.tx)
     }
 

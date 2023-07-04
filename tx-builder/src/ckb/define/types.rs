@@ -2,7 +2,7 @@ use ckb_types::{H160, H256};
 use molecule::prelude::{Builder, Entity};
 
 use common::types::axon_types::{
-    basic::{Byte32, Byte48, Byte65},
+    basic::{Byte32, Byte48, Byte65, Identity},
     delegate::{
         DelegateAtCellData as ADelegateAtCellData,
         DelegateAtCellLockData as ADelegateAtCellLockData, DelegateInfoDeltas,
@@ -10,9 +10,17 @@ use common::types::axon_types::{
         StakerSmtRoots,
     },
     metadata::{MetadataCellData as AMetadataCellData, MetadataList},
+    reward::{
+        EpochRewardStakeInfo as AEpochRewardStakeInfo,
+        EpochRewardStakeInfos as AEpochRewardStakeInfos, NotClaimInfo as ANotClaimInfo,
+        RewardDelegateInfo as ARewardDelegateInfo, RewardDelegateInfos as ARewardDelegateInfos,
+        RewardSmtCellData as ARewardSmtCellData, RewardStakeInfo as ARewardStakeInfo,
+        RewardStakeInfos as ARewardStakeInfos, RewardWitness as ARewardWitness,
+    },
     stake::{
         StakeAtCellData as AStakeAtCellData, StakeAtCellLockData as AStakeAtCellLockData,
-        StakeInfo as AStakeInfo, StakeInfos, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+        StakeInfo as AStakeInfo, StakeInfos, StakeSmtCellData as AStakeSmtCellData,
+        StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
     },
     withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData,
@@ -20,7 +28,7 @@ use common::types::axon_types::{
         WithdrawInfos as AWithdrawInfos,
     },
 };
-use common::types::smt::Root as SmtRoot;
+use common::types::smt::{Proof, Root as SmtRoot};
 use common::types::tx_builder::*;
 use common::utils::convert::*;
 
@@ -118,7 +126,16 @@ impl From<StakeSmtUpdateInfo> for AStakeSmtUpdateInfo {
 pub struct StakeSmtCellData {
     // pub version:          u8, // useless
     pub metadata_type_id: H256,
-    pub smt_root:         H256,
+    pub smt_root:         SmtRoot,
+}
+
+impl From<StakeSmtCellData> for AStakeSmtCellData {
+    fn from(v: StakeSmtCellData) -> Self {
+        AStakeSmtCellData::new_builder()
+            .smt_root(Byte32::from_slice(v.smt_root.as_slice()).unwrap())
+            .metadata_type_id(to_byte32(&v.metadata_type_id))
+            .build()
+    }
 }
 
 #[derive(Clone)]
@@ -261,6 +278,136 @@ impl From<MetadataCellData> for AMetadataCellData {
                 }
                 list.build()
             })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct RewardSmtCellData {
+    pub claim_smt_root:   SmtRoot,
+    pub metadata_type_id: H256,
+}
+
+impl From<RewardSmtCellData> for ARewardSmtCellData {
+    fn from(v: RewardSmtCellData) -> Self {
+        ARewardSmtCellData::new_builder()
+            .claim_smt_root(Byte32::from_slice(v.claim_smt_root.as_slice()).unwrap())
+            .metadata_type_id(to_byte32(&v.metadata_type_id))
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct RewardWitness {
+    pub miner:              H160,
+    pub old_not_claim_info: NotClaimInfo,
+    pub reward_infos:       Vec<EpochRewardStakeInfo>,
+    pub new_not_claim_info: NotClaimInfo,
+}
+
+impl From<RewardWitness> for ARewardWitness {
+    fn from(v: RewardWitness) -> Self {
+        ARewardWitness::new_builder()
+            .miner(to_identity(&v.miner))
+            .old_not_claim_info(v.old_not_claim_info.into())
+            .new_not_claim_info(v.new_not_claim_info.into())
+            .reward_infos({
+                let mut list = AEpochRewardStakeInfos::new_builder();
+                for r in v.reward_infos.into_iter() {
+                    list = list.push(r.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct NotClaimInfo {
+    pub epoch: u64,
+    pub proof: Proof,
+}
+
+impl From<NotClaimInfo> for ANotClaimInfo {
+    fn from(v: NotClaimInfo) -> Self {
+        ANotClaimInfo::new_builder()
+            .epoch(to_uint64(v.epoch))
+            .proof(to_bytes(v.proof))
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct EpochRewardStakeInfo {
+    pub count_proof:        Proof,
+    pub count_root:         SmtRoot,
+    pub count_epoch_proof:  Proof,
+    pub amount_proof:       Proof,
+    pub amount_root:        SmtRoot,
+    pub amount_epoch_proof: Proof,
+    pub reward_stake_infos: Vec<RewardStakeInfo>,
+}
+
+impl From<EpochRewardStakeInfo> for AEpochRewardStakeInfo {
+    fn from(v: EpochRewardStakeInfo) -> Self {
+        AEpochRewardStakeInfo::new_builder()
+            .count_proof(to_bytes(v.count_proof))
+            .count_root(to_bytes(v.count_root.as_slice().to_owned()))
+            .count_epoch_proof(to_bytes(v.count_epoch_proof))
+            .amount_proof(to_bytes(v.amount_proof))
+            .amount_root(to_bytes(v.amount_root.as_slice().to_owned()))
+            .amount_epoch_proof(to_bytes(v.amount_epoch_proof))
+            .reward_stake_infos({
+                let mut list = ARewardStakeInfos::new_builder();
+                for r in v.reward_stake_infos.into_iter() {
+                    list = list.push(r.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct RewardStakeInfo {
+    pub validator:            H160,
+    pub propose_count:        u64,
+    pub stake_amount:         u128,
+    pub delegate_infos:       Vec<RewardDelegateInfo>,
+    pub delegate_epoch_proof: Proof,
+}
+
+impl From<RewardStakeInfo> for ARewardStakeInfo {
+    fn from(v: RewardStakeInfo) -> Self {
+        ARewardStakeInfo::new_builder()
+            .validator(to_identity(&v.validator))
+            .propose_count(to_uint64(v.propose_count))
+            .staker_amount(to_uint128(v.stake_amount))
+            .delegate_epoch_proof(to_bytes(v.delegate_epoch_proof))
+            .delegate_infos({
+                let mut list = ARewardDelegateInfos::new_builder();
+                for r in v.delegate_infos.into_iter() {
+                    list = list.push(r.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct RewardDelegateInfo {
+    pub delegator_addr: ethereum_types::H160,
+    pub amount:         u128,
+}
+
+impl From<RewardDelegateInfo> for ARewardDelegateInfo {
+    fn from(v: RewardDelegateInfo) -> Self {
+        ARewardDelegateInfo::new_builder()
+            .delegator_addr(Identity::new_unchecked(bytes::Bytes::from(
+                v.delegator_addr.as_bytes().to_owned(),
+            )))
+            .amount(to_uint128(v.amount))
             .build()
     }
 }

@@ -1,16 +1,14 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use bytes::Bytes;
 use ckb_sdk::{unlock::ScriptSigner, ScriptGroup, ScriptGroupType};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
-use common::utils::convert::{to_u32, to_u64};
+use common::utils::convert::{to_bytes, to_u32, to_u64};
 use common::{
     traits::{ckb_rpc_client::CkbRpc, tx_builder::ICheckpointTxBuilder},
-    types::axon_types::basic::Bytes as ABytes,
     types::axon_types::checkpoint::{CheckpointCellData, CheckpointWitness},
     types::tx_builder::{Checkpoint, CheckpointProof, CheckpointTypeIds, PrivateKey},
 };
@@ -108,10 +106,8 @@ where
                 .input_type(
                     Some(
                         CheckpointWitness::new_builder()
-                            .proof(ABytes::new_unchecked(self.proof.proof.bytes()))
-                            .proposal(ABytes::new_unchecked(Bytes::from(
-                                self.proof.proposal.hash().as_bytes().to_owned(),
-                            )))
+                            .proof(to_bytes(self.proof.proof.bytes().into()))
+                            .proposal(to_bytes(self.proof.proposal.hash().as_bytes().to_owned()))
                             .build()
                             .as_bytes(),
                     )

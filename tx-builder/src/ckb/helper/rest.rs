@@ -108,7 +108,7 @@ impl Reward {
         }
     }
 
-    pub async fn get_cell(ckb_rpc: &impl CkbRpc, reward_type: Script) -> Result<Cell> {
-        get_cell_by_type(ckb_rpc, reward_type).await
+    pub async fn get_cell(ckb_rpc: &impl CkbRpc, reward_type_id: &H256) -> Result<Cell> {
+        get_cell_by_type(ckb_rpc, Self::smt_type(reward_type_id)).await
     }
 }
