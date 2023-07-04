@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellDep, CellInput, CellOutput, Script},
+    packed::{CellDep, CellInput, CellOutput, Script, WitnessArgs},
     prelude::{Entity, Pack},
     H160,
 };
@@ -136,8 +136,11 @@ where
         ];
 
         let mut witnesses = vec![
-            ARewardWitness::from(reward_witness).as_bytes(), // reward cell lock & type
-            bytes::Bytes::default(),                         // selection cell lock & type
+            WitnessArgs::new_builder()
+                .input_type(Some(ARewardWitness::from(reward_witness).as_bytes()).pack())
+                .build()
+                .as_bytes(),
+            bytes::Bytes::default(), // selection cell lock & type
         ];
         if token_amount.is_some() {
             witnesses.push(OmniEth::witness_placeholder().as_bytes()); // AT cell lock

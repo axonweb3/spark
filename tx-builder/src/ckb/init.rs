@@ -28,8 +28,8 @@ use crate::ckb::define::types::{
     DelegateSmtCellData, MetadataCellData, RewardSmtCellData, StakeSmtCellData,
 };
 use crate::ckb::helper::{
-    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Secp256k1,
-    Selection, Stake, Tx, TypeId, Xudt,
+    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Reward,
+    Secp256k1, Selection, Stake, Tx, TypeId, Xudt,
 };
 use crate::ckb::NETWORK_TYPE;
 
@@ -110,7 +110,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             HMetadata::type_dep(),
             Stake::smt_type_dep(),
             Delegate::smt_type_dep(),
-            // Reward::smt_type_dep(),
+            Reward::smt_type_dep(),
         ];
 
         let witnesses = vec![

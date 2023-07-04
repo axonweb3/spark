@@ -1,5 +1,5 @@
 use common::traits::tx_builder::IInitTxBuilder;
-use common::types::tx_builder::{Checkpoint, Metadata};
+use common::types::tx_builder::{Checkpoint, Metadata, PrivateKey};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::init::InitTxBuilder;
@@ -16,10 +16,9 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
     let omni_eth = OmniEth::new(test_seeder_key.clone());
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
-    let (tx, type_id_args) = InitTxBuilder::new(
+    _init_tx(
         ckb,
         test_seeder_key,
-        10000,
         Checkpoint {
             epoch: 0,
             period: 0,
@@ -35,11 +34,21 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             ..Default::default()
         },
     )
-    .build_tx()
-    .await
-    .unwrap();
+    .await;
+}
 
-    let tx = Tx::new(ckb, tx);
+pub async fn _init_tx(
+    ckb: &CkbRpcClient,
+    seeder_key: PrivateKey,
+    checkpoint: Checkpoint,
+    metadata: Metadata,
+) -> Tx<CkbRpcClient> {
+    let (tx, type_id_args) = InitTxBuilder::new(ckb, seeder_key, 10000, checkpoint, metadata)
+        .build_tx()
+        .await
+        .unwrap();
+
+    let mut tx = Tx::new(ckb, tx);
 
     match tx.send().await {
         Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
@@ -48,4 +57,6 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
 
     let type_ids: CTypeIds = type_id_args.into();
     write_file(TYPE_IDS_PATH, &type_ids);
+
+    tx
 }

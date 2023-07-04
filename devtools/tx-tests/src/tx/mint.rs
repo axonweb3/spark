@@ -36,7 +36,7 @@ pub async fn mint_tx(ckb: &CkbRpcClient) {
     .await
     .unwrap();
 
-    let tx = Tx::new(ckb, tx);
+    let mut tx = Tx::new(ckb, tx);
 
     match tx.send().await {
         Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
