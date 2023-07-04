@@ -55,7 +55,6 @@ impl From<StakerSmtRoot> for AStakerSmtRoot {
 
 #[derive(Clone, Default)]
 pub struct DelegateSmtCellData {
-    // pub version:          u8, // useless
     pub metadata_type_id: H256,
     pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
 }
@@ -63,7 +62,6 @@ pub struct DelegateSmtCellData {
 impl From<DelegateSmtCellData> for ADelegateSmtCellData {
     fn from(value: DelegateSmtCellData) -> Self {
         ADelegateSmtCellData::new_builder()
-            // .version(value.version.into()) // useless
             .metadata_type_id(to_byte32(&value.metadata_type_id))
             .smt_roots({
                 let mut list = StakerSmtRoots::new_builder();
@@ -136,10 +134,6 @@ impl From<StakeAtCellData> for AStakeAtCellData {
 
 #[derive(Clone)]
 pub struct StakeAtCellLockData {
-    // pub version:          u8, // useless
-    // pub l1_address:       H160, // useless
-    // pub l2_address:       H160, // useless
-    // pub metadata_type_id: H256, // useless
     pub l1_pub_key:  Byte65,
     pub bls_pub_key: Byte48,
     pub stake_info:  StakeItem,
@@ -170,9 +164,6 @@ impl From<DelegateAtCellData> for ADelegateAtCellData {
 
 #[derive(Clone, Default)]
 pub struct DelegateAtCellLockData {
-    // pub version:          u8, // useless
-    // pub l1_address:       H160, // useless
-    // pub metadata_type_id: H256, // useless
     pub delegator_infos: Vec<DelegateItem>,
 }
 
@@ -182,9 +173,6 @@ impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
             .extend(value.delegator_infos.into_iter().map(Into::into))
             .build();
         ADelegateAtCellLockData::new_builder()
-            // .version(value.version.into()) // useless
-            // .l1_address(Identity::from_slice(value.l1_address.as_bytes()).unwrap()) // useless
-            // .metadata_type_id(to_byte32(&value.metadata_type_id)) // useless
             .delegator_infos(infos)
             .build()
     }
@@ -205,8 +193,6 @@ impl From<WithdrawAtCellData> for AWithdrawAtCellData {
 
 #[derive(Clone, Default)]
 pub struct WithdrawAtCellLockData {
-    // pub version:          u8, // useless
-    // pub metadata_type_id: H256, // useless
     pub withdraw_infos: Vec<WithdrawInfo>,
 }
 
@@ -216,8 +202,6 @@ impl From<WithdrawAtCellLockData> for AWithdrawAtCellLockData {
             .extend(value.withdraw_infos.into_iter().map(Into::into))
             .build();
         AWithdrawAtCellLockData::new_builder()
-            // .version(value.version.into()) // useless
-            // .metadata_type_id(to_byte32(&value.metadata_type_id)) // useless
             .withdraw_infos(infos)
             .build()
     }
@@ -240,7 +224,6 @@ impl From<WithdrawInfo> for AWithdrawInfo {
 
 #[derive(Clone, Default)]
 pub struct MetadataCellData {
-    // pub version:                u8, // useless
     pub epoch:                  u64,
     pub propose_count_smt_root: H256,
     pub type_ids:               TypeIds,
@@ -250,7 +233,6 @@ pub struct MetadataCellData {
 impl From<MetadataCellData> for AMetadataCellData {
     fn from(v: MetadataCellData) -> Self {
         AMetadataCellData::new_builder()
-            // .version(v.version.into()) // useless
             .epoch(to_uint64(v.epoch))
             .propose_count_smt_root(to_byte32(&v.propose_count_smt_root))
             .type_ids((v.type_ids).into())

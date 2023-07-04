@@ -9,13 +9,19 @@ anyhow = "1.0"
 async-trait = "0.1"
 axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "0c3f0db" }
 bytes = "1.0"
-ckb-fixed-hash-core = "0.109"
+ckb-fixed-hash-core = "0.108"
 ckb-jsonrpc-types = "0.108"
 ckb-sdk = "2.4"
 ckb-types = "0.108"
 dashmap = "5.4"
 derive_more = "0.99"
-ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
+ethereum-types = { version = "0.14", features = [
+    "arbitrary",
+    "codec",
+    "rlp",
+    "serialize",
+    "std",
+] }
 faster-hex = "0.8"
 lazy_static = "1.4"
 molecule = "0.7"
@@ -23,8 +29,15 @@ parking_lot = "0.12"
 rand = "0.8"
 rlp = "0.5"
 rlp-derive = "0.1"
-rocksdb = { package = "ckb-rocksdb", version = "0.20", default-features = false, features = ["snappy", "march-native"] }
-sea-orm = { version = "0.11", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"], default-features = false }
+rocksdb = { package = "ckb-rocksdb", version = "0.20", default-features = false, features = [
+    "snappy",
+    "march-native",
+] }
+sea-orm = { version = "0.11", features = [
+    "runtime-tokio-native-tls",
+    "sqlx-sqlite",
+    "macros",
+], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 sparse-merkle-tree = "0.6"

@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{types::tx_builder::DelegateRequirement, Result};
 use async_trait::async_trait;
 
 use crate::types::{relation_db::transaction::Model, smt::Address};
@@ -36,4 +36,6 @@ pub trait APIAdapter: Send + Sync {
         offset: u64,
         page_size: u64,
     ) -> Result<Vec<Model>>;
+
+    async fn get_stake_requirement_info(&self, addr: Address) -> Result<DelegateRequirement>;
 }

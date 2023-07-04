@@ -1,26 +1,39 @@
-use common::traits::{
-    api::APIAdapter,
-    async_trait,
-    query::TransactionStorage,
-    smt::{DelegateSmtStorage, RewardSmtStorage, StakeSmtStorage},
-};
-use common::types::{relation_db::transaction::Model, smt::Address};
-use common::Result;
 use std::sync::Arc;
 
+use common::types::{relation_db::transaction::Model, smt::Address};
+use common::utils::convert::{to_ckb_h160, to_u128, to_u32, to_u8};
+use common::Result;
+use common::{
+    traits::{
+        api::APIAdapter,
+        async_trait,
+        ckb_rpc_client::CkbRpc,
+        query::TransactionStorage,
+        smt::{DelegateSmtStorage, RewardSmtStorage, StakeSmtStorage},
+    },
+    types::{axon_types, tx_builder::DelegateRequirement},
+};
+
+use molecule::prelude::Entity;
+use tx_builder::ckb::helper::Delegate;
+use tx_builder::ckb::METADATA_TYPE_ID;
+
 #[derive(Clone)]
-pub struct DefaultAPIAdapter<T, S> {
+pub struct DefaultAPIAdapter<C, T, S> {
+    ckb_rpc_client:   Arc<C>,
     relation_storage: Arc<T>,
     _smt_storage:     Arc<S>,
 }
 
-impl<T, S> DefaultAPIAdapter<T, S>
+impl<C, T, S> DefaultAPIAdapter<C, T, S>
 where
+    C: CkbRpc + 'static,
     T: TransactionStorage + 'static,
     S: StakeSmtStorage + DelegateSmtStorage + RewardSmtStorage + 'static,
 {
-    pub fn new(relation_storage: Arc<T>, smt_storage: Arc<S>) -> Self {
+    pub fn new(ckb_rpc_client: Arc<C>, relation_storage: Arc<T>, smt_storage: Arc<S>) -> Self {
         Self {
+            ckb_rpc_client,
             relation_storage,
             _smt_storage: smt_storage,
         }
@@ -28,8 +41,9 @@ where
 }
 
 #[async_trait]
-impl<T, S> APIAdapter for DefaultAPIAdapter<T, S>
+impl<C, T, S> APIAdapter for DefaultAPIAdapter<C, T, S>
 where
+    C: CkbRpc + 'static,
     T: TransactionStorage + Sync + Send + 'static,
     S: StakeSmtStorage + DelegateSmtStorage + RewardSmtStorage + Sync + Send + 'static,
 {
@@ -79,5 +93,20 @@ where
         self.relation_storage
             .get_latest_stake_transactions(offset, limit)
             .await
+    }
+
+    async fn get_stake_requirement_info(&self, addr: Address) -> Result<DelegateRequirement> {
+        let req_type_script =
+            Delegate::requirement_type((*METADATA_TYPE_ID).load().as_ref(), &to_ckb_h160(&addr));
+        let cell =
+            Delegate::get_requirement_cell(self.ckb_rpc_client.as_ref(), req_type_script).await?;
+        let cell_data = cell.output_data.unwrap().as_bytes().to_vec();
+        let req = axon_types::delegate::DelegateRequirement::new_unchecked(cell_data.into());
+
+        Ok(DelegateRequirement {
+            commission_rate:    to_u8(&req.commission_rate()),
+            maximum_delegators: to_u32(&req.max_delegator_size()),
+            threshold:          to_u128(&req.threshold()),
+        })
     }
 }

@@ -1,15 +1,17 @@
 use std::{path::PathBuf, sync::Arc};
 
-use crate::{adapter::DefaultAPIAdapter, jsonrpc::run_server};
 use common::{
     traits::query::TransactionStorage,
     types::{relation_db::transaction, H160},
     AnyError, Result,
 };
+use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{
     relation_db::{establish_connection, Set, TransactionHistory},
     smt::SmtManager,
 };
+
+use crate::{adapter::DefaultAPIAdapter, jsonrpc::run_server};
 
 static RELATION_DB_URL: &str = "sqlite::memory:";
 static ROCKS_DB_PATH: &str = "./free-space/smt";
@@ -34,12 +36,14 @@ pub async fn mock_data(hash: String, amount: u32) -> Result<transaction::ActiveM
 }
 
 async fn _mock_adapter() {
+    let ckb_rpc_client = Arc::new(CkbRpcClient::new("https://testnet.ckb.dev/"));
     let db = establish_connection(RELATION_DB_URL).await.unwrap();
     let relation_db = TransactionHistory { db };
     let mut smt_path = PathBuf::from(ROCKS_DB_PATH);
     smt_path.push("stake");
     let smt_manager = SmtManager::new(smt_path);
-    let _adapter = DefaultAPIAdapter::new(Arc::new(relation_db), Arc::new(smt_manager));
+    let _adapter =
+        DefaultAPIAdapter::new(ckb_rpc_client, Arc::new(relation_db), Arc::new(smt_manager));
 }
 
 #[tokio::test]
@@ -57,12 +61,14 @@ async fn mock_db() {
 
 #[tokio::test]
 async fn mock_jsonrpc_server() -> Result<()> {
+    let ckb_rpc_client = Arc::new(CkbRpcClient::new("https://testnet.ckb.dev/"));
     let db = establish_connection(RELATION_DB_URL).await?;
     let relation_db = TransactionHistory { db };
     let mut smt_path = PathBuf::from(ROCKS_DB_PATH);
     smt_path.push("stake");
     let smt_manager = SmtManager::new(smt_path);
-    let adapter = DefaultAPIAdapter::new(Arc::new(relation_db), Arc::new(smt_manager));
+    let adapter =
+        DefaultAPIAdapter::new(ckb_rpc_client, Arc::new(relation_db), Arc::new(smt_manager));
     let _ = run_server(Arc::new(adapter), "127.0.0.1:8000").await?;
 
     Ok(())

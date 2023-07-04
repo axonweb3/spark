@@ -1,5 +1,8 @@
 private_key = ""
+ckb_node_url = "https://testnet.ckb.dev/"
 rpc_listening_address = "127.0.0.1:8000"
 rdb_url = ""
 kvdb_path = "free-space/db"
 network_type = "testnet"
+metadata_type_id = "0x0000000000000000000000000000000000000000000000000000000000000000"
+checkpoint_type_id = "0x0000000000000000000000000000000000000000000000000000000000000000"

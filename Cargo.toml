@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 api = { path = "./api" }
 common = { path = "./common" }
+ckb-types = "0.108"
 rpc-client = { path = "./rpc-client" }
 storage = { path = "./storage" }
 tx-builder = { path = "./tx-builder" }
@@ -24,5 +25,5 @@ members = [
     "query",
     "rpc-client",
     "storage",
-    "tx-builder"
+    "tx-builder",
 ]

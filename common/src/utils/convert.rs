@@ -14,6 +14,10 @@ pub fn new_u128(v: &[u8]) -> u128 {
     u128::from_le_bytes(bytes)
 }
 
+pub fn to_u8(v: &Byte) -> u8 {
+    v.as_slice()[0]
+}
+
 pub fn to_u128(v: &Uint128) -> u128 {
     new_u128(v.as_slice())
 }

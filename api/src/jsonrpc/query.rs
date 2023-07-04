@@ -25,7 +25,6 @@ pub struct StatusRpcModule<Adapter> {
 }
 
 impl<Adapter: APIAdapter> StatusRpcModule<Adapter> {
-    #[allow(dead_code)]
     pub fn new(adapter: Arc<Adapter>) -> Self {
         Self { adapter }
     }
@@ -140,7 +139,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
             },
         );
 
-        let reses = res
+        let ret = res
             .iter()
             .filter(|m| m.event == event_type)
             .cloned()
@@ -152,7 +151,7 @@ impl<Adapter: APIAdapter + 'static> AccountHistoryRpcServer for StatusRpcModule<
                 transactions: txs.clone(),
             })
             .collect();
-        Ok(reses)
+        Ok(ret)
     }
 
     async fn get_reward_history(
