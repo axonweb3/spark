@@ -15,14 +15,15 @@ use common::traits::{
 };
 use common::types::axon_types::delegate::{
     DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
-    DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
+    DelegateAtWitness, DelegateCellData, DelegateInfoDeltas,
+    DelegateSmtCellData as ADelegateSmtCellData,
 };
-use common::types::smt::Delegator as SmtDelegator;
+use common::types::ckb_rpc_client::Cell;
+use common::types::smt::{Delegator as SmtDelegator, UserAmount};
 use common::types::tx_builder::{
     Amount, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt, InStakeSmt,
     NonTopDelegators, PrivateKey, Staker as TxStaker,
 };
-use common::types::{ckb_rpc_client::Cell, smt::UserAmount};
 use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_uint128, to_usize};
 
 use crate::ckb::define::types::{DelegateInfo, StakeGroupInfo};
@@ -92,10 +93,17 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         ];
 
         let mut outputs_data = vec![root];
+        let mut witnesses = vec![smt_witness.as_bytes()];
 
         // insert delegate AT cells and withdraw AT cells to the tx
-        self.fill_tx(&statistics, &mut inputs, &mut outputs, &mut outputs_data)
-            .await?;
+        self.fill_tx(
+            &statistics,
+            &mut inputs,
+            &mut outputs,
+            &mut outputs_data,
+            &mut witnesses,
+        )
+        .await?;
 
         let cell_deps = vec![
             Secp256k1::lock_dep(),
@@ -107,14 +115,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
             Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
             Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
             Withdraw::lock_dep(),
-        ];
-
-        // todo
-        let witnesses = vec![
-            smt_witness.as_bytes(),                    // Delegate AT cell lock
-            OmniEth::witness_placeholder().as_bytes(), // Withdraw AT cell lock
-            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
-            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -147,6 +147,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         inputs: &mut Vec<CellInput>,
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
+        witnesses: &mut Vec<Bytes>,
     ) -> Result<()> {
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
@@ -157,6 +158,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .previous_output(delegate_cell.out_point.clone().into())
                     .build(),
             );
+            witnesses.push(self.delegate_at_witness().as_bytes());
 
             let (old_total_delegate_amount, old_delegate_data) =
                 self.parse_delegate_data(delegate_cell);
@@ -176,6 +178,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                             .previous_output(old_withdraw_cell.out_point.clone().into())
                             .build(),
                     );
+                    witnesses.push(self.delegate_at_witness().as_bytes());
 
                     let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
                     let mut delegator_infos: Vec<DelegateItem> = Vec::new();
@@ -277,6 +280,13 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         }
 
         Ok(())
+    }
+
+    fn delegate_at_witness(&self) -> WitnessArgs {
+        let stake_at_witness = DelegateAtWitness::new_builder().mode(1.into()).build();
+        WitnessArgs::new_builder()
+            .lock(Some(stake_at_witness.as_bytes()).pack())
+            .build()
     }
 
     fn parse_delegate_data(&self, cell: &Cell) -> (Amount, DelegateAtCellData) {

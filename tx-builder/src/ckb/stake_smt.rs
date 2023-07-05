@@ -8,28 +8,22 @@ use ckb_types::{
     packed::{CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
+use molecule::prelude::Builder;
 
+use common::traits::{
+    ckb_rpc_client::CkbRpc, smt::StakeSmtStorage, tx_builder::IStakeSmtTxBuilder,
+};
 use common::types::axon_types::{
     basic::Byte32,
-    stake::{StakeArgs, StakeAtCellData, StakeSmtCellData},
+    stake::{StakeArgs, StakeAtCellData, StakeAtWitness, StakeSmtCellData},
 };
-use common::types::tx_builder::{StakeItem, StakeSmtTypeIds, Staker as TxStaker};
-use common::{
-    traits::smt::StakeSmtStorage,
-    types::{
-        ckb_rpc_client::Cell,
-        tx_builder::{Amount, Epoch, InStakeSmt, NonTopStakers, PrivateKey},
-    },
+use common::types::ckb_rpc_client::Cell;
+use common::types::smt::{Root, Staker as SmtStaker, UserAmount};
+use common::types::tx_builder::{
+    Amount, Epoch, InStakeSmt, NonTopStakers, PrivateKey, StakeItem, StakeSmtTypeIds,
+    Staker as TxStaker,
 };
-use common::{
-    traits::{ckb_rpc_client::CkbRpc, tx_builder::IStakeSmtTxBuilder},
-    types::smt::Root,
-};
-use common::{
-    types::smt::{Staker as SmtStaker, UserAmount},
-    utils::convert::new_u128,
-};
-use molecule::prelude::Builder;
+use common::utils::convert::new_u128;
 
 use crate::ckb::define::{
     constants::{INAUGURATION, TOKEN_BYTES},
@@ -105,6 +99,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
         ];
 
         let mut outputs_data = vec![new_stake_smt_cell_data];
+        let mut witnesses = vec![smt_witness.as_bytes()];
 
         // insert stake AT cells and withdraw AT cells to the transaction
         self.fill_tx(
@@ -113,6 +108,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
             &mut inputs,
             &mut outputs,
             &mut outputs_data,
+            &mut witnesses,
         )
         .await?;
 
@@ -127,16 +123,8 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
             Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
-        // todo
-        let mut witnesses = vec![
-            smt_witness.as_bytes(),                    // Stake smt cell lock
-            OmniEth::witness_placeholder().as_bytes(), // Stake AT cell lock, may not be needed
-            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
-        ];
-
         if !statistics.withdraw_amounts.is_empty() {
             cell_deps.push(Withdraw::lock_dep());
-            witnesses.push(OmniEth::witness_placeholder().as_bytes()); // Withdraw AT cell lock
         }
 
         let tx = TransactionBuilder::default()
@@ -162,7 +150,6 @@ struct Statistics {
 }
 
 impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S> {
-    // todo: witness?
     async fn fill_tx(
         &self,
         statistics: &Statistics,
@@ -170,6 +157,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         inputs: &mut Vec<CellInput>,
         outputs: &mut Vec<CellOutput>,
         outputs_data: &mut Vec<Bytes>,
+        witnesses: &mut Vec<Bytes>,
     ) -> Result<()> {
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
         for (staker, stake_cell) in inputs_stake_cells.iter() {
@@ -179,6 +167,8 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     .previous_output(inputs_stake_cells[staker].out_point.clone().into())
                     .build(),
             );
+
+            witnesses.push(self.stake_at_witness().as_bytes());
 
             let (old_total_stake_amount, old_stake_data) = self.parse_stake_data(stake_cell);
 
@@ -200,6 +190,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                             .previous_output(old_withdraw_cell.out_point.clone().into())
                             .build(),
                     );
+                    witnesses.push(self.stake_at_witness().as_bytes());
 
                     (
                         old_total_stake_amount - withdraw_amount,
@@ -254,7 +245,15 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                 outputs_data.push(withdraw_data.unwrap());
             }
         }
+
         Ok(())
+    }
+
+    fn stake_at_witness(&self) -> WitnessArgs {
+        let stake_at_witness = StakeAtWitness::new_builder().mode(1.into()).build();
+        WitnessArgs::new_builder()
+            .lock(Some(stake_at_witness.as_bytes()).pack())
+            .build()
     }
 
     fn parse_stake_data(&self, cell: &Cell) -> (Amount, StakeAtCellData) {
