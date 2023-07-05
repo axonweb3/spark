@@ -15,7 +15,7 @@ use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::tx::init::_init_tx;
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
-static ROCKSDB_PATH: &str = "./free-space/smt";
+static ROCKSDB_PATH: &str = "./free-space/smt/reward";
 
 pub async fn reward_tx(ckb: &CkbRpcClient) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);

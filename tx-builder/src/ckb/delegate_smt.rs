@@ -126,12 +126,14 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
             .build();
 
         let omni_eth = OmniEth::new(self.kicker.clone());
-        let kicker_lock = OmniEth::lock(&omni_eth.address()?);
-        let tx = Tx::new(self.ckb, tx).balance(kicker_lock).await?;
+        let kick_lock = OmniEth::lock(&omni_eth.address()?);
+
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(kick_lock.clone()).await?;
 
         // todo: sign tx
 
-        Ok((tx, statistics.non_top_delegators))
+        Ok((tx.inner(), statistics.non_top_delegators))
     }
 }
 

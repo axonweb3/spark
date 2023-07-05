@@ -98,11 +98,10 @@ impl<'a, C: CkbRpc> IWithdrawTxBuilder<'a, C> for WithdrawTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 }
 

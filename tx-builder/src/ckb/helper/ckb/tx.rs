@@ -44,10 +44,22 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
         self.tx
     }
 
+    pub fn inner_clone(&self) -> TransactionView {
+        self.tx.clone()
+    }
+
+    pub fn inner_ref(&self) -> &TransactionView {
+        &self.tx
+    }
+
+    pub fn set_tx(&mut self, tx: TransactionView) {
+        self.tx = tx;
+    }
+
     /// There is no pure CKB cell in the input and output of the transaction.
     /// Collect CKB cells and add them to the input of the transaction.
     /// Add a CKB change cell to the output of the transaction.
-    pub async fn balance(mut self, capacity_provider: Script) -> Result<TransactionView> {
+    pub async fn balance(&mut self, capacity_provider: Script) -> Result<()> {
         let outputs_capacity = self.add_ckb_to_outputs(capacity_provider.clone())?;
 
         let inputs_capacity = self
@@ -56,7 +68,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
 
         self.change_ckb(inputs_capacity, outputs_capacity)?;
 
-        Ok(self.tx)
+        Ok(())
     }
 
     pub fn sign(&mut self, signer: &impl ScriptSigner, script_group: &ScriptGroup) -> Result<()> {

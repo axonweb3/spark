@@ -127,11 +127,10 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 
     async fn build_update_delegate_tx(&self, delegate_cell: Cell) -> Result<TransactionView> {
@@ -181,11 +180,10 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 
     async fn add_token_to_intpus(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {

@@ -14,10 +14,14 @@ pub async fn mint_tx(ckb: &CkbRpcClient) {
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let mut stakers = vec![];
-    for staker_privkey in priv_keys.staker_privkeys.into_iter() {
+    for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
-        println!("staker ckb addres: {}", omni_eth.ckb_address().unwrap());
+        println!(
+            "staker{} ckb addres: {}",
+            i,
+            omni_eth.ckb_address().unwrap()
+        );
         stakers.push((omni_eth.address().unwrap(), 200));
     }
 

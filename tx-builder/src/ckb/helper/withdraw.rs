@@ -1,10 +1,10 @@
 use anyhow::Result;
-use ckb_types::packed::{CellDep, OutPoint, Script};
+use ckb_types::packed::{CellDep, OutPoint, Script, WitnessArgs};
 use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::types::axon_types::withdraw::WithdrawArgs;
+use common::types::axon_types::withdraw::{WithdrawArgs, WithdrawWitness};
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::NetworkType;
 use common::types::{
@@ -71,6 +71,19 @@ impl Withdraw {
         xudt: Script,
     ) -> Result<Option<Cell>> {
         get_cell_by_scripts(ckb_rpc, withdraw_lock, xudt).await
+    }
+
+    pub fn witness(kicker_unlock: bool) -> WitnessArgs {
+        if kicker_unlock {
+            WitnessArgs::new_builder().build()
+        } else {
+            let lock_field = WithdrawWitness::new_builder()
+                .signature(to_bytes(vec![0u8; 65]))
+                .build();
+            WitnessArgs::new_builder()
+                .lock(Some(lock_field.as_bytes()).pack())
+                .build()
+        }
     }
 
     pub fn update_cell_data(

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::unlock::{InfoCellData, ScriptSigner};
+use ckb_sdk::unlock::InfoCellData;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::H160;
 use ckb_types::{
@@ -125,19 +125,20 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx).balance(seeder_lock.clone()).await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(seeder_lock.clone()).await?;
 
-        let (tx, type_id_args) = self.modify_outputs(tx, omni_eth.address()?)?;
+        let (tx_view, type_id_args) = self.modify_outputs(tx.inner_ref(), omni_eth.address()?)?;
+        tx.set_tx(tx_view);
 
-        let signer = omni_eth.signer()?;
-        let tx = signer.sign_tx(&tx, &ScriptGroup {
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
             script:         seeder_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![0],
             output_indices: vec![],
         })?;
 
-        Ok((tx, type_id_args))
+        Ok((tx.inner(), type_id_args))
     }
 }
 
@@ -167,7 +168,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
     fn modify_outputs(
         &self,
-        tx: TransactionView,
+        tx: &TransactionView,
         seeder_addr: H160,
     ) -> Result<(TransactionView, TypeIds)> {
         let mut outputs = tx.outputs().into_iter().collect::<Vec<_>>();

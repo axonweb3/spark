@@ -20,7 +20,7 @@ use common::types::axon_types::{
     stake::{
         StakeAtCellData as AStakeAtCellData, StakeAtCellLockData as AStakeAtCellLockData,
         StakeInfo as AStakeInfo, StakeInfos, StakeSmtCellData as AStakeSmtCellData,
-        StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+        StakeSmtUpdateInfo as AStakeSmtUpdateInfo, StakeSmtWitness as AStakeSmtWitness,
     },
     withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData,
@@ -99,11 +99,25 @@ impl From<StakeInfo> for AStakeInfo {
     }
 }
 
+pub struct StakeSmtWitness {
+    pub mode:        u8, // 0 is update stake at cell itself, 1 is update stake smt cell
+    pub update_info: StakeSmtUpdateInfo,
+}
+
+impl From<StakeSmtWitness> for AStakeSmtWitness {
+    fn from(v: StakeSmtWitness) -> Self {
+        AStakeSmtWitness::new_builder()
+            .mode(v.mode.into())
+            .update_info(v.update_info.into())
+            .build()
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct StakeSmtUpdateInfo {
     pub all_stake_infos: Vec<StakeInfo>,
-    pub old_epoch_proof: Vec<u8>,
-    pub new_epoch_proof: Vec<u8>,
+    pub old_epoch_proof: Proof,
+    pub new_epoch_proof: Proof,
 }
 
 impl From<StakeSmtUpdateInfo> for AStakeSmtUpdateInfo {

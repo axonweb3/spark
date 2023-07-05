@@ -22,7 +22,7 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient) {
         ckb,
         StakeItem {
             is_increase:        true,
-            amount:             10,
+            amount:             100,
             inauguration_epoch: 2,
         },
         0,
@@ -80,7 +80,7 @@ async fn stake_tx(
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
     let test_staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let omni_eth = OmniEth::new(test_staker_key.clone());
-    println!("staker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
+    println!("staker0 ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let first_stake = first_stake_info.is_some();
     let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);

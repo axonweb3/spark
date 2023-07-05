@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::unlock::ScriptSigner;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
@@ -88,23 +87,24 @@ impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx).balance(seeder_lock.clone()).await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(seeder_lock.clone()).await?;
 
         let signer = OmniEth::new(self.seeder_key.clone()).signer()?;
-        let tx = signer.sign_tx(&tx, &ScriptGroup {
+        tx.sign(&signer, &ScriptGroup {
             script:         seeder_lock.clone(),
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![1],
             output_indices: vec![],
         })?;
-        let tx = signer.sign_tx(&tx, &ScriptGroup {
-            script:         seeder_lock,
+        tx.sign(&signer, &ScriptGroup {
+            script:         seeder_lock.clone(),
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![2],
             output_indices: vec![],
         })?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 }
 

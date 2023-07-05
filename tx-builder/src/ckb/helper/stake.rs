@@ -6,14 +6,14 @@ use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::axon_types::stake::{
-    StakeArgs, StakeAtWitness, StakeInfoBuilder, StakeInfoDelta, StakeInfos, StakeSmtUpdateInfo,
-    StakeSmtWitness,
+    StakeArgs, StakeAtWitness, StakeInfoDelta, StakeSmtWitness as AStakeSmtWitness,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{NetworkType, StakeItem};
 use common::utils::convert::*;
 
-use crate::ckb::define::{scripts::*, types::StakeInfo};
+use crate::ckb::define::scripts::*;
+use crate::ckb::define::types::{StakeInfo, StakeSmtUpdateInfo, StakeSmtWitness};
 use crate::ckb::helper::ckb::cell_collector::{get_cell_by_scripts, get_cell_by_type};
 use crate::ckb::helper::metadata::Metadata;
 use crate::ckb::helper::unique_cell_dep;
@@ -95,9 +95,13 @@ impl Stake {
         unique_cell_dep(ckb_rpc, Self::smt_type(type_id)).await
     }
 
-    // todo: eth sig placeholder
-    pub fn witness_placeholder(mode: u8) -> WitnessArgs {
+    pub fn witness(mode: u8) -> WitnessArgs {
         let lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
+
+        if mode == 0 { // staker unlock
+             // todo: eth sig placeholder
+        }
+
         WitnessArgs::new_builder()
             .lock(Some(lock_field.as_bytes()).pack())
             .build()
@@ -124,29 +128,21 @@ impl Stake {
     }
 
     pub fn smt_witness(
+        mode: u8,
         all_stake_infos: Vec<StakeInfo>,
-        old_proof: Vec<u8>,
-        new_proof: Vec<u8>,
+        old_epoch_proof: Vec<u8>,
+        new_epoch_proof: Vec<u8>,
     ) -> WitnessArgs {
-        let stake_infos = StakeInfos::new_builder()
-            .extend(all_stake_infos.into_iter().map(|s| {
-                StakeInfoBuilder::default()
-                    .addr(to_identity(&s.addr))
-                    .amount(to_uint128(s.amount))
-                    .build()
-            }))
-            .build();
-        let updates = StakeSmtUpdateInfo::new_builder()
-            .all_stake_infos(stake_infos)
-            .old_epoch_proof(to_bytes(old_proof))
-            .new_epoch_proof(to_bytes(new_proof))
-            .build();
-        let input_type = StakeSmtWitness::new_builder()
-            .mode(0.into())
-            .update_info(updates)
-            .build();
+        let type_field = AStakeSmtWitness::from(StakeSmtWitness {
+            mode,
+            update_info: StakeSmtUpdateInfo {
+                all_stake_infos,
+                old_epoch_proof,
+                new_epoch_proof,
+            },
+        });
         WitnessArgs::new_builder()
-            .input_type(Some(input_type.as_bytes()).pack())
+            .input_type(Some(type_field.as_bytes()).pack())
             .build()
     }
 }

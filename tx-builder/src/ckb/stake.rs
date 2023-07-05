@@ -130,11 +130,10 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 
     async fn build_update_stake_tx(&self, stake_cell: Cell) -> Result<TransactionView> {
@@ -173,9 +172,9 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         ];
 
         let witnesses = vec![
-            Stake::witness_placeholder(0u8).as_bytes(), // stake AT cell lock, todo
-            OmniEth::witness_placeholder().as_bytes(),  // AT cell lock
-            OmniEth::witness_placeholder().as_bytes(),  // capacity provider lock
+            Stake::witness(0u8).as_bytes(),            // stake AT cell lock, todo
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()
@@ -186,11 +185,10 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 
     async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Amount> {
