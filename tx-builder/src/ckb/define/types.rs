@@ -1,12 +1,14 @@
-use ckb_types::{H160, H256};
+use ckb_types::{packed::Byte32 as CByte32, H160, H256};
 use molecule::prelude::{Builder, Entity};
 
 use common::types::axon_types::{
     basic::{Byte32, Byte48, Byte65, Identity},
     delegate::{
         DelegateAtCellData as ADelegateAtCellData,
-        DelegateAtCellLockData as ADelegateAtCellLockData, DelegateInfoDeltas,
-        DelegateSmtCellData as ADelegateSmtCellData, StakerSmtRoot as AStakerSmtRoot,
+        DelegateAtCellLockData as ADelegateAtCellLockData, DelegateInfo as ADelegateInfo,
+        DelegateInfoDeltas, DelegateInfos, DelegateSmtCellData as ADelegateSmtCellData,
+        DelegateSmtUpdateInfo as ADelegateSmtUpdateInfo, DelegateSmtWitness as ADelegateSmtWitness,
+        StakeGroupInfo as AStakeGroupInfo, StakeGroupInfos, StakerSmtRoot as AStakerSmtRoot,
         StakerSmtRoots,
     },
     metadata::{MetadataCellData as AMetadataCellData, MetadataList},
@@ -32,6 +34,38 @@ use common::types::smt::{Proof, Root as SmtRoot};
 use common::types::tx_builder::*;
 use common::utils::convert::*;
 
+pub struct DelegateSmtWitness {
+    pub mode:        u8,
+    pub update_info: DelegateSmtUpdateInfo,
+}
+
+impl From<DelegateSmtWitness> for ADelegateSmtWitness {
+    fn from(v: DelegateSmtWitness) -> Self {
+        ADelegateSmtWitness::new_builder()
+            .mode(v.mode.into())
+            .update_info(v.update_info.into())
+            .build()
+    }
+}
+
+pub struct DelegateSmtUpdateInfo {
+    pub all_stake_group_infos: Vec<StakeGroupInfo>,
+}
+
+impl From<DelegateSmtUpdateInfo> for ADelegateSmtUpdateInfo {
+    fn from(v: DelegateSmtUpdateInfo) -> Self {
+        ADelegateSmtUpdateInfo::new_builder()
+            .all_stake_group_infos({
+                let mut list = StakeGroupInfos::new_builder();
+                for i in v.all_stake_group_infos.into_iter() {
+                    list = list.push(i.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct StakeGroupInfo {
     pub staker:                   H160,
@@ -40,10 +74,36 @@ pub struct StakeGroupInfo {
     pub delegate_new_epoch_proof: Vec<u8>,
 }
 
+impl From<StakeGroupInfo> for AStakeGroupInfo {
+    fn from(v: StakeGroupInfo) -> Self {
+        AStakeGroupInfo::new_builder()
+            .staker(to_identity(&v.staker))
+            .delegate_old_epoch_proof(to_bytes(v.delegate_old_epoch_proof))
+            .delegate_new_epoch_proof(to_bytes(v.delegate_new_epoch_proof))
+            .delegate_infos({
+                let mut list = DelegateInfos::new_builder();
+                for d in v.delegate_infos.into_iter() {
+                    list = list.push(d.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct DelegateInfo {
     pub delegator_addr: H160,
     pub amount:         u128,
+}
+
+impl From<DelegateInfo> for ADelegateInfo {
+    fn from(v: DelegateInfo) -> Self {
+        ADelegateInfo::new_builder()
+            .delegator_addr(to_identity(&v.delegator_addr))
+            .amount(to_uint128(v.amount))
+            .build()
+    }
 }
 
 #[derive(Clone, Default)]
@@ -64,15 +124,15 @@ impl From<StakerSmtRoot> for AStakerSmtRoot {
 #[derive(Clone, Default)]
 pub struct DelegateSmtCellData {
     // pub version:          u8, // useless
-    pub metadata_type_id: H256,
-    pub smt_roots:        Vec<StakerSmtRoot>, // smt root of all delegator infos
+    pub metadata_type_hash: CByte32,
+    pub smt_roots:          Vec<StakerSmtRoot>, // smt root of all delegator infos
 }
 
 impl From<DelegateSmtCellData> for ADelegateSmtCellData {
     fn from(value: DelegateSmtCellData) -> Self {
         ADelegateSmtCellData::new_builder()
             // .version(value.version.into()) // useless
-            .metadata_type_id(to_byte32(&value.metadata_type_id))
+            .metadata_type_id(to_axon_byte32(&value.metadata_type_hash))
             .smt_roots({
                 let mut list = StakerSmtRoots::new_builder();
                 for r in value.smt_roots.into_iter() {
@@ -80,21 +140,6 @@ impl From<DelegateSmtCellData> for ADelegateSmtCellData {
                 }
                 list.build()
             })
-            .build()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct StakeInfo {
-    pub addr:   H160,
-    pub amount: u128,
-}
-
-impl From<StakeInfo> for AStakeInfo {
-    fn from(value: StakeInfo) -> Self {
-        AStakeInfo::new_builder()
-            .addr(to_identity(&value.addr))
-            .amount(to_uint128(value.amount))
             .build()
     }
 }
@@ -137,17 +182,32 @@ impl From<StakeSmtUpdateInfo> for AStakeSmtUpdateInfo {
 }
 
 #[derive(Clone, Default)]
+pub struct StakeInfo {
+    pub addr:   H160,
+    pub amount: u128,
+}
+
+impl From<StakeInfo> for AStakeInfo {
+    fn from(value: StakeInfo) -> Self {
+        AStakeInfo::new_builder()
+            .addr(to_identity(&value.addr))
+            .amount(to_uint128(value.amount))
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct StakeSmtCellData {
     // pub version:          u8, // useless
-    pub metadata_type_id: H256,
-    pub smt_root:         SmtRoot,
+    pub metadata_type_hash: CByte32,
+    pub smt_root:           SmtRoot,
 }
 
 impl From<StakeSmtCellData> for AStakeSmtCellData {
     fn from(v: StakeSmtCellData) -> Self {
         AStakeSmtCellData::new_builder()
             .smt_root(Byte32::from_slice(v.smt_root.as_slice()).unwrap())
-            .metadata_type_id(to_byte32(&v.metadata_type_id))
+            .metadata_type_id(to_axon_byte32(&v.metadata_type_hash))
             .build()
     }
 }
@@ -298,15 +358,15 @@ impl From<MetadataCellData> for AMetadataCellData {
 
 #[derive(Default)]
 pub struct RewardSmtCellData {
-    pub claim_smt_root:   SmtRoot,
-    pub metadata_type_id: H256,
+    pub claim_smt_root:     SmtRoot,
+    pub metadata_type_hash: CByte32,
 }
 
 impl From<RewardSmtCellData> for ARewardSmtCellData {
     fn from(v: RewardSmtCellData) -> Self {
         ARewardSmtCellData::new_builder()
             .claim_smt_root(Byte32::from_slice(v.claim_smt_root.as_slice()).unwrap())
-            .metadata_type_id(to_byte32(&v.metadata_type_id))
+            .metadata_type_id(to_axon_byte32(&v.metadata_type_hash))
             .build()
     }
 }

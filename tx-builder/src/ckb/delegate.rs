@@ -167,9 +167,9 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         ];
 
         let witnesses = vec![
-            Delegate::witness_placeholder(0u8).as_bytes(), // delegate AT cell lock, todo
-            OmniEth::witness_placeholder().as_bytes(),     // AT cell lock
-            OmniEth::witness_placeholder().as_bytes(),     // capacity provider lock
+            Delegate::witness(0u8).as_bytes(), // delegate AT cell lock, todo
+            OmniEth::witness_placeholder().as_bytes(), // AT cell lock
+            OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
 
         let tx = TransactionBuilder::default()

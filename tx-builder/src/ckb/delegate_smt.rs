@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -15,8 +16,7 @@ use common::traits::{
 };
 use common::types::axon_types::delegate::{
     DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
-    DelegateAtWitness, DelegateCellData, DelegateInfoDeltas,
-    DelegateSmtCellData as ADelegateSmtCellData,
+    DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Delegator as SmtDelegator, UserAmount};
@@ -105,6 +105,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         )
         .await?;
 
+        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
+
         let cell_deps = vec![
             Secp256k1::lock_dep(),
             OmniEth::lock_dep(),
@@ -126,12 +128,17 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
             .build();
 
         let omni_eth = OmniEth::new(self.kicker.clone());
-        let kick_lock = OmniEth::lock(&omni_eth.address()?);
+        let kicker_lock = OmniEth::lock(&omni_eth.address()?);
 
         let mut tx = Tx::new(self.ckb, tx);
-        tx.balance(kick_lock.clone()).await?;
+        tx.balance(kicker_lock.clone()).await?;
 
-        // todo: sign tx
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
+            script:         kicker_lock,
+            group_type:     ScriptGroupType::Lock,
+            input_indices:  vec![tx.inner_ref().inputs().len() - 1],
+            output_indices: vec![],
+        })?;
 
         Ok((tx.inner(), statistics.non_top_delegators))
     }
@@ -160,7 +167,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .previous_output(delegate_cell.out_point.clone().into())
                     .build(),
             );
-            witnesses.push(self.delegate_at_witness().as_bytes());
+            witnesses.push(Delegate::witness(1).as_bytes());
 
             let (old_total_delegate_amount, old_delegate_data) =
                 self.parse_delegate_data(delegate_cell);
@@ -180,7 +187,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                             .previous_output(old_withdraw_cell.out_point.clone().into())
                             .build(),
                     );
-                    witnesses.push(self.delegate_at_witness().as_bytes());
+                    witnesses.push(Withdraw::witness(true).as_bytes());
 
                     let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
                     let mut delegator_infos: Vec<DelegateItem> = Vec::new();
@@ -284,13 +291,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         Ok(())
     }
 
-    fn delegate_at_witness(&self) -> WitnessArgs {
-        let stake_at_witness = DelegateAtWitness::new_builder().mode(1.into()).build();
-        WitnessArgs::new_builder()
-            .lock(Some(stake_at_witness.as_bytes()).pack())
-            .build()
-    }
-
     fn parse_delegate_data(&self, cell: &Cell) -> (Amount, DelegateAtCellData) {
         let mut cell_data_bytes = cell.output_data.clone().unwrap().into_bytes();
         let total_delegate_amount = new_u128(&cell_data_bytes[..TOKEN_BYTES]);
@@ -312,16 +312,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             let old_smt = self
                 .delegate_smt_storage
                 .get_sub_leaves(self.current_epoch + INAUGURATION, to_eth_h160(staker))
-                .await?;
-
-            // get the old epoch proof for witness
-            let old_epoch_proof = self
-                .delegate_smt_storage
-                .generate_sub_proof(
-                    to_eth_h160(staker),
-                    self.current_epoch + INAUGURATION,
-                    old_smt.clone().into_keys().collect(),
-                )
                 .await?;
 
             let mut new_smt = old_smt.clone();
@@ -364,21 +354,28 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             )
             .await?;
 
+            // get the old epoch proof for witness
+            let old_epoch_proof = self
+                .delegate_smt_storage
+                .generate_top_proof(vec![self.current_epoch + INAUGURATION], to_eth_h160(staker))
+                .await?;
+
+            new_roots.push(
+                self.update_delegate_smt(staker.clone(), new_smt.clone())
+                    .await?,
+            );
+
             // get the new epoch proof for witness
             let new_epoch_proof = self
                 .delegate_smt_storage
-                .generate_sub_proof(
-                    to_eth_h160(staker),
-                    self.current_epoch + INAUGURATION,
-                    new_smt.clone().into_keys().collect(),
-                )
+                .generate_top_proof(vec![self.current_epoch + INAUGURATION], to_eth_h160(staker))
                 .await?;
 
             delegate_infos.push(StakeGroupInfo {
                 staker:                   staker.clone(),
                 delegate_old_epoch_proof: old_epoch_proof,
                 delegate_new_epoch_proof: new_epoch_proof,
-                delegate_infos:           new_smt
+                delegate_infos:           old_smt
                     .clone()
                     .into_iter()
                     .map(|(addr, amount)| DelegateInfo {
@@ -387,21 +384,20 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     })
                     .collect(),
             });
-
-            new_roots.push(self.update_delegate_smt(staker.clone(), new_smt).await?);
         }
 
         Ok((
             ADelegateSmtCellData::from(DelegateSmtCellData {
-                metadata_type_id: self.type_ids.metadata_type_id.clone(),
-                smt_roots:        new_roots,
+                metadata_type_hash: Metadata::type_(&self.type_ids.metadata_type_id)
+                    .calc_script_hash(),
+                smt_roots:          new_roots,
             })
             .as_bytes(),
             Statistics {
                 non_top_delegators,
                 withdraw_amounts,
             },
-            Delegate::smt_witness(delegate_infos),
+            Delegate::smt_witness(0, delegate_infos),
         ))
     }
 

@@ -200,11 +200,13 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // metadata cell
         let metadata_type_id = TypeId::calc(&first_input, 3);
+        let metadata_type = HMetadata::type_(&metadata_type_id);
+        let metadata_type_hash = metadata_type.calc_script_hash();
         outputs[3] = tx
             .output(3)
             .unwrap()
             .as_builder()
-            .type_(Some(HMetadata::type_(&metadata_type_id)).pack())
+            .type_(Some(metadata_type).pack())
             .build();
 
         // stake smt cell
@@ -275,7 +277,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             issue_type_id,
             selection_type_id,
             checkpoint_type_id,
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_id,
             reward_smt_type_id,
             stake_smt_type_id,
             delegate_smt_type_id,
@@ -325,7 +327,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // stake smt cell data
         outputs_data[4] = AStakeSmtCellData::from(StakeSmtCellData {
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_hash: metadata_type_hash.clone(),
             ..Default::default()
         })
         .as_bytes()
@@ -333,7 +335,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // delegate smt cell data
         outputs_data[5] = ADelegateSmtCellData::from(DelegateSmtCellData {
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_hash: metadata_type_hash.clone(),
             ..Default::default()
         })
         .as_bytes()
@@ -341,7 +343,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // reward smt cell data
         outputs_data[6] = ARewardSmtCellData::from(RewardSmtCellData {
-            metadata_type_id,
+            metadata_type_hash,
             ..Default::default()
         })
         .as_bytes()

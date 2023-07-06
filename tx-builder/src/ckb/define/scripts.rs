@@ -150,7 +150,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_LOCK_TESTNET: Script = Script {
         code_hash: h256!("0x0a2adef4af62c9350eee7d31dfc2b5f340f2fa5c5d70f6834c13465cb545cde3"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x036abf118006a72129d57f8daa841e7dbab56aeb2f8c356f74618665a9bb4429"),
+        tx_hash: h256!("0x790bf6c94a9ef39ea353c98deb77a238b113580676fa2de86bc547f0d3a55a5d"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -166,7 +166,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_SMT_TYPE_TESTNET: Script = Script {
         code_hash: h256!("0x4b40fbfc384278eb1a8bcda34a08b37642d33d49a804e56185926ff6e779e01d"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x036abf118006a72129d57f8daa841e7dbab56aeb2f8c356f74618665a9bb4429"),
+        tx_hash: h256!("0x790bf6c94a9ef39ea353c98deb77a238b113580676fa2de86bc547f0d3a55a5d"),
         index: 1,
         dep_type: DepType::Code,
     };

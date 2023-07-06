@@ -339,8 +339,9 @@ where
             vec![
                 // reward smt cell data
                 ARewardSmtCellData::from(RewardSmtCellData {
-                    claim_smt_root:   reward_smt_root,
-                    metadata_type_id: self.type_ids.metadata_type_id.clone(),
+                    claim_smt_root:     reward_smt_root,
+                    metadata_type_hash: Reward::smt_type(&self.type_ids.metadata_type_id)
+                        .calc_script_hash(),
                 })
                 .as_bytes(),
                 // AT cell data

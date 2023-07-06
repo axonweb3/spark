@@ -4,32 +4,32 @@ use ckb_types::prelude::Pack;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::SmtManager;
 
-use common::traits::tx_builder::IStakeSmtTxBuilder;
-use common::types::tx_builder::StakeSmtTypeIds;
-use tx_builder::ckb::helper::{OmniEth, Stake, Tx, Xudt};
-use tx_builder::ckb::stake_smt::StakeSmtTxBuilder;
+use common::traits::tx_builder::IDelegateSmtTxBuilder;
+use common::types::tx_builder::DelegateSmtTypeIds;
+use tx_builder::ckb::delegate_smt::DelegateSmtTxBuilder;
+use tx_builder::ckb::helper::{Delegate, OmniEth, Tx, Xudt};
 
 use crate::config::parse_file;
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
-static ROCKSDB_PATH: &str = "./free-space/smt/stake";
+static ROCKSDB_PATH: &str = "./free-space/smt/delegate";
 
-pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
+pub async fn delegate_smt_tx(ckb: &CkbRpcClient) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let test_kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
+    let test_kicker_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let omni_eth = OmniEth::new(test_kicker_key.clone());
     println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
-    let stake_smt_type_id = type_ids.stake_smt_type_id.into_h256().unwrap();
+    let delegate_smt_type_id = type_ids.delegate_smt_type_id.into_h256().unwrap();
     let xudt_owner = type_ids.xudt_owner.into_h256().unwrap();
 
-    let stake_cell = Stake::get_cell(
+    let delegate_cell = Delegate::get_cell(
         ckb,
-        Stake::lock(&metadata_type_id, &omni_eth.address().unwrap()),
+        Delegate::lock(&metadata_type_id, &omni_eth.address().unwrap()),
         Xudt::type_(&xudt_owner.pack()),
     )
     .await
@@ -40,18 +40,17 @@ pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
     fs::remove_dir_all(path.clone()).unwrap();
     let smt = SmtManager::new(path);
 
-    let (tx, _) = StakeSmtTxBuilder::new(
+    let (tx, _) = DelegateSmtTxBuilder::new(
         ckb,
         test_kicker_key,
         0,
-        StakeSmtTypeIds {
+        DelegateSmtTypeIds {
             metadata_type_id,
             checkpoint_type_id,
-            stake_smt_type_id,
+            delegate_smt_type_id,
             xudt_owner,
         },
-        10,
-        vec![stake_cell],
+        vec![delegate_cell],
         smt,
     )
     .build_tx()

@@ -95,18 +95,6 @@ impl Stake {
         unique_cell_dep(ckb_rpc, Self::smt_type(type_id)).await
     }
 
-    pub fn witness(mode: u8) -> WitnessArgs {
-        let lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
-
-        if mode == 0 { // staker unlock
-             // todo: eth sig placeholder
-        }
-
-        WitnessArgs::new_builder()
-            .lock(Some(lock_field.as_bytes()).pack())
-            .build()
-    }
-
     pub fn item(stake: &StakeInfoDelta) -> StakeItem {
         StakeItem {
             is_increase:        to_bool(&stake.is_increase()),
@@ -125,6 +113,18 @@ impl Stake {
 
     pub async fn get_smt_cell(ckb_rpc: &impl CkbRpc, delegate_smt_type: Script) -> Result<Cell> {
         get_cell_by_type(ckb_rpc, delegate_smt_type).await
+    }
+
+    pub fn witness(mode: u8) -> WitnessArgs {
+        let lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
+
+        if mode == 0 { // staker unlock
+             // todo: eth sig placeholder
+        }
+
+        WitnessArgs::new_builder()
+            .lock(Some(lock_field.as_bytes()).pack())
+            .build()
     }
 
     pub fn smt_witness(
