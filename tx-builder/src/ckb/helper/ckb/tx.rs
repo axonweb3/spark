@@ -1,16 +1,18 @@
 use anyhow::Result;
-use ckb_jsonrpc_types::OutputsValidator;
+use ckb_jsonrpc_types::{OutputsValidator, Status};
 use ckb_sdk::types::ScriptGroup;
 use ckb_sdk::unlock::ScriptSigner;
 use ckb_types::{
     core::{Capacity, TransactionView},
     packed::{Byte32, Bytes, CellInput, CellOutput, Script},
     prelude::*,
+    H256,
 };
 use linked_hash_map::LinkedHashMap;
 
 use common::traits::ckb_rpc_client::CkbRpc;
 use common::types::ckb_rpc_client::{ScriptType, SearchKey};
+use common::types::TransactionWithStatusResponse;
 
 use crate::ckb::define::constants::FEE_RATE;
 use crate::ckb::define::error::CkbTxErr;
@@ -19,8 +21,9 @@ use crate::ckb::helper::ckb::cell_collector::{get_live_cell, get_live_cells};
 const KB: u64 = 1000;
 
 pub struct Tx<'a, C: CkbRpc> {
-    tx:  TransactionView,
-    rpc: &'a C,
+    rpc:     &'a C,
+    tx:      TransactionView,
+    tx_hash: H256,
 }
 
 pub struct ScriptGroups {
@@ -30,17 +33,33 @@ pub struct ScriptGroups {
 
 impl<'a, C: CkbRpc> Tx<'a, C> {
     pub fn new(rpc: &'a C, tx: TransactionView) -> Self {
-        Self { tx, rpc }
+        Self {
+            rpc,
+            tx,
+            tx_hash: H256::default(),
+        }
     }
 
     pub fn inner(self) -> TransactionView {
         self.tx
     }
 
+    pub fn inner_clone(&self) -> TransactionView {
+        self.tx.clone()
+    }
+
+    pub fn inner_ref(&self) -> &TransactionView {
+        &self.tx
+    }
+
+    pub fn set_tx(&mut self, tx: TransactionView) {
+        self.tx = tx;
+    }
+
     /// There is no pure CKB cell in the input and output of the transaction.
     /// Collect CKB cells and add them to the input of the transaction.
     /// Add a CKB change cell to the output of the transaction.
-    pub async fn balance(mut self, capacity_provider: Script) -> Result<TransactionView> {
+    pub async fn balance(&mut self, capacity_provider: Script) -> Result<()> {
         let outputs_capacity = self.add_ckb_to_outputs(capacity_provider.clone())?;
 
         let inputs_capacity = self
@@ -49,7 +68,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
 
         self.change_ckb(inputs_capacity, outputs_capacity)?;
 
-        Ok(self.tx)
+        Ok(())
     }
 
     pub fn sign(&mut self, signer: &impl ScriptSigner, script_group: &ScriptGroup) -> Result<()> {
@@ -57,13 +76,37 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
         Ok(())
     }
 
-    pub async fn send(&self) -> Result<String> {
+    pub async fn send(&mut self) -> Result<String> {
         let outputs_validator = Some(OutputsValidator::Passthrough);
-        let tx_hash = self
+        self.tx_hash = self
             .rpc
             .send_transaction(&(self.tx.data().into()), outputs_validator)
             .await?;
-        Ok(tx_hash.to_string())
+        Ok(self.tx_hash.to_string())
+    }
+
+    pub async fn query_status(&self) -> Result<Option<TransactionWithStatusResponse>> {
+        self.rpc.get_transaction(self.tx_hash.clone()).await
+    }
+
+    pub async fn wait_until_committed(&self, interval_ms: u64, max_try: u64) -> Result<()> {
+        let mut status = Status::Proposed;
+        let mut try_count = 0;
+
+        while status != Status::Committed {
+            if let Some(tx_with_status) = self.rpc.get_transaction(self.tx_hash.clone()).await? {
+                status = tx_with_status.tx_status.status;
+            }
+
+            try_count += 1;
+            if try_count >= max_try {
+                break;
+            }
+
+            async_std::task::sleep(tokio::time::Duration::from_millis(interval_ms)).await;
+        }
+
+        Ok(())
     }
 
     pub async fn gen_script_group(&self) -> Result<ScriptGroups> {

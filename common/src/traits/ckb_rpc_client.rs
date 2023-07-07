@@ -1,11 +1,12 @@
-use crate::types::{
-    BlockNumber, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction, Uint32,
-};
 use anyhow::Result;
 use async_trait::async_trait;
 use ckb_types::H256;
 
 use crate::types::ckb_rpc_client::{Cell, IndexerTip, Order, Pagination, RpcSearchKey, SearchKey};
+use crate::types::{
+    BlockNumber, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction,
+    TransactionWithStatusResponse, Uint32,
+};
 
 #[async_trait]
 pub trait CkbRpc: Send + Sync + Clone {
@@ -28,6 +29,9 @@ pub trait CkbRpc: Send + Sync + Clone {
         tx: &Transaction,
         outputs_validator: Option<OutputsValidator>,
     ) -> Result<H256>;
+
+    // Chain
+    async fn get_transaction(&self, hash: H256) -> Result<Option<TransactionWithStatusResponse>>;
 }
 
 #[async_trait]

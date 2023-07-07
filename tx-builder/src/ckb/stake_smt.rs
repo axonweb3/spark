@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
@@ -13,10 +14,8 @@ use molecule::prelude::Builder;
 use common::traits::{
     ckb_rpc_client::CkbRpc, smt::StakeSmtStorage, tx_builder::IStakeSmtTxBuilder,
 };
-use common::types::axon_types::{
-    basic::Byte32,
-    stake::{StakeArgs, StakeAtCellData, StakeAtWitness, StakeSmtCellData},
-};
+use common::types::axon_types::basic::Byte32;
+use common::types::axon_types::stake::{StakeArgs, StakeAtCellData, StakeSmtCellData};
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Root, Staker as SmtStaker, UserAmount};
 use common::types::tx_builder::{
@@ -112,6 +111,8 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
         )
         .await?;
 
+        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
+
         let mut cell_deps = vec![
             OmniEth::lock_dep(),
             Secp256k1::lock_dep(),
@@ -135,12 +136,20 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
             .witnesses(witnesses.pack())
             .build();
 
-        let kicker_lock = OmniEth::lock(&OmniEth::new(self.kicker.clone()).address()?);
-        let tx = Tx::new(self.ckb, tx).balance(kicker_lock).await?;
+        let omni_eth = OmniEth::new(self.kicker.clone());
+        let kicker_lock = OmniEth::lock(&omni_eth.address()?);
 
-        // todo: sign tx
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(kicker_lock.clone()).await?;
 
-        Ok((tx, statistics.non_top_stakers))
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
+            script:         kicker_lock,
+            group_type:     ScriptGroupType::Lock,
+            input_indices:  vec![tx.inner_ref().inputs().len() - 1],
+            output_indices: vec![],
+        })?;
+
+        Ok((tx.inner(), statistics.non_top_stakers))
     }
 }
 
@@ -168,7 +177,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     .build(),
             );
 
-            witnesses.push(self.stake_at_witness().as_bytes());
+            witnesses.push(Stake::witness(1).as_bytes());
 
             let (old_total_stake_amount, old_stake_data) = self.parse_stake_data(stake_cell);
 
@@ -190,7 +199,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                             .previous_output(old_withdraw_cell.out_point.clone().into())
                             .build(),
                     );
-                    witnesses.push(self.stake_at_witness().as_bytes());
+                    witnesses.push(Withdraw::witness(true).as_bytes());
 
                     (
                         old_total_stake_amount - withdraw_amount,
@@ -212,7 +221,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                         .as_builder()
                         .delta(
                             StakeItem {
-                                is_increase:        false,
+                                is_increase:        true,
                                 amount:             0,
                                 inauguration_epoch: 0,
                             }
@@ -249,13 +258,6 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         Ok(())
     }
 
-    fn stake_at_witness(&self) -> WitnessArgs {
-        let stake_at_witness = StakeAtWitness::new_builder().mode(1.into()).build();
-        WitnessArgs::new_builder()
-            .lock(Some(stake_at_witness.as_bytes()).pack())
-            .build()
-    }
-
     fn parse_stake_data(&self, cell: &Cell) -> (Amount, StakeAtCellData) {
         let mut cell_data_bytes = cell.output_data.clone().unwrap().into_bytes();
         let total_stake_amount = new_u128(&cell_data_bytes[..TOKEN_BYTES]);
@@ -274,7 +276,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .collect();
 
         self.stake_smt_storage
-            .insert(self.current_epoch + INAUGURATION, new_smt_stakers)
+            .insert(self.current_epoch, new_smt_stakers)
             .await?;
 
         self.stake_smt_storage.get_top_root().await
@@ -297,8 +299,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                 &StakeArgs::new_unchecked(cell.output.lock.args.as_bytes().to_owned().into())
                     .stake_addr()
                     .as_bytes(),
-            )
-            .unwrap();
+            )?;
 
             let (_, stake_data) = self.parse_stake_data(&cell);
             let stake_delta = Stake::item(&stake_data.lock().delta());
@@ -359,10 +360,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         // get the old epoch proof for witness
         let old_epoch_proof = self
             .stake_smt_storage
-            .generate_sub_proof(
-                self.current_epoch + INAUGURATION,
-                old_smt.clone().into_keys().collect(),
-            )
+            .generate_top_proof(vec![self.current_epoch])
             .await?;
 
         let new_root = self.update_stake_smt(new_smt.clone()).await?;
@@ -370,14 +368,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         // get the new epoch proof for witness
         let new_epoch_proof = self
             .stake_smt_storage
-            .generate_sub_proof(
-                self.current_epoch + INAUGURATION,
-                new_smt.clone().into_keys().collect(),
-            )
+            .generate_top_proof(vec![self.current_epoch])
             .await?;
 
         let stake_smt_witness = Stake::smt_witness(
-            new_smt
+            0,
+            old_smt
                 .into_iter()
                 .map(|(addr, amount)| StakeInfo {
                     addr: ckb_types::H160(addr.0),

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::unlock::{InfoCellData, ScriptSigner};
+use ckb_sdk::unlock::InfoCellData;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::H160;
 use ckb_types::{
@@ -28,8 +28,8 @@ use crate::ckb::define::types::{
     DelegateSmtCellData, MetadataCellData, RewardSmtCellData, StakeSmtCellData,
 };
 use crate::ckb::helper::{
-    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Secp256k1,
-    Selection, Stake, Tx, TypeId, Xudt,
+    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Reward,
+    Secp256k1, Selection, Stake, Tx, TypeId, Xudt,
 };
 use crate::ckb::NETWORK_TYPE;
 
@@ -110,7 +110,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             HMetadata::type_dep(),
             Stake::smt_type_dep(),
             Delegate::smt_type_dep(),
-            // Reward::smt_type_dep(),
+            Reward::smt_type_dep(),
         ];
 
         let witnesses = vec![
@@ -125,19 +125,20 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx).balance(seeder_lock.clone()).await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(seeder_lock.clone()).await?;
 
-        let (tx, type_id_args) = self.modify_outputs(tx, omni_eth.address()?)?;
+        let (tx_view, type_id_args) = self.modify_outputs(tx.inner_ref(), omni_eth.address()?)?;
+        tx.set_tx(tx_view);
 
-        let signer = omni_eth.signer()?;
-        let tx = signer.sign_tx(&tx, &ScriptGroup {
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
             script:         seeder_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![0],
             output_indices: vec![],
         })?;
 
-        Ok((tx, type_id_args))
+        Ok((tx.inner(), type_id_args))
     }
 }
 
@@ -167,7 +168,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
     fn modify_outputs(
         &self,
-        tx: TransactionView,
+        tx: &TransactionView,
         seeder_addr: H160,
     ) -> Result<(TransactionView, TypeIds)> {
         let mut outputs = tx.outputs().into_iter().collect::<Vec<_>>();
@@ -199,11 +200,13 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // metadata cell
         let metadata_type_id = TypeId::calc(&first_input, 3);
+        let metadata_type = HMetadata::type_(&metadata_type_id);
+        let metadata_type_hash = metadata_type.calc_script_hash();
         outputs[3] = tx
             .output(3)
             .unwrap()
             .as_builder()
-            .type_(Some(HMetadata::type_(&metadata_type_id)).pack())
+            .type_(Some(metadata_type).pack())
             .build();
 
         // stake smt cell
@@ -274,7 +277,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             issue_type_id,
             selection_type_id,
             checkpoint_type_id,
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_id,
             reward_smt_type_id,
             stake_smt_type_id,
             delegate_smt_type_id,
@@ -324,7 +327,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // stake smt cell data
         outputs_data[4] = AStakeSmtCellData::from(StakeSmtCellData {
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_hash: metadata_type_hash.clone(),
             ..Default::default()
         })
         .as_bytes()
@@ -332,7 +335,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // delegate smt cell data
         outputs_data[5] = ADelegateSmtCellData::from(DelegateSmtCellData {
-            metadata_type_id: metadata_type_id.clone(),
+            metadata_type_hash: metadata_type_hash.clone(),
             ..Default::default()
         })
         .as_bytes()
@@ -340,7 +343,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // reward smt cell data
         outputs_data[6] = ARewardSmtCellData::from(RewardSmtCellData {
-            metadata_type_id,
+            metadata_type_hash,
             ..Default::default()
         })
         .as_bytes()

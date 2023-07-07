@@ -150,7 +150,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_LOCK_TESTNET: Script = Script {
         code_hash: h256!("0x0a2adef4af62c9350eee7d31dfc2b5f340f2fa5c5d70f6834c13465cb545cde3"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x036abf118006a72129d57f8daa841e7dbab56aeb2f8c356f74618665a9bb4429"),
+        tx_hash: h256!("0x790bf6c94a9ef39ea353c98deb77a238b113580676fa2de86bc547f0d3a55a5d"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -166,7 +166,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_SMT_TYPE_TESTNET: Script = Script {
         code_hash: h256!("0x4b40fbfc384278eb1a8bcda34a08b37642d33d49a804e56185926ff6e779e01d"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x036abf118006a72129d57f8daa841e7dbab56aeb2f8c356f74618665a9bb4429"),
+        tx_hash: h256!("0x790bf6c94a9ef39ea353c98deb77a238b113580676fa2de86bc547f0d3a55a5d"),
         index: 1,
         dep_type: DepType::Code,
     };
@@ -219,7 +219,7 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
 
-    // todo
+    // todo: main net
     pub static ref WITHDRAW_LOCK_MAINNET: Script = Script {
         code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
         hash_type: ScriptHashType::Type,
@@ -228,14 +228,14 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
     pub static ref WITHDRAW_LOCK_TESTNET: Script = Script {
-        code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
+        code_hash: h256!("0xf33d2e1805347e62ff162bb8d2abf62cd386cdc9af6c455aafa4aa6ecaefbc0d"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        tx_hash: h256!("0x9221b656d96c231d619c8fe34cbc1845702fe1c1998ec8f5c395fd5abd612373"),
         index: 0,
         dep_type: DepType::Code,
     };
 
-    // todo
+    // todo: main net
     pub static ref REWARD_SMT_TYPE_MAINNET: Script = Script {
         code_hash: h256!("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
         hash_type: ScriptHashType::Type,
@@ -244,9 +244,9 @@ lazy_static::lazy_static! {
         dep_type: DepType::Code,
     };
     pub static ref REWARD_SMT_TYPE_TESTNET: Script = Script {
-        code_hash: h256!("0x58c63de75a92d3ed83a0636d29454173608ff27a053891258e96a9a44e84ce37"),
+        code_hash: h256!("0x22b1350ab5764d255bed11c51283a8a462bcfbdf42c42eb13f4bcb8da6cbe867"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xc2721314c82baf732583e3e0612b7735d0e0af87994b89b3ce6c33f51c1095fb"),
+        tx_hash: h256!("0xb937a8938d588cddf38bab8273ce474f5d29dce6d0f9ac8c2d49b9bbe25e84b7"),
         index: 0,
         dep_type: DepType::Code,
     };

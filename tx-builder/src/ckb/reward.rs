@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellDep, CellInput, CellOutput, Script},
+    packed::{CellDep, CellInput, CellOutput, Script, WitnessArgs},
     prelude::{Entity, Pack},
     H160,
 };
@@ -136,8 +136,11 @@ where
         ];
 
         let mut witnesses = vec![
-            ARewardWitness::from(reward_witness).as_bytes(), // reward cell lock & type
-            bytes::Bytes::default(),                         // selection cell lock & type
+            WitnessArgs::new_builder()
+                .input_type(Some(ARewardWitness::from(reward_witness).as_bytes()).pack())
+                .build()
+                .as_bytes(),
+            bytes::Bytes::default(), // selection cell lock & type
         ];
         if token_amount.is_some() {
             witnesses.push(OmniEth::witness_placeholder().as_bytes()); // AT cell lock
@@ -152,11 +155,10 @@ where
             .witnesses(witnesses.pack())
             .build();
 
-        let tx = Tx::new(self.ckb, tx)
-            .balance(self.token_lock.clone())
-            .await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx)
+        Ok(tx.inner())
     }
 }
 
@@ -337,8 +339,9 @@ where
             vec![
                 // reward smt cell data
                 ARewardSmtCellData::from(RewardSmtCellData {
-                    claim_smt_root:   reward_smt_root,
-                    metadata_type_id: self.type_ids.metadata_type_id.clone(),
+                    claim_smt_root:     reward_smt_root,
+                    metadata_type_hash: Reward::smt_type(&self.type_ids.metadata_type_id)
+                        .calc_script_hash(),
                 })
                 .as_bytes(),
                 // AT cell data

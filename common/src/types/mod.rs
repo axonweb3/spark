@@ -14,5 +14,6 @@ pub use ethereum_types::{
 };
 
 pub use ckb_jsonrpc_types::{
-    BlockNumber, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction, Uint32,
+    BlockNumber, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction,
+    TransactionWithStatusResponse, Uint32,
 };

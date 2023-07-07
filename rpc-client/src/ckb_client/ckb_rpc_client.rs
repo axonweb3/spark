@@ -1,7 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ckb_jsonrpc_types::{
-    CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction, Uint32,
+    CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction,
+    TransactionWithStatusResponse, Uint32,
 };
 use ckb_types::H256;
 use common::{
@@ -120,6 +121,18 @@ impl CkbRpcClient {
     ) -> impl Future<Output = Result<H256>> {
         jsonrpc!("send_transaction", self, H256, tx, outputs_validator)
     }
+
+    pub fn get_transaction(
+        &self,
+        hash: H256,
+    ) -> impl Future<Output = Result<Option<TransactionWithStatusResponse>>> {
+        jsonrpc!(
+            "get_transaction",
+            self,
+            Option<TransactionWithStatusResponse>,
+            hash
+        )
+    }
 }
 
 #[async_trait]
@@ -148,5 +161,9 @@ impl CkbRpc for CkbRpcClient {
         outputs_validator: Option<OutputsValidator>,
     ) -> Result<H256> {
         self.send_transaction(tx, outputs_validator).await
+    }
+
+    async fn get_transaction(&self, hash: H256) -> Result<Option<TransactionWithStatusResponse>> {
+        self.get_transaction(hash).await
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ckb_sdk::{unlock::ScriptSigner, ScriptGroup, ScriptGroupType};
+use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellInput, CellOutput, WitnessArgs},
@@ -129,17 +129,17 @@ where
         let omni_eth = OmniEth::new(self.kicker_key.clone());
         let kick_lock = OmniEth::lock(&omni_eth.address()?);
 
-        let tx = Tx::new(self.ckb, tx).balance(kick_lock.clone()).await?;
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(kick_lock.clone()).await?;
 
-        let signer = omni_eth.signer()?;
-        let tx_view = signer.sign_tx(&tx, &ScriptGroup {
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
             script:         kick_lock,
             group_type:     ScriptGroupType::Lock,
             input_indices:  vec![1],
             output_indices: vec![],
         })?;
 
-        Ok(tx_view)
+        Ok(tx.inner())
     }
 }
 

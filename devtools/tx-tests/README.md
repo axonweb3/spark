@@ -37,4 +37,6 @@ cargo run -- -s redeem  // redeem stake
 cargo run -- -s first   // first delegate
 cargo run -- -s add     // add delegate
 cargo run -- -s redeem  // redeem delegate
+
+cargo run -- -t  // stake smt tx
 ```

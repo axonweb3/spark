@@ -7,6 +7,7 @@ use ckb_types::{
     packed::{CellInput, CellOutput, Script},
     prelude::{Entity, Pack},
 };
+use ethereum_types::H160;
 
 use common::traits::{
     ckb_rpc_client::CkbRpc,
@@ -19,9 +20,9 @@ use common::types::axon_types::{
     withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
 use common::types::tx_builder::*;
-use ethereum_types::H160;
 
 use crate::ckb::define::types::*;
+use crate::ckb::helper::Metadata as HMetadata;
 
 pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
     _ckb:            &'a C,
@@ -317,13 +318,15 @@ where
         metadata_cell_data.metadata.push(new_metadata);
 
         let _stake_smt_cell_data = StakeSmtCellData {
-            smt_root:         Into::<[u8; 32]>::into(new_stake_root).into(),
-            metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
+            smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
+            metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
+                .calc_script_hash(),
         };
 
         let _delegate_smt_cell_data = DelegateSmtCellData {
-            smt_roots:        delegator_staker_smt_roots,
-            metadata_type_id: metadata_cell_data.type_ids.metadata_type_id.clone(),
+            smt_roots:          delegator_staker_smt_roots,
+            metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
+                .calc_script_hash(),
         };
 
         let mut withdraw_set: HashMap<H160, u128> = HashMap::default();

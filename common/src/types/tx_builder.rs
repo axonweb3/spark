@@ -112,7 +112,7 @@ impl From<DelegateRequirement> for ADelegateRequirement {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct StakeItem {
     pub is_increase:        bool,
     pub amount:             Amount,
@@ -122,7 +122,7 @@ pub struct StakeItem {
 impl From<StakeItem> for StakeInfoDelta {
     fn from(stake: StakeItem) -> Self {
         StakeInfoDelta::new_builder()
-            .is_increase(Byte::new(stake.is_increase.into()))
+            .is_increase((stake.is_increase as u8).into())
             .amount(to_uint128(stake.amount))
             .inauguration_epoch(to_uint64(stake.inauguration_epoch))
             .build()
