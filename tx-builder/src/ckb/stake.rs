@@ -5,6 +5,7 @@ use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellInput, CellOutput, Script},
     prelude::{Entity, Pack},
+    H256,
 };
 use molecule::prelude::Builder;
 
@@ -20,15 +21,23 @@ use common::utils::convert::*;
 
 use crate::ckb::define::constants::*;
 use crate::ckb::define::error::{CkbTxErr, CkbTxResult};
-use crate::ckb::define::types::{StakeAtCellData, StakeAtCellLockData};
-use crate::ckb::helper::{
-    amount_calculator::*, token_cell_data, Checkpoint, Metadata, OmniEth, Secp256k1, Stake, Tx,
-    Withdraw, Xudt,
+use crate::ckb::define::scripts::{
+    DELEGATE_REQUIREMENT_TYPE_DEVNET, DELEGATE_REQUIREMENT_TYPE_MAINNET,
+    DELEGATE_REQUIREMENT_TYPE_TESTNET,
 };
+use crate::ckb::define::types::{
+    DelegateRequirementArgs, DelegateRequirementInfo, StakeAtCellData, StakeAtCellLockData,
+};
+use crate::ckb::helper::{
+    amount_calculator::*, token_cell_data, Checkpoint, Delegate, Metadata, OmniEth, Secp256k1,
+    Stake, Tx, TypeId, Withdraw, Xudt,
+};
+use crate::ckb::NETWORK_TYPE;
 
 pub struct StakeTxBuilder<'a, C: CkbRpc> {
     ckb:              &'a C,
     type_ids:         StakeTypeIds,
+    staker:           EthAddress,
     current_epoch:    Epoch,
     stake:            StakeItem,
     first_stake_info: Option<FirstStakeInfo>,
@@ -56,6 +65,7 @@ impl<'a, C: CkbRpc> IStakeTxBuilder<'a, C> for StakeTxBuilder<'a, C> {
         Self {
             ckb,
             type_ids,
+            staker,
             current_epoch,
             stake: stake_item,
             first_stake_info,
@@ -93,6 +103,7 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
         let mut outputs_data = self.first_stake_data(token_amount)?;
+        let mut stake_data = outputs_data[1].clone();
 
         let mut outputs = vec![
             // AT cell
@@ -108,14 +119,25 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             // delegate requirement cell
             CellOutput::new_builder()
                 .lock(self.token_lock.clone())
-                // .type_(Some(fake_type.clone()).pack()) // todo
+                .type_(
+                    Some(Delegate::requirement_type(
+                        &self.type_ids.metadata_type_id,
+                        &H256::default(),
+                    ))
+                    .pack(),
+                )
                 .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];
 
         self.add_withdraw_to_outputs(&mut outputs, &mut outputs_data)
             .await?;
 
-        let cell_deps = vec![OmniEth::lock_dep(), Secp256k1::lock_dep(), Xudt::type_dep()];
+        let cell_deps = vec![
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            Xudt::type_dep(),
+            Delegate::requriement_type_dep(),
+        ];
 
         let witnesses = vec![
             OmniEth::witness_placeholder().as_bytes(), // AT cell lock
@@ -133,7 +155,72 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         let mut tx = Tx::new(self.ckb, tx);
         tx.balance(self.token_lock.clone()).await?;
 
-        Ok(tx.inner())
+        let tx = tx.inner();
+        let mut outputs = tx.outputs().into_iter().collect::<Vec<_>>();
+        let mut outputs_data = tx.outputs_data().into_iter().collect::<Vec<_>>();
+
+        let first_input = tx.inputs().get(0).unwrap();
+        let requirement_type_id = TypeId::calc(&first_input, 2);
+        let network_type = NETWORK_TYPE.load();
+
+        outputs_data[1] = {
+            let total_stake_amount = new_u128(&stake_data[..TOKEN_BYTES]);
+            let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
+            let inner_stake_data = stake_data.lock();
+            token_cell_data(
+                total_stake_amount,
+                stake_data
+                    .as_builder()
+                    .lock(
+                        inner_stake_data
+                            .as_builder()
+                            .requirement_info(
+                                DelegateRequirementInfo {
+                                    code_hash:   if **network_type == NetworkType::Mainnet {
+                                        DELEGATE_REQUIREMENT_TYPE_MAINNET.code_hash.clone()
+                                    } else if **network_type == NetworkType::Testnet {
+                                        DELEGATE_REQUIREMENT_TYPE_TESTNET.code_hash.clone()
+                                    } else {
+                                        DELEGATE_REQUIREMENT_TYPE_DEVNET.code_hash.clone()
+                                    },
+                                    requirement: DelegateRequirementArgs {
+                                        metadata_type_hash:  Metadata::type_(
+                                            &self.type_ids.metadata_type_id,
+                                        )
+                                        .calc_script_hash(),
+                                        requirement_type_id: requirement_type_id.clone(),
+                                    },
+                                }
+                                .into(),
+                            )
+                            .build(),
+                    )
+                    .build()
+                    .as_bytes(),
+            )
+            .pack()
+        };
+
+        outputs[2] = tx
+            .output(2)
+            .unwrap()
+            .as_builder()
+            .type_(
+                Some(Delegate::requirement_type(
+                    &self.type_ids.metadata_type_id,
+                    &requirement_type_id,
+                ))
+                .pack(),
+            )
+            .build();
+
+        let tx = tx
+            .as_advanced_builder()
+            .set_outputs(outputs)
+            .set_outputs_data(outputs_data)
+            .build();
+
+        Ok(tx)
     }
 
     async fn build_update_stake_tx(&self, stake_cell: Cell) -> Result<TransactionView> {
@@ -166,7 +253,6 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             Secp256k1::lock_dep(),
             Xudt::type_dep(),
             Stake::lock_dep(),
-            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
             Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
             Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
@@ -260,9 +346,11 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
                 self.stake.amount,
                 AStakeAtCellData::from(StakeAtCellData {
                     lock: StakeAtCellLockData {
-                        l1_pub_key:  first_stake.l1_pub_key.clone(),
+                        l1_pub_key: first_stake.l1_pub_key.clone(),
+                        l2_address: self.staker.clone(),
                         bls_pub_key: first_stake.bls_pub_key.clone(),
-                        stake_info:  self.stake.clone(),
+                        stake_info: self.stake.clone(),
+                        ..Default::default()
                     },
                 })
                 .as_bytes(),

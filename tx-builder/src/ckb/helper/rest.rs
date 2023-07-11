@@ -53,6 +53,11 @@ impl Selection {
                 SELECTION_LOCK_TESTNET.hash_type,
                 selectionn_args
             ),
+            NetworkType::Devnet => script!(
+                &SELECTION_LOCK_DEVNET.code_hash,
+                SELECTION_LOCK_DEVNET.hash_type,
+                selectionn_args
+            ),
         }
     }
 
@@ -67,6 +72,11 @@ impl Selection {
                 &SELECTION_LOCK_TESTNET.tx_hash,
                 SELECTION_LOCK_TESTNET.index,
                 SELECTION_LOCK_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &SELECTION_LOCK_DEVNET.tx_hash,
+                SELECTION_LOCK_DEVNET.index,
+                SELECTION_LOCK_DEVNET.dep_type
             ),
         }
     }
@@ -90,6 +100,11 @@ impl Reward {
                 REWARD_SMT_TYPE_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &REWARD_SMT_TYPE_DEVNET.code_hash,
+                REWARD_SMT_TYPE_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -104,6 +119,11 @@ impl Reward {
                 &REWARD_SMT_TYPE_TESTNET.tx_hash,
                 REWARD_SMT_TYPE_TESTNET.index,
                 REWARD_SMT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &REWARD_SMT_TYPE_DEVNET.tx_hash,
+                REWARD_SMT_TYPE_DEVNET.index,
+                REWARD_SMT_TYPE_DEVNET.dep_type
             ),
         }
     }

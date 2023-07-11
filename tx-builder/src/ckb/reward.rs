@@ -369,9 +369,17 @@ where
     }
 
     async fn commission_rate(&self, staker: &H160, cell_deps: &mut Vec<CellDep>) -> Result<u8> {
+        let requirement_type_id = Stake::get_delegate_requirement_type_id(
+            self.ckb,
+            &self.type_ids.metadata_type_id,
+            staker,
+            &self.type_ids.xudt_owner,
+        )
+        .await?;
+
         let delegate_requirement_cell = Delegate::get_requirement_cell(
             self.ckb,
-            Delegate::requirement_type(&self.type_ids.metadata_type_id, staker),
+            Delegate::requirement_type(&self.type_ids.metadata_type_id, &requirement_type_id),
         )
         .await?;
 

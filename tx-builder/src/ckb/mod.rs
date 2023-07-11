@@ -2,6 +2,7 @@ pub mod checkpoint;
 mod define;
 pub mod delegate;
 pub mod delegate_smt;
+pub mod faucet;
 pub mod helper;
 pub mod init;
 pub mod metadata;

@@ -30,6 +30,11 @@ impl Metadata {
                 METADATA_TYPE_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &METADATA_TYPE_DEVNET.code_hash,
+                METADATA_TYPE_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -44,6 +49,11 @@ impl Metadata {
                 &METADATA_TYPE_TESTNET.tx_hash,
                 METADATA_TYPE_TESTNET.index,
                 METADATA_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &METADATA_TYPE_DEVNET.tx_hash,
+                METADATA_TYPE_DEVNET.index,
+                METADATA_TYPE_DEVNET.dep_type
             ),
         }
     }

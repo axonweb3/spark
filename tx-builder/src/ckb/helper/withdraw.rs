@@ -47,6 +47,11 @@ impl Withdraw {
                 WITHDRAW_LOCK_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &WITHDRAW_LOCK_DEVNET.code_hash,
+                WITHDRAW_LOCK_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -61,6 +66,11 @@ impl Withdraw {
                 &WITHDRAW_LOCK_TESTNET.tx_hash,
                 WITHDRAW_LOCK_TESTNET.index,
                 WITHDRAW_LOCK_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &WITHDRAW_LOCK_DEVNET.tx_hash,
+                WITHDRAW_LOCK_DEVNET.index,
+                WITHDRAW_LOCK_DEVNET.dep_type
             ),
         }
     }

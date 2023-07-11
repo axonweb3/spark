@@ -38,6 +38,7 @@ pub type NonTopDelegators = HashMap<Delegator, HashMap<Staker, InDelegateSmt>>;
 pub enum NetworkType {
     Mainnet,
     Testnet,
+    Devnet,
 }
 
 impl<'a> Deserialize<'a> for NetworkType {
@@ -225,14 +226,14 @@ impl Proof {
 #[derive(Clone, Debug)]
 pub struct ProposeCount {
     pub proposer: H160,
-    pub count:    u32,
+    pub count:    u64,
 }
 
 impl From<ProposeCount> for AProposeCount {
     fn from(propose: ProposeCount) -> Self {
         AProposeCount::new_builder()
             .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
-            .count(to_uint32(propose.count))
+            .count(to_uint64(propose.count))
             .build()
     }
 }

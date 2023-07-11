@@ -30,6 +30,11 @@ impl Checkpoint {
                 CHECKPOINT_TYPE_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &CHECKPOINT_TYPE_DEVNET.code_hash,
+                CHECKPOINT_TYPE_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -44,6 +49,11 @@ impl Checkpoint {
                 &CHECKPOINT_TYPE_TESTNET.tx_hash,
                 CHECKPOINT_TYPE_TESTNET.index,
                 CHECKPOINT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &CHECKPOINT_TYPE_DEVNET.tx_hash,
+                CHECKPOINT_TYPE_DEVNET.index,
+                CHECKPOINT_TYPE_DEVNET.dep_type
             ),
         }
     }

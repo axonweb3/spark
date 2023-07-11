@@ -24,6 +24,10 @@ delegator_privkeys = [
 
 # Run
 ```
+cd spark/devtools/tx-tests
+
+cargo run -- -f  // faucet (only used on the dev chain)
+
 cargo run -- -i  // init tx
 
 cargo run -- -m  // mint tx

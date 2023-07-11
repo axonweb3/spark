@@ -28,6 +28,11 @@ impl Xudt {
                 XUDT_TYPE_TESTNET.hash_type,
                 owner_lock_hash.as_bytes()
             ),
+            NetworkType::Devnet => script!(
+                &XUDT_TYPE_DEVNET.code_hash,
+                XUDT_TYPE_DEVNET.hash_type,
+                owner_lock_hash.as_bytes()
+            ),
         }
     }
 
@@ -42,6 +47,11 @@ impl Xudt {
                 &XUDT_TYPE_TESTNET.tx_hash,
                 XUDT_TYPE_TESTNET.index,
                 XUDT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &XUDT_TYPE_DEVNET.tx_hash,
+                XUDT_TYPE_DEVNET.index,
+                XUDT_TYPE_DEVNET.dep_type
             ),
         }
     }
