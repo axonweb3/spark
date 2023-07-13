@@ -12,7 +12,7 @@ use axon_types::{
     stake::StakeInfoDelta,
 };
 use ckb_types::{H160, H256};
-use molecule::prelude::{Builder, Byte, Entity};
+use molecule::prelude::{Builder, Byte, Entity, Reader};
 use rlp::Encodable;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
@@ -282,9 +282,44 @@ pub struct Metadata {
     pub block_height:    u64,
 }
 
+impl From<AMetadata> for Metadata {
+    fn from(meta: AMetadata) -> Self {
+        let r = meta.as_reader();
+        Metadata {
+            epoch_len:       to_u32(&r.epoch_len().to_entity()),
+            period_len:      to_u32(&r.period_len().to_entity()),
+            quorum:          to_u16(&r.quorum().to_entity()),
+            gas_limit:       to_u64(&r.gas_limit().to_entity()),
+            gas_price:       to_u64(&r.gas_price().to_entity()),
+            interval:        to_u32(&r.interval().to_entity()),
+            validators:      {
+                let mut res = Vec::with_capacity(r.validators().item_count());
+                for i in r.validators().to_entity() {
+                    res.push(Validator {
+                        bls_pub_key:    i.bls_pub_key(),
+                        pub_key:        i.pub_key(),
+                        address:        H160::from_slice(&i.address().raw_data()).unwrap(),
+                        propose_weight: to_u32(&i.propose_weight()),
+                        vote_weight:    to_u32(&i.vote_weight()),
+                        propose_count:  to_u64(&i.propose_count()),
+                    })
+                }
+                res
+            },
+            propose_ratio:   to_u32(&r.propose_ratio().to_entity()),
+            prevote_ratio:   to_u32(&r.prevote_ratio().to_entity()),
+            precommit_ratio: to_u32(&r.precommit_ratio().to_entity()),
+            brake_ratio:     to_u32(&r.brake_ratio().to_entity()),
+            tx_num_limit:    to_u32(&r.tx_num_limit().to_entity()),
+            max_tx_size:     to_u32(&r.max_tx_size().to_entity()),
+            block_height:    to_u64(&r.block_height().to_entity()),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Validator {
-    pub bls_pub_key:    bytes::Bytes,
+    pub bls_pub_key:    Byte48,
     pub pub_key:        Byte65,
     pub address:        H160,
     pub propose_weight: u32,
@@ -295,7 +330,7 @@ pub struct Validator {
 impl From<Validator> for AValidator {
     fn from(validator: Validator) -> Self {
         AValidator::new_builder()
-            .bls_pub_key(Byte48::from_slice(&validator.bls_pub_key).unwrap())
+            .bls_pub_key(validator.bls_pub_key)
             .pub_key(validator.pub_key)
             .address(Identity::from_slice(validator.address.as_bytes()).unwrap())
             .propose_weight(to_uint32(validator.propose_weight))

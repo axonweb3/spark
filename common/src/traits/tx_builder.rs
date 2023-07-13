@@ -111,6 +111,7 @@ pub trait IMetadataTxBuilder<'a, C, PSmt> {
         ckb: &'a C,
         kicker: PrivateKey,
         quorum: u16,
+        type_ids: TypeIds,
         last_metadata: Metadata,
         last_checkpoint: Checkpoint,
         smt: PSmt,

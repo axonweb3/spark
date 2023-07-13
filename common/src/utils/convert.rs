@@ -30,6 +30,12 @@ pub fn to_u32(v: &Uint32) -> u32 {
     u32::from_le_bytes(array)
 }
 
+pub fn to_u16(v: &Uint16) -> u16 {
+    let mut array: [u8; 2] = [0u8; 2];
+    array.copy_from_slice(v.as_slice());
+    u16::from_le_bytes(array)
+}
+
 pub fn to_bool(v: &Byte) -> bool {
     v.as_slice()[0].eq(&1)
 }

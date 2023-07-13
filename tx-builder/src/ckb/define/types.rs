@@ -259,6 +259,14 @@ impl From<DelegateAtCellData> for ADelegateAtCellData {
     }
 }
 
+impl From<ADelegateAtCellData> for DelegateAtCellData {
+    fn from(value: ADelegateAtCellData) -> Self {
+        DelegateAtCellData {
+            lock: value.lock().into(),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct DelegateAtCellLockData {
     // pub version:          u8, // useless
@@ -281,6 +289,26 @@ impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
     }
 }
 
+impl From<ADelegateAtCellLockData> for DelegateAtCellLockData {
+    fn from(value: ADelegateAtCellLockData) -> Self {
+        let mut res = Vec::with_capacity(value.delegator_infos().item_count());
+
+        for i in value.delegator_infos().into_iter() {
+            res.push(DelegateItem {
+                staker:             H160::from_slice(&i.staker().raw_data()).unwrap(),
+                total_amount:       to_u128(&i.total_amount()),
+                is_increase:        to_bool(&i.is_increase()),
+                amount:             to_u128(&i.amount()),
+                inauguration_epoch: to_u64(&i.inauguration_epoch()),
+            })
+        }
+
+        DelegateAtCellLockData {
+            delegator_infos: res,
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct WithdrawAtCellData {
     pub lock: WithdrawAtCellLockData,
@@ -291,6 +319,14 @@ impl From<WithdrawAtCellData> for AWithdrawAtCellData {
         AWithdrawAtCellData::new_builder()
             .lock(value.lock.into())
             .build()
+    }
+}
+
+impl From<AWithdrawAtCellData> for WithdrawAtCellData {
+    fn from(value: AWithdrawAtCellData) -> Self {
+        WithdrawAtCellData {
+            lock: value.lock().into(),
+        }
     }
 }
 
@@ -314,6 +350,14 @@ impl From<WithdrawAtCellLockData> for AWithdrawAtCellLockData {
     }
 }
 
+impl From<AWithdrawAtCellLockData> for WithdrawAtCellLockData {
+    fn from(value: AWithdrawAtCellLockData) -> Self {
+        WithdrawAtCellLockData {
+            withdraw_infos: value.withdraw_infos().into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct WithdrawInfo {
     pub amount: u128,
@@ -326,6 +370,15 @@ impl From<WithdrawInfo> for AWithdrawInfo {
             .amount(to_uint128(value.amount))
             .unlock_epoch(to_uint64(value.epoch))
             .build()
+    }
+}
+
+impl From<AWithdrawInfo> for WithdrawInfo {
+    fn from(value: AWithdrawInfo) -> Self {
+        WithdrawInfo {
+            amount: to_u128(&value.amount()),
+            epoch:  to_u64(&value.unlock_epoch()),
+        }
     }
 }
 
