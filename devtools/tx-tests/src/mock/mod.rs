@@ -1,7 +1,9 @@
 use axon_tools::types::{AxonBlock, Metadata, Proof, H256};
 use serde::de::DeserializeOwned;
 
+use common::types::axon_types::basic::Byte48;
 use common::types::tx_builder::{Proof as TProof, Proposal as TProposal, Validator as TValidator};
+use molecule::prelude::Entity;
 
 fn read_json<T: DeserializeOwned>(path: &str) -> T {
     let json = std::fs::read_to_string(path).unwrap();
@@ -30,7 +32,7 @@ pub fn mock_axon_validators() -> Vec<TValidator> {
         .verifier_list
         .iter()
         .map(|v| TValidator {
-            bls_pub_key: v.bls_pub_key.clone(),
+            bls_pub_key: Byte48::new_unchecked(v.bls_pub_key.clone()),
             address: ckb_types::H160::from_slice(v.address.as_bytes()).unwrap(),
             propose_weight: v.propose_weight,
             vote_weight: v.vote_weight,

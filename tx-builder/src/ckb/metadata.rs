@@ -4,8 +4,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput, Script},
-    prelude::{Entity, Pack},
+    packed::{CellInput, CellOutput, WitnessArgs},
+    prelude::{Entity, Pack, Reader},
 };
 use ethereum_types::H160;
 
@@ -15,19 +15,28 @@ use common::traits::{
     tx_builder::IMetadataTxBuilder,
 };
 use common::types::axon_types::{
-    basic::Byte65, delegate::DelegateAtCellData as ADelegateAtCellData,
+    delegate::{
+        DelegateAtCellData as ADelegateAtCellData, DelegateSmtCellData as ADelegateSmtCellData,
+    },
     metadata::MetadataCellData as AMetadataCellData,
+    stake::{StakeAtCellData as AStakeAtCellData, StakeSmtCellData as AStakeSmtCellData},
     withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
 use common::types::tx_builder::*;
+use molecule::prelude::Builder;
 
+use crate::ckb::define::constants::*;
 use crate::ckb::define::types::*;
-use crate::ckb::helper::Metadata as HMetadata;
+use crate::ckb::helper::{
+    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate as HDelegate, Metadata as HMetadata,
+    OmniEth, Secp256k1, Stake as HStake, Withdraw, Xudt,
+};
 
 pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
-    _ckb:            &'a C,
+    ckb:             &'a C,
     _kicker:         PrivateKey,
     quorum:          u16,
+    type_ids:        TypeIds,
     last_checkpoint: Checkpoint,
     last_metadata:   Metadata,
     smt:             PSmt,
@@ -39,17 +48,19 @@ where
     PSmt: ProposalSmtStorage + StakeSmtStorage + DelegateSmtStorage + Send + 'static + Sync,
 {
     fn new(
-        _ckb: &'a C,
+        ckb: &'a C,
         _kicker: PrivateKey,
         quorum: u16,
+        type_ids: TypeIds,
         last_metadata: Metadata,
         last_checkpoint: Checkpoint,
         smt: PSmt,
     ) -> Self {
         Self {
-            _ckb,
+            ckb,
             _kicker,
             quorum,
+            type_ids,
             last_checkpoint,
             last_metadata,
             smt,
@@ -57,8 +68,42 @@ where
     }
 
     async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers, NonTopDelegators)> {
-        // todo: get metadata cell, stake smt cell, delegate smt cell
-        let inputs = vec![];
+        let metadata_type = HMetadata::type_(&self.type_ids.metadata_type_id);
+
+        let last_metadata_cell = HMetadata::get_cell(self.ckb, metadata_type.clone()).await?;
+
+        let last_metadata_cell_data =
+            AMetadataCellData::new_unchecked(last_metadata_cell.output_data.unwrap().into_bytes());
+
+        let stake_smt = HStake::smt_type(&self.type_ids.stake_smt_type_id);
+
+        let last_stake_smt_cell = HStake::get_smt_cell(self.ckb, stake_smt.clone()).await?;
+
+        let delegate_smt = HDelegate::smt_type(&self.type_ids.delegate_smt_type_id);
+
+        let last_delegate_smt_cell =
+            HDelegate::get_smt_cell(self.ckb, delegate_smt.clone()).await?;
+
+        let mut inputs = vec![
+            // metadata
+            CellInput::new_builder()
+                .previous_output(last_metadata_cell.out_point.into())
+                .build(),
+            // stake smt
+            CellInput::new_builder()
+                .previous_output(last_stake_smt_cell.out_point.into())
+                .build(),
+            // delegate smt
+            CellInput::new_builder()
+                .previous_output(last_delegate_smt_cell.out_point.into())
+                .build(),
+        ];
+
+        let mut witnesses = vec![
+            WitnessArgs::default().as_bytes(),
+            WitnessArgs::default().as_bytes(),
+            WitnessArgs::default().as_bytes(),
+        ];
 
         ProposalSmtStorage::insert(
             &self.smt,
@@ -70,6 +115,8 @@ where
                 .collect(),
         )
         .await?;
+
+        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
 
         struct EpochStakeInfo {
             staker:     common::types::H160,
@@ -270,20 +317,27 @@ where
             })
         }
 
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
         let new_metadata = {
             let mut new_validators: Vec<Validator> = Vec::with_capacity(validators.len());
+
             for v in validators {
+                let stake_lock = HStake::lock(&self.type_ids.metadata_type_id, &v.staker.0.into());
+                let stake_cell = HStake::get_cell(self.ckb, stake_lock, xudt.clone())
+                    .await?
+                    .expect("Must have stake AT cell");
+                let mut stake_data = stake_cell.output_data.unwrap().into_bytes();
+                let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
+
                 new_validators.push(Validator {
-                    // todo: fetch validators' blspubkey pubkey to build metadata
-                    bls_pub_key:    bytes::Bytes::default(),
-                    // todo: fetch validators' blspubkey pubkey to build metadata
-                    pub_key:        Byte65::default(),
+                    bls_pub_key:    stake_data.as_reader().lock().bls_pub_key().to_entity(),
+                    pub_key:        stake_data.as_reader().lock().l1_pub_key().to_entity(),
                     address:        v.staker.0.into(),
-                    // todo
-                    propose_weight: 0,
-                    // todo
-                    vote_weight:    0,
-                    // new epoch start with all zero?
+                    // field not enabled
+                    propose_weight: 1,
+                    // field not enabled
+                    vote_weight:    1,
+                    // new epoch start with all zero
                     propose_count:  0,
                 })
             }
@@ -306,24 +360,31 @@ where
             }
         };
 
-        // fetch metadata cell data
-        let mut metadata_cell_data = MetadataCellData {
-            metadata: vec![Metadata::default(), Metadata::default()],
-            ..Default::default()
+        // new metadata cell data
+        let metadata_cell_data = MetadataCellData {
+            metadata: vec![
+                last_metadata_cell_data
+                    .as_reader()
+                    .metadata()
+                    .get(1)
+                    .unwrap()
+                    .to_entity()
+                    .into(),
+                new_metadata,
+            ],
+
+            epoch:                  self.last_checkpoint.epoch + 2,
+            propose_count_smt_root: Into::<[u8; 32]>::into(proposal_count_smt_root).into(),
+            type_ids:               self.type_ids.clone(),
         };
 
-        // update metadata
-        metadata_cell_data.epoch = self.last_checkpoint.epoch + 2;
-        metadata_cell_data.metadata.remove(0);
-        metadata_cell_data.metadata.push(new_metadata);
-
-        let _stake_smt_cell_data = StakeSmtCellData {
+        let stake_smt_cell_data = StakeSmtCellData {
             smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
             metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
                 .calc_script_hash(),
         };
 
-        let _delegate_smt_cell_data = DelegateSmtCellData {
+        let delegate_smt_cell_data = DelegateSmtCellData {
             smt_roots:          delegator_staker_smt_roots,
             metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
                 .calc_script_hash(),
@@ -339,26 +400,38 @@ where
 
         for (addr, amount) in no_top_stakers.iter() {
             *withdraw_set.entry(*addr).or_default() += amount;
-            // todo: fetch staker AT cell data
-            // AT cell data is u128 le bytes(total amount) + StakeAtCellData molecule data,
-            // here just a mock no top staker just change these staker's AT cell
-            // total amount
-            let data = bytes::Bytes::from(Vec::from(999u128.to_le_bytes()));
-            no_top_staker_cell_inputs.push(CellInput::default());
-            no_top_staker_cell_outputs.push(CellOutput::default());
+
+            let stake_lock = HStake::lock(&self.type_ids.metadata_type_id, &addr.0.into());
+            let stake_cell = HStake::get_cell(self.ckb, stake_lock.clone(), xudt.clone())
+                .await?
+                .expect("Must have stake AT cell");
+            let mut stake_data = stake_cell.output_data.unwrap().into_bytes().to_vec();
+
+            no_top_staker_cell_inputs.push(
+                CellInput::new_builder()
+                    .previous_output(stake_cell.out_point.into())
+                    .build(),
+            );
 
             let total_amount = {
                 let mut total = [0u8; 16];
-                total.copy_from_slice(&data[0..16]);
+                total.copy_from_slice(&stake_data[0..16]);
                 u128::from_le_bytes(total) - amount
             };
 
-            let new_data = {
-                let mut res = total_amount.to_le_bytes().to_vec();
-                res.extend_from_slice(&data[16..]);
-                bytes::Bytes::from(res)
-            };
-            no_top_staker_cell_datas.push(new_data);
+            for (i, v) in total_amount.to_le_bytes().into_iter().enumerate() {
+                stake_data[i] = v
+            }
+
+            no_top_staker_cell_outputs.push(
+                CellOutput::new_builder()
+                    .lock(stake_lock.clone())
+                    .type_(Some(xudt.clone()).pack())
+                    .build_exact_capacity(Capacity::bytes(stake_data.len())?)?,
+            );
+
+            no_top_staker_cell_datas.push(bytes::Bytes::from(stake_data));
+            witnesses.push(HStake::witness(1).as_bytes());
         }
 
         // remove no top delegator
@@ -373,17 +446,35 @@ where
                     match delegator_at_cell_datas.entry(*addr) {
                         std::collections::hash_map::Entry::Occupied(v) => v.into_mut(),
                         std::collections::hash_map::Entry::Vacant(v) => {
-                            // todo: fetch delegator AT cell data
-                            // AT cell data is u128 le bytes(total amount) +
-                            // DelegateAtCellData molecule
-                            // data, here just a mock no top delegator just change
-                            // these delegator's AT cell
-                            // total amount
-                            no_top_delegator_cell_inputs.push(CellInput::default());
+                            let delegate_lock =
+                                HDelegate::lock(&self.type_ids.delegate_code_hash, &addr.0.into());
+                            let delegate_cell =
+                                HDelegate::get_cell(self.ckb, delegate_lock.clone(), xudt.clone())
+                                    .await?
+                                    .expect("Must have delegate AT cell");
+
+                            let mut delegate_data = delegate_cell.output_data.unwrap().into_bytes();
+
+                            no_top_delegator_cell_inputs.push(
+                                CellInput::new_builder()
+                                    .previous_output(delegate_cell.out_point.into())
+                                    .build(),
+                            );
                             v.insert((
-                                CellOutput::default(),
-                                999u128,
-                                DelegateAtCellData::default(),
+                                CellOutput::new_builder()
+                                    .lock(delegate_lock.clone())
+                                    .type_(Some(xudt.clone()).pack())
+                                    .build_exact_capacity(Capacity::bytes(delegate_data.len())?)?,
+                                {
+                                    let mut total = [0u8; 16];
+                                    total.copy_from_slice(&delegate_data[0..16]);
+                                    u128::from_le_bytes(total)
+                                },
+                                Into::<DelegateAtCellData>::into(
+                                    ADelegateAtCellData::new_unchecked(
+                                        delegate_data.split_off(TOKEN_BYTES),
+                                    ),
+                                ),
                             ))
                         }
                     };
@@ -397,12 +488,13 @@ where
             }
         }
 
-        let (_no_top_delegator_cell_outputs, _no_top_delegator_cell_output_datas): (
+        let (no_top_delegator_cell_outputs, no_top_delegator_cell_output_datas): (
             Vec<CellOutput>,
             Vec<bytes::Bytes>,
         ) = delegator_at_cell_datas
             .into_values()
             .map(|(cell_output, total_amount, data)| {
+                witnesses.push(HDelegate::witness(0u8).as_bytes());
                 let mut res = total_amount.to_le_bytes().to_vec();
                 res.extend((Into::<ADelegateAtCellData>::into(data)).as_slice());
                 (cell_output, bytes::Bytes::from(res))
@@ -412,13 +504,35 @@ where
         let mut withdraw_inputs: Vec<CellInput> = Vec::with_capacity(withdraw_set.len());
         let mut withdraw_outputs: Vec<CellOutput> = Vec::with_capacity(withdraw_set.len());
         let mut withdraw_output_datas: Vec<bytes::Bytes> = Vec::with_capacity(withdraw_set.len());
-        for (_addr, amount) in withdraw_set {
-            // fetch withdraw cell data
-            withdraw_inputs.push(CellInput::default());
-            withdraw_outputs.push(CellOutput::default());
-            let mut total_amount = 999u128;
-            total_amount += amount;
-            let mut withdraw_data = WithdrawAtCellData::default();
+        for (addr, amount) in withdraw_set {
+            let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, &addr.0.into());
+            let withdraw_cell = Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
+                .await?
+                .expect("Must have withdraw cell");
+
+            let mut withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
+
+            withdraw_inputs.push(
+                CellInput::new_builder()
+                    .previous_output(withdraw_cell.out_point.into())
+                    .build(),
+            );
+            withdraw_outputs.push(
+                CellOutput::new_builder()
+                    .lock(withdraw_lock)
+                    .type_(Some(xudt.clone()).pack())
+                    .build_exact_capacity(Capacity::bytes(withdraw_data.len())?)?,
+            );
+            let total_amount = {
+                let mut total = [0u8; 16];
+                total.copy_from_slice(&withdraw_data[0..16]);
+                u128::from_le_bytes(total) + amount
+            };
+            let mut withdraw_data = {
+                Into::<WithdrawAtCellData>::into(AWithdrawAtCellData::new_unchecked(
+                    withdraw_data.split_off(TOKEN_BYTES),
+                ))
+            };
             if withdraw_data
                 .lock
                 .withdraw_infos
@@ -437,41 +551,64 @@ where
                 let mut res = total_amount.to_le_bytes().to_vec();
                 res.extend(Into::<AWithdrawAtCellData>::into(withdraw_data).as_slice());
                 bytes::Bytes::from(res)
-            })
+            });
+            witnesses.push(Withdraw::witness(true).as_bytes());
         }
 
         // todo
-        let outputs_data = vec![Into::<AMetadataCellData>::into(metadata_cell_data).as_bytes()];
+        let mut outputs_data = vec![
+            Into::<AMetadataCellData>::into(metadata_cell_data).as_bytes(),
+            Into::<AStakeSmtCellData>::into(stake_smt_cell_data).as_bytes(),
+            Into::<ADelegateSmtCellData>::into(delegate_smt_cell_data).as_bytes(),
+        ];
 
-        // todo: fill lock, type
-        let fake_lock = Script::default();
-        let fake_type = Script::default();
-        let outputs = vec![
+        let mut outputs = vec![
             // metadata cell
             CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
+                .lock(AlwaysSuccess::lock())
+                .type_(Some(metadata_type).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // stake smt cell
             CellOutput::new_builder()
-                .lock(fake_lock.clone())
-                .type_(Some(fake_type.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
+                .lock(AlwaysSuccess::lock())
+                .type_(Some(stake_smt).pack())
+                .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // delegate smt cell
             CellOutput::new_builder()
-                .lock(fake_lock)
-                .type_(Some(fake_type).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
+                .lock(AlwaysSuccess::lock())
+                .type_(Some(delegate_smt).pack())
+                .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];
 
-        // todo: add removed stakers' stake AT cells to inputs and outputs and
-        //       add withdraw AT cells to outputs
+        // add no top stakers
+        inputs.extend(no_top_staker_cell_inputs);
+        outputs.extend(no_top_staker_cell_outputs);
+        outputs_data.extend(no_top_staker_cell_datas);
 
-        // todo: add removed delegators' delegate AT cells to inputs and outputs and
-        //       add withdraw AT cells to outputs
+        // add no top delegators
+        inputs.extend(no_top_delegator_cell_inputs);
+        outputs.extend(no_top_delegator_cell_outputs);
+        outputs_data.extend(no_top_delegator_cell_output_datas);
+
+        // add withdraw cells
+        inputs.extend(withdraw_inputs);
+        outputs.extend(withdraw_outputs);
+        outputs_data.extend(withdraw_output_datas);
 
         // todo
-        let cell_deps = vec![];
+        let cell_deps = vec![
+            Secp256k1::lock_dep(),
+            OmniEth::lock_dep(),
+            AlwaysSuccess::lock_dep(),
+            Xudt::type_dep(),
+            HDelegate::lock_dep(),
+            HDelegate::smt_type_dep(),
+            HStake::lock_dep(),
+            HStake::smt_type_dep(),
+            Withdraw::lock_dep(),
+            HCheckpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            HMetadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+        ];
 
         // todo: balance tx, fill placeholder witnesses,
         let tx = TransactionBuilder::default()
