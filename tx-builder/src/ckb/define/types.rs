@@ -123,6 +123,18 @@ impl From<StakerSmtRoot> for AStakerSmtRoot {
     }
 }
 
+impl From<AStakerSmtRoot> for StakerSmtRoot {
+    fn from(value: AStakerSmtRoot) -> Self {
+        let mut root = [0u8; 32];
+        root.copy_from_slice(&value.root().as_bytes());
+
+        StakerSmtRoot {
+            staker: to_h160(&value.staker()),
+            root:   root.into(),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct DelegateSmtCellData {
     // pub version:          u8, // useless
@@ -305,8 +317,8 @@ impl From<ADelegateAtCellData> for DelegateAtCellData {
 #[derive(Clone, Default)]
 pub struct DelegateAtCellLockData {
     // pub version:          u8, // useless
-    // pub l1_address:       H160, // useless
     // pub metadata_type_id: H256, // useless
+    pub l2_address:      H160,
     pub delegator_infos: Vec<DelegateItem>,
 }
 
@@ -317,8 +329,8 @@ impl From<DelegateAtCellLockData> for ADelegateAtCellLockData {
             .build();
         ADelegateAtCellLockData::new_builder()
             // .version(value.version.into()) // useless
-            // .l1_address(Identity::from_slice(value.l1_address.as_bytes()).unwrap()) // useless
             // .metadata_type_id(to_byte32(&value.metadata_type_id)) // useless
+            .l2_address(Identity::from_slice(value.l2_address.as_bytes()).unwrap()) // useless
             .delegator_infos(infos)
             .build()
     }
@@ -339,6 +351,7 @@ impl From<ADelegateAtCellLockData> for DelegateAtCellLockData {
         }
 
         DelegateAtCellLockData {
+            l2_address:      to_h160(&value.l1_address()),
             delegator_infos: res,
         }
     }

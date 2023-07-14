@@ -37,8 +37,8 @@ impl Selection {
 
     pub fn lock(issue_lock_hash: &Byte32, reward_smt_type_id: &Byte32) -> Script {
         let selectionn_args = SelectionLockArgs::new_builder()
-            .omni_lock_hash(to_axon_byte32(issue_lock_hash))
-            .reward_type_id(to_axon_byte32(reward_smt_type_id))
+            .issue_lock_hash(to_axon_byte32(issue_lock_hash))
+            .reward_smt_type_id(to_axon_byte32(reward_smt_type_id))
             .build()
             .as_bytes();
 

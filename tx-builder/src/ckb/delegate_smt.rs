@@ -14,9 +14,11 @@ use molecule::prelude::Builder;
 use common::traits::{
     ckb_rpc_client::CkbRpc, smt::DelegateSmtStorage, tx_builder::IDelegateSmtTxBuilder,
 };
+use common::types::axon_types::basic::Uint64;
 use common::types::axon_types::delegate::{
     DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
     DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
+    StakerSmtRoots,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Delegator as SmtDelegator, UserAmount};
@@ -24,7 +26,7 @@ use common::types::tx_builder::{
     Amount, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt, InStakeSmt,
     NonTopDelegators, PrivateKey, Staker as TxStaker,
 };
-use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_uint128, to_usize};
+use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_h160, to_uint128, to_usize};
 
 use crate::ckb::define::types::{DelegateInfo, StakeGroupInfo};
 use crate::ckb::define::{
@@ -72,7 +74,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
 
     async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)> {
         let delegate_smt_type = Delegate::smt_type(&self.type_ids.delegate_smt_type_id);
-
         let delegate_smt_cell = Delegate::get_smt_cell(self.ckb, delegate_smt_type.clone()).await?;
 
         let mut inputs = vec![
@@ -82,7 +83,11 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
                 .build(),
         ];
 
-        let (root, statistics, smt_witness) = self.collect().await?;
+        let smt_bytes = delegate_smt_cell.output_data.unwrap().into_bytes();
+        let delegate_smt_data = ADelegateSmtCellData::new_unchecked(smt_bytes);
+        let roots = self.get_old_roots(delegate_smt_data.smt_roots());
+
+        let (root, statistics, smt_witness) = self.collect(roots).await?;
 
         let mut outputs = vec![
             // delegate smt cell
@@ -150,6 +155,20 @@ struct Statistics {
 }
 
 impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
+    fn get_old_roots(
+        &self,
+        old_smt_roots: StakerSmtRoots,
+    ) -> HashMap<ckb_types::H160, StakerSmtRoot> {
+        let mut old_roots = HashMap::new();
+
+        for old_root in old_smt_roots.into_iter() {
+            let root = StakerSmtRoot::from(old_root);
+            old_roots.insert(root.staker.clone(), root);
+        }
+
+        old_roots
+    }
+
     async fn fill_tx(
         &self,
         statistics: &Statistics,
@@ -216,9 +235,11 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                         }
                     }
 
+                    let delegator_addr = old_delegate_data.lock().l1_address();
                     let new_delegate_data = old_delegate_data
                         .as_builder()
                         .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
+                            l2_address: to_h160(&delegator_addr),
                             delegator_infos,
                         }))
                         .build()
@@ -243,8 +264,14 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     let mut new_delegates = DelegateInfoDeltas::new_builder();
 
                     for delegate in old_delegate_data.lock().delegator_infos() {
-                        new_delegates =
-                            new_delegates.push(delegate.as_builder().amount(to_uint128(0)).build());
+                        new_delegates = new_delegates.push(
+                            delegate
+                                .as_builder()
+                                .amount(to_uint128(0))
+                                .inauguration_epoch(Uint64::default())
+                                .is_increase(0.into())
+                                .build(),
+                        );
                     }
 
                     let inner_delegate_data = old_delegate_data.lock();
@@ -299,7 +326,10 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         (total_delegate_amount, delegate_data)
     }
 
-    async fn collect(&mut self) -> Result<(Bytes, Statistics, WitnessArgs)> {
+    async fn collect(
+        &mut self,
+        mut old_smt_roots: HashMap<ckb_types::H160, StakerSmtRoot>,
+    ) -> Result<(Bytes, Statistics, WitnessArgs)> {
         let mut delegates = HashMap::new();
         self.collect_cell_delegates(&mut delegates)?;
 
@@ -386,11 +416,15 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             });
         }
 
+        for new_root in new_roots.into_iter() {
+            old_smt_roots.insert(new_root.staker.clone(), new_root.clone());
+        }
+
         Ok((
             ADelegateSmtCellData::from(DelegateSmtCellData {
                 metadata_type_hash: Metadata::type_(&self.type_ids.metadata_type_id)
                     .calc_script_hash(),
-                smt_roots:          new_roots,
+                smt_roots:          old_smt_roots.values().cloned().collect(),
             })
             .as_bytes(),
             Statistics {
@@ -414,7 +448,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
             let mut cell_bytes = cell.output_data.clone().unwrap().into_bytes();
 
-            let delegate = &DelegateAtCellData::new_unchecked(cell_bytes.split_off(TOKEN_BYTES));
+            let delegate = DelegateAtCellData::new_unchecked(cell_bytes.split_off(TOKEN_BYTES));
             let delegate_infos = delegate.lock().delegator_infos();
             let mut expired = false;
 

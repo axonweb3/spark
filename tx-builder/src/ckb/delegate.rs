@@ -31,7 +31,8 @@ pub struct DelegateTxBuilder<'a, C: CkbRpc> {
     ckb:           &'a C,
     type_ids:      StakeTypeIds,
     current_epoch: Epoch,
-    delegators:    Vec<DelegateItem>,
+    delegator:     EthAddress,
+    delegates:     Vec<DelegateItem>,
     delegate_lock: Script,
     token_lock:    Script,
     withdraw_lock: Script,
@@ -45,7 +46,7 @@ impl<'a, C: CkbRpc> IDelegateTxBuilder<'a, C> for DelegateTxBuilder<'a, C> {
         type_ids: StakeTypeIds,
         delegator: EthAddress,
         current_epoch: Epoch,
-        delegators: Vec<DelegateItem>,
+        delegates: Vec<DelegateItem>,
     ) -> Self {
         let delegate_lock = Delegate::lock(&type_ids.metadata_type_id, &delegator);
         let withdraw_lock = Withdraw::lock(&type_ids.metadata_type_id, &delegator);
@@ -56,7 +57,8 @@ impl<'a, C: CkbRpc> IDelegateTxBuilder<'a, C> for DelegateTxBuilder<'a, C> {
             ckb,
             type_ids,
             current_epoch,
-            delegators,
+            delegator,
+            delegates,
             delegate_lock,
             token_lock,
             withdraw_lock,
@@ -65,7 +67,7 @@ impl<'a, C: CkbRpc> IDelegateTxBuilder<'a, C> for DelegateTxBuilder<'a, C> {
     }
 
     async fn build_tx(&self) -> Result<TransactionView> {
-        for delegate in self.delegators.iter() {
+        for delegate in self.delegates.iter() {
             if delegate.inauguration_epoch > self.current_epoch + INAUGURATION {
                 return Err(CkbTxErr::InaugurationEpoch {
                     expected: self.current_epoch,
@@ -191,7 +193,7 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
             let mut total_increase = 0;
             let mut total_decrease = 0;
 
-            for item in self.delegators.iter() {
+            for item in self.delegates.iter() {
                 if item.is_increase {
                     total_increase += item.amount;
                 } else {
@@ -255,7 +257,7 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         let mut total_delegate_amount = 0;
         let mut delegates = vec![];
 
-        for item in self.delegators.iter() {
+        for item in self.delegates.iter() {
             if !item.is_increase {
                 return Err(CkbTxErr::Increase(item.is_increase));
             }
@@ -282,6 +284,7 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
                 total_delegate_amount,
                 DelegateAtCellData::from(TDelegateAtCellData {
                     lock: TDelegateAtCellLockData {
+                        l2_address:      self.delegator.clone(),
                         delegator_infos: delegates,
                     },
                 })
@@ -353,7 +356,7 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         let mut stakers = HashSet::new();
         let mut updated_delegates = DelegateInfoDeltas::new_builder();
 
-        for delegate in self.delegators.iter() {
+        for delegate in self.delegates.iter() {
             stakers.insert(delegate.staker.clone());
 
             if last_delegates.contains_key(&delegate.staker) {

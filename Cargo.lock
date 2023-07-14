@@ -340,7 +340,7 @@ dependencies = [
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=6dbf20a#6dbf20a2843b2eb0eb5cd02140c3e1eefd398771"
+source = "git+https://github.com/axonweb3/axon-contract?rev=e1d1fa7#e1d1fa7bfc236f445335b05845e53d76ce2cf765"
 dependencies = [
  "molecule",
  "molecule2",
@@ -2489,7 +2489,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=6dbf20a#6dbf20a2843b2eb0eb5cd02140c3e1eefd398771"
+source = "git+https://github.com/axonweb3/axon-contract?rev=e1d1fa7#e1d1fa7bfc236f445335b05845e53d76ce2cf765"
 
 [[package]]
 name = "native-tls"

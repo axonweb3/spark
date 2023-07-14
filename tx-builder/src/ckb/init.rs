@@ -19,13 +19,14 @@ use common::types::axon_types::{
     metadata::MetadataCellData as AMetadataCellData,
     reward::RewardSmtCellData as ARewardSmtCellData, stake::StakeSmtCellData as AStakeSmtCellData,
 };
+use common::types::smt::Root as SmtRoot;
 use common::types::tx_builder::*;
 use common::utils::convert::{to_axon_byte32, to_h256};
 
 use crate::ckb::define::constants::START_EPOCH;
 use crate::ckb::define::scripts::*;
 use crate::ckb::define::types::{
-    DelegateSmtCellData, MetadataCellData, RewardSmtCellData, StakeSmtCellData,
+    DelegateSmtCellData, MetadataCellData, RewardSmtCellData, StakeSmtCellData, StakerSmtRoot,
 };
 use crate::ckb::helper::{
     AlwaysSuccess, Checkpoint as HCheckpoint, Delegate, Metadata as HMetadata, OmniEth, Reward,
@@ -39,6 +40,7 @@ pub struct InitTxBuilder<'a, C: CkbRpc> {
     max_supply: Amount,
     checkpoint: Checkpoint,
     metadata:   Metadata,
+    stakers:    Vec<StakerEthAddr>,
 }
 
 #[async_trait]
@@ -49,6 +51,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
         max_supply: Amount,
         checkpoint: Checkpoint,
         metadata: Metadata,
+        stakers: Vec<StakerEthAddr>,
     ) -> Self {
         Self {
             ckb,
@@ -56,6 +59,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             max_supply,
             checkpoint,
             metadata,
+            stakers,
         }
     }
 
@@ -160,7 +164,20 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             // stake smt cell data
             AStakeSmtCellData::default().as_bytes(),
             // delegate smt cell data
-            ADelegateSmtCellData::default().as_bytes(),
+            ADelegateSmtCellData::from(DelegateSmtCellData {
+                metadata_type_hash: HMetadata::type_(&H256::default()).calc_script_hash(),
+                smt_roots:          {
+                    let mut smt_roots = vec![];
+                    for staker in self.stakers.clone() {
+                        smt_roots.push(StakerSmtRoot {
+                            staker,
+                            root: SmtRoot::default(),
+                        });
+                    }
+                    smt_roots
+                },
+            })
+            .as_bytes(),
             // reward smt cell data
             ARewardSmtCellData::default().as_bytes(),
         ]
@@ -348,7 +365,16 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
         // delegate smt cell data
         outputs_data[5] = ADelegateSmtCellData::from(DelegateSmtCellData {
             metadata_type_hash: metadata_type_hash.clone(),
-            ..Default::default()
+            smt_roots:          {
+                let mut smt_roots = vec![];
+                for staker in self.stakers.clone() {
+                    smt_roots.push(StakerSmtRoot {
+                        staker,
+                        root: SmtRoot::default(),
+                    });
+                }
+                smt_roots
+            },
         })
         .as_bytes()
         .pack();

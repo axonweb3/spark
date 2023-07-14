@@ -37,7 +37,9 @@ pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
     .unwrap();
 
     let path = PathBuf::from(ROCKSDB_PATH);
-    fs::remove_dir_all(path.clone()).unwrap();
+    if std::path::Path::new(ROCKSDB_PATH).exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
     let smt = SmtManager::new(path);
 
     let (tx, _) = StakeSmtTxBuilder::new(

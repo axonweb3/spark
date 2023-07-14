@@ -18,6 +18,7 @@ pub trait IInitTxBuilder<'a, C: CkbRpc> {
         max_supply: Amount,
         checkpoint: Checkpoint,
         metadata: Metadata,
+        stakers: Vec<StakerEthAddr>,
     ) -> Self;
 
     async fn build_tx(&self) -> Result<(TransactionView, TypeIds)>;
