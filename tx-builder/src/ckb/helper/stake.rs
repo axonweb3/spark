@@ -5,18 +5,22 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
+use common::types::axon_types::basic::Byte65;
 use common::types::axon_types::stake::{
-    StakeArgs, StakeAtWitness, StakeInfoDelta, StakeSmtWitness as AStakeSmtWitness,
+    StakeArgs, StakeAtCellData, StakeAtWitness, StakeInfoDelta, StakeSmtWitness as AStakeSmtWitness,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::{NetworkType, StakeItem};
 use common::utils::convert::*;
 
+use crate::ckb::define::constants::TOKEN_BYTES;
+use crate::ckb::define::error::CkbTxErr;
 use crate::ckb::define::scripts::*;
 use crate::ckb::define::types::{StakeInfo, StakeSmtUpdateInfo, StakeSmtWitness};
 use crate::ckb::helper::ckb::cell_collector::{get_cell_by_scripts, get_cell_by_type};
 use crate::ckb::helper::metadata::Metadata;
 use crate::ckb::helper::unique_cell_dep;
+use crate::ckb::helper::xudt::Xudt;
 use crate::ckb::NETWORK_TYPE;
 use crate::{cell_dep, out_point, script};
 
@@ -42,6 +46,11 @@ impl Stake {
                 STAKE_LOCK_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &STAKE_LOCK_DEVNET.code_hash,
+                STAKE_LOCK_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -56,6 +65,11 @@ impl Stake {
             NetworkType::Testnet => script!(
                 &STAKE_SMT_TYPE_TESTNET.code_hash,
                 STAKE_SMT_TYPE_TESTNET.hash_type,
+                args
+            ),
+            NetworkType::Devnet => script!(
+                &STAKE_SMT_TYPE_DEVNET.code_hash,
+                STAKE_SMT_TYPE_DEVNET.hash_type,
                 args
             ),
         }
@@ -73,6 +87,11 @@ impl Stake {
                 STAKE_LOCK_TESTNET.index,
                 STAKE_LOCK_TESTNET.dep_type
             ),
+            NetworkType::Devnet => cell_dep!(
+                &STAKE_LOCK_DEVNET.tx_hash,
+                STAKE_LOCK_DEVNET.index,
+                STAKE_LOCK_DEVNET.dep_type
+            ),
         }
     }
 
@@ -87,6 +106,11 @@ impl Stake {
                 &STAKE_SMT_TYPE_TESTNET.tx_hash,
                 STAKE_SMT_TYPE_TESTNET.index,
                 STAKE_SMT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &STAKE_SMT_TYPE_DEVNET.tx_hash,
+                STAKE_SMT_TYPE_DEVNET.index,
+                STAKE_SMT_TYPE_DEVNET.dep_type
             ),
         }
     }
@@ -116,10 +140,11 @@ impl Stake {
     }
 
     pub fn witness(mode: u8) -> WitnessArgs {
-        let lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
+        let mut lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
 
-        if mode == 0 { // staker unlock
-             // todo: eth sig placeholder
+        if mode == 0 {
+            // staker unlocking
+            lock_field = lock_field.as_builder().eth_sig(Byte65::default()).build();
         }
 
         WitnessArgs::new_builder()
@@ -144,5 +169,33 @@ impl Stake {
         WitnessArgs::new_builder()
             .input_type(Some(type_field.as_bytes()).pack())
             .build()
+    }
+
+    pub async fn get_delegate_requirement_type_id(
+        ckb_rpc: &impl CkbRpc,
+        metadata_type_id: &H256,
+        staker: &H160,
+        xudt_owner: &H256,
+    ) -> Result<H256> {
+        let stake_cell = Stake::get_cell(
+            ckb_rpc,
+            Self::lock(metadata_type_id, staker),
+            Xudt::type_(&xudt_owner.pack()),
+        )
+        .await?;
+
+        if stake_cell.is_none() {
+            return Err(CkbTxErr::CellNotFound("StakeAT".to_owned()).into());
+        }
+
+        let mut stake_data = stake_cell.unwrap().output_data.unwrap().into_bytes();
+        let stake_data = StakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
+        let delegate_requirement_type_id = stake_data
+            .lock()
+            .requirement_info()
+            .requirement()
+            .requirement_type_id();
+
+        Ok(H256::from_slice(&delegate_requirement_type_id.as_bytes())?)
     }
 }

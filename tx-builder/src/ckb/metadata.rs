@@ -111,7 +111,7 @@ where
             self.last_checkpoint
                 .propose_count
                 .iter()
-                .map(|v| (v.proposer.0.into(), v.count as u64))
+                .map(|v| (v.proposer.0.into(), v.count))
                 .collect(),
         )
         .await?;

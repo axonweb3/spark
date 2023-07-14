@@ -43,6 +43,11 @@ impl Delegate {
                 DELEGATE_LOCK_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &DELEGATE_LOCK_DEVNET.code_hash,
+                DELEGATE_LOCK_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
@@ -60,16 +65,20 @@ impl Delegate {
                 DELEGATE_SMT_TYPE_TESTNET.hash_type,
                 args
             ),
+            NetworkType::Devnet => script!(
+                &DELEGATE_SMT_TYPE_DEVNET.code_hash,
+                DELEGATE_SMT_TYPE_DEVNET.hash_type,
+                args
+            ),
         }
     }
 
-    // todo
-    pub fn requirement_type(metadata_type_id: &H256, _staker_addr: &H160) -> Script {
+    pub fn requirement_type(metadata_type_id: &H256, requirement_type_id: &H256) -> Script {
         let metadata_type_hash = Metadata::type_(metadata_type_id).calc_script_hash();
 
         let args = DelegateRequirementArgs::new_builder()
             .metadata_type_id(to_axon_byte32(&metadata_type_hash))
-            // .requirement_type_id(to_byte32(&requirement_type_id))
+            .requirement_type_id(to_byte32(requirement_type_id))
             .build()
             .as_bytes();
 
@@ -82,6 +91,11 @@ impl Delegate {
             NetworkType::Testnet => script!(
                 &DELEGATE_REQUIREMENT_TYPE_TESTNET.code_hash,
                 DELEGATE_REQUIREMENT_TYPE_TESTNET.hash_type,
+                args
+            ),
+            NetworkType::Devnet => script!(
+                &DELEGATE_REQUIREMENT_TYPE_DEVNET.code_hash,
+                DELEGATE_REQUIREMENT_TYPE_DEVNET.hash_type,
                 args
             ),
         }
@@ -99,6 +113,11 @@ impl Delegate {
                 DELEGATE_LOCK_TESTNET.index,
                 DELEGATE_LOCK_TESTNET.dep_type
             ),
+            NetworkType::Devnet => cell_dep!(
+                &DELEGATE_LOCK_DEVNET.tx_hash,
+                DELEGATE_LOCK_DEVNET.index,
+                DELEGATE_LOCK_DEVNET.dep_type
+            ),
         }
     }
 
@@ -113,6 +132,11 @@ impl Delegate {
                 &DELEGATE_SMT_TYPE_TESTNET.tx_hash,
                 DELEGATE_SMT_TYPE_TESTNET.index,
                 DELEGATE_SMT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &DELEGATE_SMT_TYPE_DEVNET.tx_hash,
+                DELEGATE_SMT_TYPE_DEVNET.index,
+                DELEGATE_SMT_TYPE_DEVNET.dep_type
             ),
         }
     }
@@ -132,6 +156,11 @@ impl Delegate {
                 &DELEGATE_REQUIREMENT_TYPE_TESTNET.tx_hash,
                 DELEGATE_REQUIREMENT_TYPE_TESTNET.index,
                 DELEGATE_REQUIREMENT_TYPE_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &DELEGATE_REQUIREMENT_TYPE_DEVNET.tx_hash,
+                DELEGATE_REQUIREMENT_TYPE_DEVNET.index,
+                DELEGATE_REQUIREMENT_TYPE_DEVNET.dep_type
             ),
         }
     }
@@ -168,7 +197,7 @@ impl Delegate {
     pub fn witness(mode: u8) -> WitnessArgs {
         let lock_field = DelegateAtWitness::new_builder().mode(mode.into()).build();
 
-        if mode == 0 { // staker unlock
+        if mode == 0 { // delegator unlocking
              // todo: eth sig placeholder
         }
 

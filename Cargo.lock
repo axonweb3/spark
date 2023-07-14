@@ -340,7 +340,7 @@ dependencies = [
 [[package]]
 name = "axon-types"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=0c3f0db#0c3f0db37fb6d3f33ee08434498723d01f12ef68"
+source = "git+https://github.com/axonweb3/axon-contract?rev=6dbf20a#6dbf20a2843b2eb0eb5cd02140c3e1eefd398771"
 dependencies = [
  "molecule",
  "molecule2",
@@ -2489,7 +2489,7 @@ dependencies = [
 [[package]]
 name = "molecule2"
 version = "0.1.0"
-source = "git+https://github.com/axonweb3/axon-contract?rev=0c3f0db#0c3f0db37fb6d3f33ee08434498723d01f12ef68"
+source = "git+https://github.com/axonweb3/axon-contract?rev=6dbf20a#6dbf20a2843b2eb0eb5cd02140c3e1eefd398771"
 
 [[package]]
 name = "native-tls"
@@ -4456,6 +4456,7 @@ dependencies = [
  "anyhow",
  "axon-tools",
  "bytes",
+ "ckb-jsonrpc-types",
  "ckb-types",
  "clap 4.2.7",
  "common",

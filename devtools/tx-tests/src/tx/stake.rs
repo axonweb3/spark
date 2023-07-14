@@ -104,6 +104,9 @@ async fn stake_tx(
     .await
     .unwrap();
 
+    // let json_tx = ckb_jsonrpc_types::TransactionView::from(tx);
+    // println!("{}", serde_json::to_string_pretty(&json_tx).unwrap());
+
     let mut tx = Tx::new(ckb, tx);
     let script_groups = tx.gen_script_group().await.unwrap();
     let signer = omni_eth.signer().unwrap();

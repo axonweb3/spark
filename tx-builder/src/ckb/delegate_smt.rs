@@ -33,7 +33,7 @@ use crate::ckb::define::{
     types::{DelegateAtCellLockData, DelegateSmtCellData, StakerSmtRoot},
 };
 use crate::ckb::helper::{
-    token_cell_data, AlwaysSuccess, Checkpoint, Delegate, Metadata, OmniEth, Secp256k1, Tx,
+    token_cell_data, AlwaysSuccess, Checkpoint, Delegate, Metadata, OmniEth, Secp256k1, Stake, Tx,
     Withdraw, Xudt,
 };
 
@@ -541,9 +541,17 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
     }
 
     async fn get_maximum_delegators(&self, staker: &TxStaker) -> Result<usize> {
+        let requirement_type_id = Stake::get_delegate_requirement_type_id(
+            self.ckb,
+            &self.type_ids.metadata_type_id,
+            staker,
+            &self.type_ids.xudt_owner,
+        )
+        .await?;
+
         let delegate_requirement_cell = Delegate::get_requirement_cell(
             self.ckb,
-            Delegate::requirement_type(&self.type_ids.metadata_type_id, staker),
+            Delegate::requirement_type(&self.type_ids.metadata_type_id, &requirement_type_id),
         )
         .await?;
 

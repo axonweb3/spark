@@ -151,7 +151,7 @@ impl StakeSmtStorage for SmtManager {
         let leaves = StakeSmtStorage::get_sub_leaves(self, epoch).await?;
         StakeSmtStorage::remove(self, epoch, leaves.into_keys().collect()).await?;
 
-        let new_stakers = stakers
+        let new_stakers: Vec<(H256, LeafValue)> = stakers
             .iter()
             .map(|s| {
                 (

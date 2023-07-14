@@ -20,9 +20,11 @@ use common::types::axon_types::{
         RewardStakeInfos as ARewardStakeInfos, RewardWitness as ARewardWitness,
     },
     stake::{
-        StakeAtCellData as AStakeAtCellData, StakeAtCellLockData as AStakeAtCellLockData,
-        StakeInfo as AStakeInfo, StakeInfos, StakeSmtCellData as AStakeSmtCellData,
-        StakeSmtUpdateInfo as AStakeSmtUpdateInfo, StakeSmtWitness as AStakeSmtWitness,
+        DelegateRequirementArgs as ADelegateRequirementArgs,
+        DelegateRequirementInfo as ADelegateRequirementInfo, StakeAtCellData as AStakeAtCellData,
+        StakeAtCellLockData as AStakeAtCellLockData, StakeInfo as AStakeInfo, StakeInfos,
+        StakeSmtCellData as AStakeSmtCellData, StakeSmtUpdateInfo as AStakeSmtUpdateInfo,
+        StakeSmtWitness as AStakeSmtWitness,
     },
     withdraw::{
         WithdrawAtCellData as AWithdrawAtCellData,
@@ -225,23 +227,56 @@ impl From<StakeAtCellData> for AStakeAtCellData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct StakeAtCellLockData {
     // pub version:          u8, // useless
     // pub l1_address:       H160, // useless
-    // pub l2_address:       H160, // useless
     // pub metadata_type_id: H256, // useless
-    pub l1_pub_key:  Byte65,
-    pub bls_pub_key: Byte48,
-    pub stake_info:  StakeItem,
+    pub l1_pub_key:       Byte65,
+    pub l2_address:       H160,
+    pub bls_pub_key:      Byte48,
+    pub stake_info:       StakeItem,
+    pub requirement_info: DelegateRequirementInfo,
 }
 
 impl From<StakeAtCellLockData> for AStakeAtCellLockData {
-    fn from(value: StakeAtCellLockData) -> Self {
+    fn from(v: StakeAtCellLockData) -> Self {
         AStakeAtCellLockData::new_builder()
-            .l1_pub_key(value.l1_pub_key)
-            .bls_pub_key(value.bls_pub_key)
-            .delta(value.stake_info.into())
+            .l1_pub_key(v.l1_pub_key)
+            .l2_address(to_identity(&v.l2_address))
+            .bls_pub_key(v.bls_pub_key)
+            .delta(v.stake_info.into())
+            .requirement_info(v.requirement_info.into())
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct DelegateRequirementInfo {
+    pub code_hash:   H256,
+    pub requirement: DelegateRequirementArgs,
+}
+
+impl From<DelegateRequirementInfo> for ADelegateRequirementInfo {
+    fn from(v: DelegateRequirementInfo) -> Self {
+        ADelegateRequirementInfo::new_builder()
+            .code_hash(to_byte32(&v.code_hash))
+            .requirement(v.requirement.into())
+            .build()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct DelegateRequirementArgs {
+    pub metadata_type_hash:  CByte32,
+    pub requirement_type_id: H256,
+}
+
+impl From<DelegateRequirementArgs> for ADelegateRequirementArgs {
+    fn from(v: DelegateRequirementArgs) -> Self {
+        ADelegateRequirementArgs::new_builder()
+            .metadata_type_id(to_axon_byte32(&v.metadata_type_hash))
+            .requirement_type_id(to_byte32(&v.requirement_type_id))
             .build()
     }
 }

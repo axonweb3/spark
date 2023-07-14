@@ -13,7 +13,7 @@ use molecule::prelude::Entity;
 
 use common::types::tx_builder::NetworkType;
 
-use crate::ckb::define::scripts::{OMNI_LOCK_MAINNET, OMNI_LOCK_TESTNET};
+use crate::ckb::define::scripts::{OMNI_LOCK_DEVNET, OMNI_LOCK_MAINNET, OMNI_LOCK_TESTNET};
 use crate::ckb::NETWORK_TYPE;
 use crate::{cell_dep, out_point, script};
 
@@ -68,6 +68,14 @@ impl OmniEth {
                 );
                 Address::new(ckb_sdk::NetworkType::Testnet, address_payload, true).to_string()
             }
+            NetworkType::Devnet => {
+                let address_payload = ckb_sdk::AddressPayload::new_full(
+                    ScriptHashType::Type,
+                    OMNI_LOCK_DEVNET.code_hash.clone().pack(),
+                    config.build_args(),
+                );
+                Address::new(ckb_sdk::NetworkType::Dev, address_payload, true).to_string()
+            }
         })
     }
 
@@ -86,6 +94,7 @@ impl OmniEth {
         let omni_lock_code_hash = match **NETWORK_TYPE.load() {
             NetworkType::Mainnet => &OMNI_LOCK_MAINNET.code_hash,
             NetworkType::Testnet => &OMNI_LOCK_TESTNET.code_hash,
+            NetworkType::Devnet => &OMNI_LOCK_DEVNET.code_hash,
         };
         script!(omni_lock_code_hash, ScriptHashType::Type, cfg.build_args())
     }
@@ -97,6 +106,7 @@ impl OmniEth {
         let omni_lock_code_hash = match **NETWORK_TYPE.load() {
             NetworkType::Mainnet => &OMNI_LOCK_MAINNET.code_hash,
             NetworkType::Testnet => &OMNI_LOCK_TESTNET.code_hash,
+            NetworkType::Devnet => &OMNI_LOCK_DEVNET.code_hash,
         };
         Ok(script!(
             omni_lock_code_hash,
@@ -116,6 +126,11 @@ impl OmniEth {
                 &OMNI_LOCK_TESTNET.tx_hash,
                 OMNI_LOCK_TESTNET.index,
                 OMNI_LOCK_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &OMNI_LOCK_DEVNET.tx_hash,
+                OMNI_LOCK_DEVNET.index,
+                OMNI_LOCK_DEVNET.dep_type
             ),
         }
     }

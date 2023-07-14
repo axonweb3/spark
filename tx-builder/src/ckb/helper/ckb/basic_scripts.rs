@@ -29,6 +29,11 @@ impl AlwaysSuccess {
                 ALWAYS_SUCCESS_LOCK_TESTNET.hash_type,
                 bytes::Bytes::default()
             ),
+            NetworkType::Devnet => script!(
+                &ALWAYS_SUCCESS_LOCK_DEVNET.code_hash,
+                ALWAYS_SUCCESS_LOCK_DEVNET.hash_type,
+                bytes::Bytes::default()
+            ),
         }
     }
 
@@ -43,6 +48,11 @@ impl AlwaysSuccess {
                 &ALWAYS_SUCCESS_LOCK_TESTNET.tx_hash,
                 ALWAYS_SUCCESS_LOCK_TESTNET.index,
                 ALWAYS_SUCCESS_LOCK_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &ALWAYS_SUCCESS_LOCK_DEVNET.tx_hash,
+                ALWAYS_SUCCESS_LOCK_DEVNET.index,
+                ALWAYS_SUCCESS_LOCK_DEVNET.dep_type
             ),
         }
     }
@@ -60,6 +70,11 @@ impl Secp256k1 {
                 &SECP2561_BLAKE160_TESTNET.tx_hash,
                 SECP2561_BLAKE160_TESTNET.index,
                 SECP2561_BLAKE160_TESTNET.dep_type
+            ),
+            NetworkType::Devnet => cell_dep!(
+                &SECP2561_BLAKE160_DEVNET.tx_hash,
+                SECP2561_BLAKE160_DEVNET.index,
+                SECP2561_BLAKE160_DEVNET.dep_type
             ),
         }
     }

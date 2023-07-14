@@ -99,7 +99,7 @@ impl SmtValueEncode {
 }
 
 // Define SMT value
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct LeafValue(pub [u8; 32]);
 impl Value for LeafValue {
     fn to_h256(&self) -> H256 {

@@ -284,33 +284,45 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             xudt_owner: to_h256(&selection_lock_hash),
             checkpoint_code_hash: if **network_type == NetworkType::Mainnet {
                 CHECKPOINT_TYPE_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 CHECKPOINT_TYPE_TESTNET.code_hash.clone()
+            } else {
+                CHECKPOINT_TYPE_DEVNET.code_hash.clone()
             },
             metadata_code_hash: if **network_type == NetworkType::Mainnet {
                 METADATA_TYPE_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 METADATA_TYPE_TESTNET.code_hash.clone()
+            } else {
+                METADATA_TYPE_DEVNET.code_hash.clone()
             },
             reward_code_hash: if **network_type == NetworkType::Mainnet {
                 REWARD_SMT_TYPE_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 REWARD_SMT_TYPE_TESTNET.code_hash.clone()
+            } else {
+                REWARD_SMT_TYPE_DEVNET.code_hash.clone()
             },
             stake_code_hash: if **network_type == NetworkType::Mainnet {
                 STAKE_SMT_TYPE_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 STAKE_SMT_TYPE_TESTNET.code_hash.clone()
+            } else {
+                STAKE_SMT_TYPE_DEVNET.code_hash.clone()
             },
             delegate_code_hash: if **network_type == NetworkType::Mainnet {
                 DELEGATE_SMT_TYPE_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 DELEGATE_SMT_TYPE_TESTNET.code_hash.clone()
+            } else {
+                DELEGATE_SMT_TYPE_DEVNET.code_hash.clone()
             },
             withdraw_code_hash: if **network_type == NetworkType::Mainnet {
                 WITHDRAW_LOCK_MAINNET.code_hash.clone()
-            } else {
+            } else if **network_type == NetworkType::Testnet {
                 WITHDRAW_LOCK_TESTNET.code_hash.clone()
+            } else {
+                WITHDRAW_LOCK_DEVNET.code_hash.clone()
             },
             xudt_type_hash: to_h256(&Xudt::type_(&selection_lock_hash).calc_script_hash()),
         };

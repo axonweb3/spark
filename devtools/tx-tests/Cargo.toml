@@ -8,6 +8,7 @@ edition = "2021"
 anyhow = "1.0"
 axon-tools = { version = "0.1", features = ["impl-serde", "proof"] }
 bytes = "1.0"
+ckb-jsonrpc-types = "0.108"
 ckb-types = "0.108"
 clap = { version = "4", features = ["cargo"] }
 common = { path = "../../common" }

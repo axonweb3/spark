@@ -219,14 +219,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                 .lock(
                     inner_stake_data
                         .as_builder()
-                        .delta(
-                            StakeItem {
-                                is_increase:        true,
-                                amount:             0,
-                                inauguration_epoch: 0,
-                            }
-                            .into(),
-                        )
+                        .delta(StakeItem::default().into())
                         .build(),
                 )
                 .build()
@@ -276,7 +269,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .collect();
 
         self.stake_smt_storage
-            .insert(self.current_epoch, new_smt_stakers)
+            .insert(self.current_epoch + INAUGURATION, new_smt_stakers)
             .await?;
 
         self.stake_smt_storage.get_top_root().await
@@ -360,7 +353,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         // get the old epoch proof for witness
         let old_epoch_proof = self
             .stake_smt_storage
-            .generate_top_proof(vec![self.current_epoch])
+            .generate_top_proof(vec![self.current_epoch + INAUGURATION])
             .await?;
 
         let new_root = self.update_stake_smt(new_smt.clone()).await?;
@@ -368,7 +361,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         // get the new epoch proof for witness
         let new_epoch_proof = self
             .stake_smt_storage
-            .generate_top_proof(vec![self.current_epoch])
+            .generate_top_proof(vec![self.current_epoch + INAUGURATION])
             .await?;
 
         let stake_smt_witness = Stake::smt_witness(

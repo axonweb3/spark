@@ -1,6 +1,7 @@
 mod checkpoint;
 mod delegate;
 mod delegate_smt;
+mod faucet;
 mod init;
 mod mint;
 mod reward;
@@ -10,6 +11,7 @@ mod stake_smt;
 pub use checkpoint::checkpoint_tx;
 pub use delegate::{add_delegate_tx, first_delegate_tx, reedem_delegate_tx};
 pub use delegate_smt::delegate_smt_tx;
+pub use faucet::faucet_tx;
 pub use init::init_tx;
 pub use mint::mint_tx;
 pub use reward::reward_tx;
