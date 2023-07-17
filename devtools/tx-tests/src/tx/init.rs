@@ -16,6 +16,18 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
     let omni_eth = OmniEth::new(test_seeder_key.clone());
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
+    let mut stakers = vec![];
+    for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
+        let privkey = staker_privkey.clone().into_h256().unwrap();
+        let omni_eth = OmniEth::new(privkey);
+        println!(
+            "staker{} ckb addres: {}",
+            i,
+            omni_eth.ckb_address().unwrap()
+        );
+        stakers.push(omni_eth.address().unwrap());
+    }
+
     _init_tx(
         ckb,
         test_seeder_key,
@@ -33,6 +45,7 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             validators: mock_axon_validators(),
             ..Default::default()
         },
+        stakers,
     )
     .await;
 }
@@ -42,11 +55,13 @@ pub async fn _init_tx(
     seeder_key: PrivateKey,
     checkpoint: Checkpoint,
     metadata: Metadata,
+    stakers: Vec<ckb_types::H160>,
 ) -> Tx<CkbRpcClient> {
-    let (tx, type_id_args) = InitTxBuilder::new(ckb, seeder_key, 10000, checkpoint, metadata)
-        .build_tx()
-        .await
-        .unwrap();
+    let (tx, type_id_args) =
+        InitTxBuilder::new(ckb, seeder_key, 10000, checkpoint, metadata, stakers)
+            .build_tx()
+            .await
+            .unwrap();
 
     let mut tx = Tx::new(ckb, tx);
 

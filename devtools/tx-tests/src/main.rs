@@ -20,86 +20,87 @@ async fn main() {
                 .short('n')
                 .required(false)
                 .num_args(1)
+                .value_parser(["dev", "test", "main"])
                 .default_value("test")
-                .help("switch network"),
+                .help("Switch network"),
         )
         .arg(
             clap::Arg::new("faucet")
                 .short('f')
                 .required(false)
                 .num_args(0)
-                .help("send CKB from secp256k1 address to Omni ETH CKB address"),
+                .help("Send CKB from secp256k1 address to Omni ETH CKB address"),
         )
         .arg(
             clap::Arg::new("init")
                 .short('i')
                 .required(false)
                 .num_args(0)
-                .help("test init tx"),
+                .help("Test init tx"),
         )
         .arg(
             clap::Arg::new("mint")
                 .short('m')
                 .required(false)
                 .num_args(0)
-                .help("test mint tx"),
+                .help("Test mint tx"),
         )
         .arg(
             clap::Arg::new("stake")
                 .short('s')
                 .required(false)
                 .num_args(1)
-                .default_value("")
-                .help("test stake tx"),
+                .value_parser(["first", "add", "redeem"])
+                .help("Test stake tx"),
         )
         .arg(
             clap::Arg::new("delegate")
                 .short('d')
                 .required(false)
                 .num_args(1)
-                .default_value("")
-                .help("test delegate tx"),
+                .value_parser(["first", "add", "redeem"])
+                .help("Test delegate tx"),
         )
         .arg(
             clap::Arg::new("checkpoint")
                 .short('c')
                 .required(false)
                 .num_args(0)
-                .help("test checkpoint tx"),
+                .help("Test checkpoint tx"),
         )
         .arg(
             clap::Arg::new("stake smt")
                 .short('t')
                 .required(false)
                 .num_args(0)
-                .help("test stake smt tx"),
+                .help("Test stake smt tx"),
         )
         .arg(
             clap::Arg::new("delegate smt")
                 .short('e')
                 .required(false)
                 .num_args(0)
-                .help("test delegate smt tx"),
+                .help("Test delegate smt tx"),
         )
         .arg(
             clap::Arg::new("reward")
                 .short('r')
                 .required(false)
                 .num_args(0)
-                .help("test reward tx"),
+                .help("Test reward tx"),
         );
 
     let matches = cmd.get_matches();
     let net = matches.get_one::<String>("net").unwrap().as_str();
-    let faucet = matches.get_one::<bool>("faucet").unwrap().to_owned();
-    let init = matches.get_one::<bool>("init").unwrap().to_owned();
-    let mint = matches.get_one::<bool>("mint").unwrap().to_owned();
-    let stake = matches.get_one::<String>("stake").unwrap().as_str();
-    let delegate = matches.get_one::<String>("delegate").unwrap().as_str();
-    let checkpoint = matches.get_one::<bool>("checkpoint").unwrap().to_owned();
-    let stake_smt = matches.get_one::<bool>("stake smt").unwrap().to_owned();
-    let delegate_smt = matches.get_one::<bool>("delegate smt").unwrap().to_owned();
-    let reward = matches.get_one::<bool>("reward").unwrap().to_owned();
+    let faucet = *matches.get_one::<bool>("faucet").unwrap();
+    let init = *matches.get_one::<bool>("init").unwrap();
+    let mint = *matches.get_one::<bool>("mint").unwrap();
+    let stake = matches.get_one::<String>("stake");
+    let delegate = matches.get_one::<String>("delegate");
+    let checkpoint = *matches.get_one::<bool>("checkpoint").unwrap();
+    let stake_smt = *matches.get_one::<bool>("stake smt").unwrap();
+    let delegate_smt = *matches.get_one::<bool>("delegate smt").unwrap();
+    let reward = *matches.get_one::<bool>("reward").unwrap();
 
     let ckb = match net {
         "dev" => {
@@ -132,8 +133,8 @@ async fn main() {
         mint_tx(&ckb).await;
     }
 
-    if !stake.is_empty() {
-        match stake {
+    if stake.is_some() {
+        match stake.unwrap().as_str() {
             "first" => first_stake_tx(&ckb).await,
             "add" => add_stake_tx(&ckb).await,
             "redeem" => reedem_stake_tx(&ckb).await,
@@ -141,8 +142,8 @@ async fn main() {
         }
     }
 
-    if !delegate.is_empty() {
-        match delegate {
+    if delegate.is_some() {
+        match delegate.unwrap().as_str() {
             "first" => first_delegate_tx(&ckb).await,
             "add" => add_delegate_tx(&ckb).await,
             "redeem" => reedem_delegate_tx(&ckb).await,

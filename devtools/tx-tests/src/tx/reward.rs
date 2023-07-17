@@ -43,6 +43,7 @@ pub async fn reward_tx(ckb: &CkbRpcClient) {
             validators: vec![],
             ..Default::default()
         },
+        vec![],
     )
     .await;
 

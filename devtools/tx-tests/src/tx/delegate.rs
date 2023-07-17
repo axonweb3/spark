@@ -82,7 +82,7 @@ async fn delegate_tx(
     first_delegate: bool,
 ) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let test_delegator_key = priv_keys.delegator_privkeys[1].clone().into_h256().unwrap();
+    let test_delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let omni_eth = OmniEth::new(test_delegator_key.clone());
     println!(
         "delegatorr ckb addres: {}\n",
