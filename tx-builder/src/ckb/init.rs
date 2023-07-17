@@ -148,6 +148,9 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
 
 impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
     fn build_data(&self) -> Vec<Bytes> {
+        let mut metadata = self.metadata.clone();
+        metadata.validators.sort();
+
         vec![
             // issue cell data
             InfoCellData::new_simple(0, 0, H256::default()).pack(),

@@ -330,8 +330,18 @@ where
                 let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
 
                 new_validators.push(Validator {
-                    bls_pub_key:    stake_data.as_reader().lock().bls_pub_key().to_entity(),
-                    pub_key:        stake_data.as_reader().lock().l1_pub_key().to_entity(),
+                    bls_pub_key:    stake_data
+                        .as_reader()
+                        .lock()
+                        .bls_pub_key()
+                        .to_entity()
+                        .as_bytes(),
+                    pub_key:        stake_data
+                        .as_reader()
+                        .lock()
+                        .l1_pub_key()
+                        .to_entity()
+                        .as_bytes(),
                     address:        v.staker.0.into(),
                     // field not enabled
                     propose_weight: 1,

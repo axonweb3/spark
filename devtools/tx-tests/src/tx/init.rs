@@ -6,7 +6,7 @@ use tx_builder::ckb::init::InitTxBuilder;
 
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::config::{parse_file, write_file};
-use crate::mock::mock_axon_validators;
+use crate::mock::mock_axon_validators_v2;
 
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
@@ -17,8 +17,11 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let mut stakers = vec![];
+    let mut staker_privkeys = vec![];
     for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
         let privkey = staker_privkey.clone().into_h256().unwrap();
+        staker_privkeys.push(privkey.clone());
+
         let omni_eth = OmniEth::new(privkey);
         println!(
             "staker{} ckb addres: {}",
@@ -42,7 +45,7 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             epoch_len: 100,
             period_len: 100,
             quorum: 10,
-            validators: mock_axon_validators(),
+            validators: mock_axon_validators_v2(&staker_privkeys),
             ..Default::default()
         },
         stakers,

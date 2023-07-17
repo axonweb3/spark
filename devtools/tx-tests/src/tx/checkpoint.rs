@@ -6,7 +6,7 @@ use tx_builder::ckb::helper::{OmniEth, Tx};
 
 use crate::config::parse_file;
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
-use crate::mock::{mock_axon_proof, mock_axon_proposal};
+use crate::mock::{mock_axon_proof_v2, mock_axon_proposal_v2};
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
 pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
@@ -14,6 +14,12 @@ pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
     let test_kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let omni_eth = OmniEth::new(test_kicker_key.clone());
     println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
+
+    let mut staker_privkeys = vec![];
+    for staker_privkey in priv_keys.staker_privkeys.into_iter() {
+        let privkey = staker_privkey.clone().into_h256().unwrap();
+        staker_privkeys.push(privkey);
+    }
 
     let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
@@ -35,8 +41,8 @@ pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
             ..Default::default()
         },
         CheckpointProof {
-            proof:    mock_axon_proof(),
-            proposal: mock_axon_proposal(),
+            proof:    mock_axon_proof_v2(&staker_privkeys),
+            proposal: mock_axon_proposal_v2(),
         },
     )
     .await

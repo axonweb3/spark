@@ -365,10 +365,10 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
 
     fn update_stake_data(
         &self,
-        wallet_amount: Amount,
+        mut wallet_amount: Amount,
         stake_data: Bytes,
     ) -> CkbTxResult<Vec<Bytes>> {
-        let total_stake_amount = new_u128(&stake_data[..TOKEN_BYTES]);
+        let mut total_stake_amount = new_u128(&stake_data[..TOKEN_BYTES]);
 
         let mut stake_data = stake_data;
         let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
@@ -383,12 +383,17 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         )
         .calc_actual_amount()?;
 
+        if actual_info.is_increase {
+            total_stake_amount = actual_info.total_elect_amount;
+            wallet_amount = actual_info.wallet_amount;
+        }
+
         let inner_stake_data = stake_data.lock();
 
         Ok(vec![
             // stake AT cell data
             token_cell_data(
-                actual_info.total_elect_amount,
+                total_stake_amount,
                 stake_data
                     .as_builder()
                     .lock(
@@ -408,7 +413,7 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
                     .as_bytes(),
             ),
             // AT cell data
-            actual_info.wallet_amount.pack().as_bytes(),
+            wallet_amount.pack().as_bytes(),
         ])
     }
 }

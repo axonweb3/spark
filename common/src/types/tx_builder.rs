@@ -202,6 +202,21 @@ impl From<Checkpoint> for CheckpointCellData {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ProposeCount {
+    pub proposer: H160,
+    pub count:    u64,
+}
+
+impl From<ProposeCount> for AProposeCount {
+    fn from(propose: ProposeCount) -> Self {
+        AProposeCount::new_builder()
+            .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
+            .count(to_uint64(propose.count))
+            .build()
+    }
+}
+
 #[derive(Default)]
 pub struct CheckpointProof {
     pub proof:    Proof,
@@ -223,21 +238,6 @@ impl Proof {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ProposeCount {
-    pub proposer: H160,
-    pub count:    u64,
-}
-
-impl From<ProposeCount> for AProposeCount {
-    fn from(propose: ProposeCount) -> Self {
-        AProposeCount::new_builder()
-            .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
-            .count(to_uint64(propose.count))
-            .build()
-    }
-}
-
 type Hash = ethereum_types::H256;
 
 #[derive(RlpEncodable, RlpDecodable, Default)]
@@ -249,17 +249,16 @@ pub struct Proposal {
     pub signed_txs_hash:          ethereum_types::H256,
     pub timestamp:                u64,
     pub number:                   u64,
-    pub gas_limit:                ethereum_types::U256,
-    pub extra_data:               bytes::Bytes,
-    pub mixed_hash:               Option<ethereum_types::H256>,
-    pub base_fee_per_gas:         ethereum_types::U256,
     pub proof:                    Proof,
-    pub chain_id:                 u64,
     pub call_system_script_count: u32,
     pub tx_hashes:                Vec<Hash>,
 }
 
 impl Proposal {
+    pub fn bytes(&self) -> bytes::Bytes {
+        self.rlp_bytes().into()
+    }
+
     pub fn hash(&self) -> H256 {
         Hasher::digest(self.rlp_bytes().freeze())
     }
@@ -297,8 +296,8 @@ impl From<AMetadata> for Metadata {
                 let mut res = Vec::with_capacity(r.validators().item_count());
                 for i in r.validators().to_entity() {
                     res.push(Validator {
-                        bls_pub_key:    i.bls_pub_key(),
-                        pub_key:        i.pub_key(),
+                        bls_pub_key:    i.bls_pub_key().as_bytes(),
+                        pub_key:        i.pub_key().as_bytes(),
                         address:        H160::from_slice(&i.address().raw_data()).unwrap(),
                         propose_weight: to_u32(&i.propose_weight()),
                         vote_weight:    to_u32(&i.vote_weight()),
@@ -318,21 +317,33 @@ impl From<AMetadata> for Metadata {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Validator {
-    pub bls_pub_key:    Byte48,
-    pub pub_key:        Byte65,
+    pub bls_pub_key:    bytes::Bytes, // Byte48,
+    pub pub_key:        bytes::Bytes, // Byte65,
     pub address:        H160,
     pub propose_weight: u32,
     pub vote_weight:    u32,
     pub propose_count:  u64,
 }
 
+impl core::cmp::PartialOrd for Validator {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl core::cmp::Ord for Validator {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.address.cmp(&other.address)
+    }
+}
+
 impl From<Validator> for AValidator {
     fn from(validator: Validator) -> Self {
         AValidator::new_builder()
-            .bls_pub_key(validator.bls_pub_key)
-            .pub_key(validator.pub_key)
+            .pub_key(Byte65::new_unchecked(validator.pub_key))
+            .bls_pub_key(Byte48::new_unchecked(validator.bls_pub_key))
             .address(Identity::from_slice(validator.address.as_bytes()).unwrap())
             .propose_weight(to_uint32(validator.propose_weight))
             .vote_weight(to_uint32(validator.vote_weight))

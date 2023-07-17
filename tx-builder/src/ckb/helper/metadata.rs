@@ -62,7 +62,7 @@ impl Metadata {
         unique_cell_dep(ckb_rpc, Self::type_(type_id)).await
     }
 
-    pub async fn get_cell(ckb_rpc: &impl CkbRpc, checkpoint_type: Script) -> Result<Cell> {
-        get_cell_by_type(ckb_rpc, checkpoint_type).await
+    pub async fn get_cell(ckb_rpc: &impl CkbRpc, metadata_type: Script) -> Result<Cell> {
+        get_cell_by_type(ckb_rpc, metadata_type).await
     }
 }

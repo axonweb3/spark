@@ -141,7 +141,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         tx.sign(&omni_eth.signer()?, &ScriptGroup {
             script:         kicker_lock,
             group_type:     ScriptGroupType::Lock,
-            input_indices:  vec![tx.inner_ref().inputs().len() - 1],
+            input_indices:  vec![tx.inner_ref().witnesses().len() - 1],
             output_indices: vec![],
         })?;
 
