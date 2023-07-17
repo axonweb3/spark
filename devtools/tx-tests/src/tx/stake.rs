@@ -116,15 +116,13 @@ async fn stake_tx(
             tx.sign(&signer, group.1).unwrap();
         }
     } else {
-        let mut first_group = true;
-        for group in script_groups.lock_groups.iter() {
-            if !first_group {
-                println!("sign; not stake id: {:?}", group.1.input_indices);
-                tx.sign(&signer, group.1).unwrap();
+        for (i, group) in script_groups.lock_groups.iter().enumerate() {
+            if i == 0 {
+                println!("not sign; stake AT cell: {:?}", group.1.input_indices);
             } else {
-                println!("not sign; stake id: {:?}", group.1.input_indices);
+                println!("sign; other cell: {:?}", group.1.input_indices);
+                tx.sign(&signer, group.1).unwrap();
             }
-            first_group = false;
         }
     }
 
@@ -133,7 +131,7 @@ async fn stake_tx(
         Err(e) => println!("{}", e),
     }
 
-    println!("\ntx: {}", tx.inner());
+    // println!("\ntx: {}", tx.inner());
 }
 
 fn hex_decode(src: &str) -> Vec<u8> {

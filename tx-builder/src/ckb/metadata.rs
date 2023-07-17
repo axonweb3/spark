@@ -497,8 +497,10 @@ where
                     match delegator_at_cell_datas.entry(*addr) {
                         std::collections::hash_map::Entry::Occupied(v) => v.into_mut(),
                         std::collections::hash_map::Entry::Vacant(v) => {
-                            let delegate_lock =
-                                HDelegate::lock(&self.type_ids.delegate_code_hash, &addr.0.into());
+                            let delegate_lock = HDelegate::lock(
+                                &self.type_ids.delegate_smt_code_hash,
+                                &addr.0.into(),
+                            );
                             let delegate_cell =
                                 HDelegate::get_cell(self.ckb, delegate_lock.clone(), xudt.clone())
                                     .await?

@@ -118,15 +118,13 @@ async fn delegate_tx(
             tx.sign(&signer, group.1).unwrap();
         }
     } else {
-        let mut first_group = true;
-        for group in script_groups.lock_groups.iter() {
-            if !first_group {
-                println!("sign; not delegate id: {:?}", group.1.input_indices);
-                tx.sign(&signer, group.1).unwrap();
+        for (i, group) in script_groups.lock_groups.iter().enumerate() {
+            if i == 0 {
+                println!("not sign; delegate AT cell: {:?}", group.1.input_indices);
             } else {
-                println!("not sign; delegate id: {:?}", group.1.input_indices);
+                println!("sign; other cell: {:?}", group.1.input_indices);
+                tx.sign(&signer, group.1).unwrap();
             }
-            first_group = false;
         }
     }
 
@@ -135,5 +133,5 @@ async fn delegate_tx(
         Err(e) => println!("{}", e),
     }
 
-    println!("\ntx: {}", tx.inner());
+    // println!("\ntx: {}", tx.inner());
 }

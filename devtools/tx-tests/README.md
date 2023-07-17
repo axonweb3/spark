@@ -45,4 +45,6 @@ cargo run -- -s redeem  // redeem delegate
 cargo run -- -t  // stake smt tx
 
 cargo run -- -e  // delegate smt tx
+
+cargo run -- -w  // withdraw tx
 ```

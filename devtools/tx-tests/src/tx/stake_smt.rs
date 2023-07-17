@@ -66,5 +66,5 @@ pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
         Err(e) => println!("{}", e),
     }
 
-    println!("\ntx: {}", tx.inner());
+    // println!("\ntx: {}", tx.inner());
 }

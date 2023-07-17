@@ -32,10 +32,10 @@ pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
             metadata_type_id,
             checkpoint_type_id,
         },
-        100,
+        1,
         Checkpoint {
-            epoch: 0,
-            period: 1,
+            epoch: 1,
+            period: 0,
             latest_block_height: 10,
             timestamp: 11111,
             ..Default::default()
@@ -70,5 +70,5 @@ pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
         Err(e) => println!("{}", e),
     }
 
-    println!("\ntx: {}", tx.inner());
+    // println!("\ntx: {}", tx.inner());
 }

@@ -67,12 +67,12 @@ impl<'a, C: CkbRpc> IWithdrawTxBuilder<'a, C> for WithdrawTxBuilder<'a, C> {
             CellOutput::new_builder()
                 .lock(self.withdraw_lock.clone())
                 .type_(Some(self.xudt.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
+                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // AT cell
             CellOutput::new_builder()
                 .lock(self.token_lock.clone())
                 .type_(Some(self.xudt.clone()).pack())
-                .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
+                .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
         ];
 
         let cell_deps = vec![

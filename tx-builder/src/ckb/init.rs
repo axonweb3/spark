@@ -323,14 +323,14 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             } else {
                 REWARD_SMT_TYPE_DEVNET.code_hash.clone()
             },
-            stake_code_hash: if **network_type == NetworkType::Mainnet {
+            stake_smt_code_hash: if **network_type == NetworkType::Mainnet {
                 STAKE_SMT_TYPE_MAINNET.code_hash.clone()
             } else if **network_type == NetworkType::Testnet {
                 STAKE_SMT_TYPE_TESTNET.code_hash.clone()
             } else {
                 STAKE_SMT_TYPE_DEVNET.code_hash.clone()
             },
-            delegate_code_hash: if **network_type == NetworkType::Mainnet {
+            delegate_smt_code_hash: if **network_type == NetworkType::Mainnet {
                 DELEGATE_SMT_TYPE_MAINNET.code_hash.clone()
             } else if **network_type == NetworkType::Testnet {
                 DELEGATE_SMT_TYPE_TESTNET.code_hash.clone()
@@ -343,6 +343,20 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
                 WITHDRAW_LOCK_TESTNET.code_hash.clone()
             } else {
                 WITHDRAW_LOCK_DEVNET.code_hash.clone()
+            },
+            stake_code_hash: if **network_type == NetworkType::Mainnet {
+                STAKE_LOCK_MAINNET.code_hash.clone()
+            } else if **network_type == NetworkType::Testnet {
+                STAKE_LOCK_TESTNET.code_hash.clone()
+            } else {
+                STAKE_LOCK_DEVNET.code_hash.clone()
+            },
+            delegate_code_hash: if **network_type == NetworkType::Mainnet {
+                DELEGATE_LOCK_MAINNET.code_hash.clone()
+            } else if **network_type == NetworkType::Testnet {
+                DELEGATE_LOCK_TESTNET.code_hash.clone()
+            } else {
+                DELEGATE_LOCK_DEVNET.code_hash.clone()
             },
             xudt_type_hash: to_h256(&Xudt::type_(&selection_lock_hash).calc_script_hash()),
         };
