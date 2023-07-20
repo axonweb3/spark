@@ -11,7 +11,13 @@ use common::types::axon_types::{
         StakeGroupInfo as AStakeGroupInfo, StakeGroupInfos, StakerSmtRoot as AStakerSmtRoot,
         StakerSmtRoots,
     },
-    metadata::{MetadataCellData as AMetadataCellData, MetadataList},
+    metadata::{
+        DelegateInfo as AMetadataDelegateInfo, DelegateInfos as AMetadataDelegateInfos,
+        DelegateProof as ADelegateProof, DelegateProofs, ElectionSmtProof as AElectionSmtProof,
+        MetadataCellData as AMetadataCellData, MetadataList, MetadataWitness as AMetadataWitness,
+        MinerGroupInfo as AMinerGroupInfo, MinerGroupInfos,
+        StakeSmtElectionInfo as AStakeSmtElectionInfo,
+    },
     reward::{
         EpochRewardStakeInfo as AEpochRewardStakeInfo,
         EpochRewardStakeInfos as AEpochRewardStakeInfos, NotClaimInfo as ANotClaimInfo,
@@ -103,6 +109,15 @@ impl From<DelegateInfo> for ADelegateInfo {
     fn from(v: DelegateInfo) -> Self {
         ADelegateInfo::new_builder()
             .delegator_addr(to_identity(&v.delegator_addr))
+            .amount(to_uint128(v.amount))
+            .build()
+    }
+}
+
+impl From<DelegateInfo> for AMetadataDelegateInfo {
+    fn from(v: DelegateInfo) -> Self {
+        AMetadataDelegateInfo::new_builder()
+            .addr(to_identity(&v.delegator_addr))
             .amount(to_uint128(v.amount))
             .build()
     }
@@ -450,6 +465,106 @@ impl From<MetadataCellData> for AMetadataCellData {
                 let mut list = MetadataList::new_builder();
                 for m in v.metadata.into_iter() {
                     list = list.push(m.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct MetadataWitness {
+    pub new_propose_proof: Vec<u8>,
+    pub smt_election_info: StakeSmtElectionInfo,
+}
+
+impl From<MetadataWitness> for AMetadataWitness {
+    fn from(value: MetadataWitness) -> Self {
+        AMetadataWitness::new_builder()
+            .new_propose_proof(to_bytes(value.new_propose_proof))
+            .smt_election_info(value.smt_election_info.into())
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct StakeSmtElectionInfo {
+    pub n2:                  ElectionSmtProof,
+    pub new_stake_proof:     Vec<u8>,
+    pub new_delegate_proofs: Vec<DelegateProof>,
+}
+
+impl From<StakeSmtElectionInfo> for AStakeSmtElectionInfo {
+    fn from(value: StakeSmtElectionInfo) -> Self {
+        AStakeSmtElectionInfo::new_builder()
+            .n2(value.n2.into())
+            .new_stake_proof(to_bytes(value.new_stake_proof))
+            .new_delegate_proofs({
+                let mut list = DelegateProofs::new_builder();
+                for p in value.new_delegate_proofs {
+                    list = list.push(p.into())
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct ElectionSmtProof {
+    pub miners:             Vec<MinerGroupInfo>,
+    pub staker_epoch_proof: Vec<u8>,
+}
+
+impl From<ElectionSmtProof> for AElectionSmtProof {
+    fn from(value: ElectionSmtProof) -> Self {
+        AElectionSmtProof::new_builder()
+            .staker_epoch_proof(to_bytes(value.staker_epoch_proof))
+            .miners({
+                let mut list = MinerGroupInfos::new_builder();
+
+                for m in value.miners {
+                    list = list.push(m.into());
+                }
+                list.build()
+            })
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct DelegateProof {
+    pub staker: H160,
+    pub proof:  Vec<u8>,
+}
+
+impl From<DelegateProof> for ADelegateProof {
+    fn from(value: DelegateProof) -> Self {
+        ADelegateProof::new_builder()
+            .staker(to_identity(&value.staker))
+            .proof(to_bytes(value.proof))
+            .build()
+    }
+}
+
+#[derive(Default)]
+pub struct MinerGroupInfo {
+    pub staker:               H160,
+    pub amount:               u128,
+    pub delegate_infos:       Vec<DelegateInfo>,
+    pub delegate_epoch_proof: Vec<u8>,
+}
+
+impl From<MinerGroupInfo> for AMinerGroupInfo {
+    fn from(value: MinerGroupInfo) -> Self {
+        AMinerGroupInfo::new_builder()
+            .staker(to_identity(&value.staker))
+            .amount(to_uint128(value.amount))
+            .delegate_epoch_proof(to_bytes(value.delegate_epoch_proof))
+            .delegate_infos({
+                let mut list = AMetadataDelegateInfos::new_builder();
+                for d in value.delegate_infos.into_iter() {
+                    list = list.push(d.into());
                 }
                 list.build()
             })
