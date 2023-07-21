@@ -102,7 +102,7 @@ impl Withdraw {
         new_amount: u128,
     ) -> bytes::Bytes {
         let mut withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
-        let mut total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
+        let total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
         let withdraw_data =
             AWithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
 
@@ -113,7 +113,6 @@ impl Withdraw {
             let epoch = to_u64(&item.unlock_epoch());
             new_withdraw_infos = new_withdraw_infos.push(if epoch == inaugration_epoch {
                 inserted = true;
-                total_withdraw_amount += new_amount;
                 AWithdrawInfo::from(WithdrawInfo {
                     epoch:  inaugration_epoch,
                     amount: to_u128(&item.amount()) + new_amount,
@@ -133,7 +132,7 @@ impl Withdraw {
         let inner_withdraw_data = withdraw_data.lock();
 
         token_cell_data(
-            total_withdraw_amount,
+            total_withdraw_amount + new_amount,
             withdraw_data
                 .as_builder()
                 .lock(

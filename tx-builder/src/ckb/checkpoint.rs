@@ -107,7 +107,7 @@ where
                     Some(
                         CheckpointWitness::new_builder()
                             .proof(to_bytes(self.proof.proof.bytes().into()))
-                            .proposal(to_bytes(self.proof.proposal.hash().as_bytes().to_owned()))
+                            .proposal(to_bytes(self.proof.proposal.bytes().into()))
                             .build()
                             .as_bytes(),
                     )

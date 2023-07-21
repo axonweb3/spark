@@ -2315,6 +2315,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak-hash"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b286e6b663fb926e1eeb68528e69cb70ed46c6d65871a21b2215ae8154c6d3c"
+dependencies = [
+ "primitive-types",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "kicker"
 version = "0.1.0"
 
@@ -4455,6 +4465,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axon-tools",
+ "bit-vec",
+ "blst",
  "bytes",
  "ckb-jsonrpc-types",
  "ckb-types",
@@ -4462,16 +4474,19 @@ dependencies = [
  "common",
  "faster-hex 0.6.1",
  "hex",
+ "keccak-hash",
  "kicker",
  "molecule",
  "ophelia",
  "ophelia-blst",
+ "rlp",
  "rpc-client",
  "serde",
  "serde_derive",
  "serde_json",
  "storage",
  "stringreader",
+ "tiny-keccak",
  "tokio",
  "toml 0.7.4",
  "tx-builder",
