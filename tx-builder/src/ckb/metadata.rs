@@ -18,7 +18,7 @@ use common::types::axon_types::{
     delegate::{
         DelegateAtCellData as ADelegateAtCellData, DelegateSmtCellData as ADelegateSmtCellData,
     },
-    metadata::MetadataCellData as AMetadataCellData,
+    metadata::{MetadataCellData as AMetadataCellData, MetadataWitness as AMetadataWitness},
     stake::{StakeAtCellData as AStakeAtCellData, StakeSmtCellData as AStakeSmtCellData},
     withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
@@ -67,7 +67,13 @@ where
         }
     }
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers, NonTopDelegators)> {
+    async fn build_tx(
+        &self,
+    ) -> Result<(
+        TransactionView,
+        Vec<(H160, u128)>,
+        HashMap<H160, HashMap<H160, u128>>,
+    )> {
         let metadata_type = HMetadata::type_(&self.type_ids.metadata_type_id);
 
         let last_metadata_cell = HMetadata::get_cell(self.ckb, metadata_type.clone()).await?;
@@ -117,6 +123,10 @@ where
         .await?;
 
         let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
+        let new_proposal_count_smt_proof =
+            ProposalSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
+                .await
+                .unwrap();
 
         struct EpochStakeInfo {
             staker:     common::types::H160,
@@ -202,6 +212,11 @@ where
             }
         };
 
+        let old_stake_smt_proof =
+            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
+                .await
+                .unwrap();
+
         StakeSmtStorage::remove(
             &self.smt,
             self.last_checkpoint.epoch,
@@ -214,26 +229,12 @@ where
             .await
             .unwrap();
 
-        let old_stake_smt_proof = StakeSmtStorage::generate_sub_proof(
-            &self.smt,
-            self.last_checkpoint.epoch - 1,
-            self.last_metadata
-                .validators
-                .iter()
-                .map(|v| v.address.0.into())
-                .collect(),
-        )
-        .await
-        .unwrap();
-        let new_stake_smt_proof = StakeSmtStorage::generate_sub_proof(
-            &self.smt,
-            self.last_checkpoint.epoch,
-            validators.iter().map(|v| v.staker).collect(),
-        )
-        .await
-        .unwrap();
+        let new_stake_smt_proof =
+            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch + 1])
+                .await
+                .unwrap();
 
-        let _stake_smt_update = {
+        let stake_smt_update = {
             StakeSmtUpdateInfo {
                 all_stake_infos: {
                     let mut res = Vec::with_capacity(validators.len());
@@ -248,11 +249,25 @@ where
                     res
                 },
                 old_epoch_proof: old_stake_smt_proof,
-                new_epoch_proof: new_stake_smt_proof,
+                new_epoch_proof: new_stake_smt_proof.clone(),
             }
         };
 
         let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
+
+        let mut old_delegator_roots = std::collections::VecDeque::with_capacity(validators.len());
+
+        for v in validators.iter() {
+            old_delegator_roots.push_back(
+                DelegateSmtStorage::generate_top_proof(
+                    &self.smt,
+                    vec![self.last_checkpoint.epoch],
+                    v.staker,
+                )
+                .await
+                .unwrap(),
+            )
+        }
 
         let delegatets_remove_keys = no_top_delegators
             .iter()
@@ -273,24 +288,45 @@ where
 
         let mut delegator_smt_update_infos = Vec::with_capacity(validators.len());
         let mut delegator_staker_smt_roots = Vec::with_capacity(validators.len());
+        let mut miner_groups = Vec::with_capacity(validators.len());
+        let mut delegator_proofs = Vec::new();
         for v in validators.iter() {
+            let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
+                &self.smt,
+                vec![self.last_checkpoint.epoch + 1],
+                v.staker,
+            )
+            .await
+            .unwrap();
+            miner_groups.push(MinerGroupInfo {
+                staker:               v.staker.0.into(),
+                amount:               v.amount,
+                delegate_epoch_proof: delegate_new_epoch_proof.clone(),
+                delegate_infos:       v
+                    .delegaters
+                    .iter()
+                    .map(|(k, v)| DelegateInfo {
+                        delegator_addr: k.0.into(),
+                        amount:         *v,
+                    })
+                    .collect(),
+            });
+            delegator_proofs.push(DelegateProof {
+                staker: v.staker.0.into(),
+                proof:  delegate_new_epoch_proof.clone(),
+            });
             delegator_staker_smt_roots.push(StakerSmtRoot {
                 staker: v.staker.0.into(),
                 root:   Into::<[u8; 32]>::into(
-                    DelegateSmtStorage::get_sub_root(
-                        &self.smt,
-                        self.last_checkpoint.epoch,
-                        v.staker,
-                    )
-                    .await
-                    .unwrap()
-                    .unwrap(),
+                    DelegateSmtStorage::get_top_root(&self.smt, v.staker)
+                        .await
+                        .unwrap(),
                 )
                 .into(),
             });
             delegator_smt_update_infos.push(StakeGroupInfo {
-                staker:                   v.staker.0.into(),
-                delegate_infos:           v
+                staker: v.staker.0.into(),
+                delegate_infos: v
                     .delegaters
                     .iter()
                     .map(|v| DelegateInfo {
@@ -298,22 +334,8 @@ where
                         amount:         *v.1,
                     })
                     .collect(),
-                delegate_old_epoch_proof: DelegateSmtStorage::generate_sub_proof(
-                    &self.smt,
-                    v.staker,
-                    self.last_checkpoint.epoch - 1,
-                    v.delegaters.iter().map(|v| v.0 .0.into()).collect(),
-                )
-                .await
-                .unwrap(),
-                delegate_new_epoch_proof: DelegateSmtStorage::generate_sub_proof(
-                    &self.smt,
-                    v.staker,
-                    self.last_checkpoint.epoch,
-                    v.delegaters.iter().map(|v| v.0 .0.into()).collect(),
-                )
-                .await
-                .unwrap(),
+                delegate_old_epoch_proof: old_delegator_roots.pop_front().unwrap(),
+                delegate_new_epoch_proof,
             })
         }
 
@@ -388,6 +410,25 @@ where
             type_ids:               self.type_ids.clone(),
         };
 
+        let metadata_witness = {
+            let stake_smt_election_info = StakeSmtElectionInfo {
+                n2:                  ElectionSmtProof {
+                    miners:             miner_groups,
+                    staker_epoch_proof: new_stake_smt_proof.clone(),
+                },
+                new_stake_proof:     new_stake_smt_proof,
+                new_delegate_proofs: delegator_proofs,
+            };
+
+            let witness_data = MetadataWitness {
+                new_propose_proof: new_proposal_count_smt_proof,
+                smt_election_info: stake_smt_election_info,
+            };
+
+            WitnessArgs::new_builder()
+                .input_type(Some(Into::<AMetadataWitness>::into(witness_data).as_bytes()).pack())
+                .build()
+        };
         let stake_smt_cell_data = StakeSmtCellData {
             smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
             metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
@@ -572,6 +613,18 @@ where
             Into::<ADelegateSmtCellData>::into(delegate_smt_cell_data).as_bytes(),
         ];
 
+        witnesses[0] = metadata_witness.as_bytes();
+        witnesses[1] = {
+            HStake::smt_witness(
+                0,
+                stake_smt_update.all_stake_infos,
+                stake_smt_update.old_epoch_proof,
+                stake_smt_update.new_epoch_proof,
+            )
+            .as_bytes()
+        };
+        witnesses[2] = HDelegate::smt_witness(0, delegator_smt_update_infos).as_bytes();
+
         let mut outputs = vec![
             // metadata cell
             CellOutput::new_builder()
@@ -620,16 +673,19 @@ where
             HMetadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
         ];
 
+        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
+
         // todo: balance tx, fill placeholder witnesses,
         let tx = TransactionBuilder::default()
             .inputs(inputs)
             .outputs(outputs)
             .outputs_data(outputs_data.pack())
             .cell_deps(cell_deps)
+            .witnesses(witnesses.pack())
             .build();
 
         // todo: sign tx
 
-        Ok((tx, HashMap::default(), HashMap::default()))
+        Ok((tx, no_top_stakers, no_top_delegators))
     }
 }

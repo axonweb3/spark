@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ckb_types::core::TransactionView;
 use ckb_types::H256;
+use ethereum_types::H160;
 
 use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::traits::smt::{
@@ -9,6 +10,8 @@ use crate::traits::smt::{
 };
 use crate::types::ckb_rpc_client::Cell;
 use crate::types::tx_builder::*;
+
+use std::collections::HashMap;
 
 #[async_trait]
 pub trait IInitTxBuilder<'a, C: CkbRpc> {
@@ -118,7 +121,13 @@ pub trait IMetadataTxBuilder<'a, C, PSmt> {
         smt: PSmt,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers, NonTopDelegators)>;
+    async fn build_tx(
+        &self,
+    ) -> Result<(
+        TransactionView,
+        Vec<(H160, u128)>,
+        HashMap<H160, HashMap<H160, u128>>,
+    )>;
 }
 
 #[async_trait]

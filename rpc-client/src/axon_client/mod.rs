@@ -96,7 +96,6 @@ mod tests {
     // #[tokio::test]
     async fn _test_http_client() {
         use super::*;
-        use common::types::axon_rpc_client::Block;
         let client = HttpClientBuilder::default()
             .build("http://localhost:8000")
             .unwrap();
@@ -114,7 +113,6 @@ mod tests {
     // #[tokio::test]
     async fn _test_http_client_macro() {
         use super::*;
-        use common::types::axon_rpc_client::Block;
         let http = HttpClientBuilder::default()
             .build("http://localhost:8000")
             .unwrap();
@@ -132,7 +130,6 @@ mod tests {
     // #[tokio::test]
     async fn _test_ws_client() {
         use super::*;
-        use common::types::axon_rpc_client::Block;
         let url = "ws://localhost:8000/socket";
         let client = WsClientBuilder::default().build(&url).await.unwrap();
         let params = rpc_params![];
