@@ -366,18 +366,25 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
                     continue;
                 }
 
+                let mut total_delegat_to_staker_amount =
+                    to_u128(&last_delegate_info.total_amount());
+
                 let actual_info = self.update_delegate(
                     last_delegate_info,
                     delegate,
                     wallet_amount,
                     total_delegate_amount,
-                    to_u128(&last_delegate_info.total_amount()),
+                    total_delegat_to_staker_amount,
                 )?;
+
+                if actual_info.is_increase {
+                    total_delegat_to_staker_amount = actual_info.total_elect_amount;
+                }
 
                 updated_delegates = updated_delegates.push(
                     DelegateItem {
                         staker:             delegate.staker.clone(),
-                        total_amount:       actual_info.total_elect_amount,
+                        total_amount:       total_delegat_to_staker_amount,
                         is_increase:        actual_info.is_increase,
                         amount:             actual_info.amount,
                         inauguration_epoch: delegate.inauguration_epoch,
@@ -449,11 +456,13 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         )
         .calc_actual_amount()?;
 
-        *wallet_amount = actual_info.wallet_amount;
-        if actual_info.total_elect_amount > total_to_staker_amount {
-            *total_delegate_amount += actual_info.total_elect_amount - total_to_staker_amount;
-        } else {
-            *total_delegate_amount -= total_to_staker_amount - actual_info.total_elect_amount;
+        if actual_info.is_increase {
+            *wallet_amount = actual_info.wallet_amount;
+            if actual_info.total_elect_amount > total_to_staker_amount {
+                *total_delegate_amount += actual_info.total_elect_amount - total_to_staker_amount;
+            } else {
+                *total_delegate_amount -= total_to_staker_amount - actual_info.total_elect_amount;
+            }
         }
 
         Ok(actual_info)

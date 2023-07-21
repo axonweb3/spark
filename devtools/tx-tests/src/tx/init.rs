@@ -42,7 +42,7 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             ..Default::default()
         },
         Metadata {
-            epoch_len: 100,
+            epoch_len: 1,
             period_len: 100,
             quorum: 10,
             validators: mock_axon_validators_v2(&staker_privkeys),

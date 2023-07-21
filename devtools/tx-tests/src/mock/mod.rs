@@ -93,7 +93,7 @@ pub fn mock_axon_proof_v2(priv_keys: &Vec<CH256>) -> TProof {
         .iter()
         .map(|k| gen_bls_keypair(k.as_bytes()))
         .collect::<Vec<_>>();
-    let signature = gen_bls_signature(message.as_ref(), &bls_keypairs);
+    let signature = gen_bls_signature(&message, &bls_keypairs);
 
     let bitmap = BitVec::from_elem(priv_keys.len(), true);
 

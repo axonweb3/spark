@@ -393,21 +393,23 @@ pub struct DelegateSmtTypeIds {
 
 #[derive(Clone, Default)]
 pub struct TypeIds {
-    pub issue_type_id:        H256,
-    pub selection_type_id:    H256,
-    pub metadata_code_hash:   H256,
-    pub metadata_type_id:     H256,
-    pub checkpoint_code_hash: H256,
-    pub checkpoint_type_id:   H256,
-    pub stake_code_hash:      H256,
-    pub stake_smt_type_id:    H256,
-    pub delegate_code_hash:   H256,
-    pub delegate_smt_type_id: H256,
-    pub reward_code_hash:     H256,
-    pub reward_smt_type_id:   H256,
-    pub withdraw_code_hash:   H256,
-    pub xudt_type_hash:       H256,
-    pub xudt_owner:           H256,
+    pub issue_type_id:          H256,
+    pub selection_type_id:      H256,
+    pub metadata_code_hash:     H256,
+    pub metadata_type_id:       H256,
+    pub checkpoint_code_hash:   H256,
+    pub checkpoint_type_id:     H256,
+    pub stake_smt_code_hash:    H256,
+    pub stake_smt_type_id:      H256,
+    pub delegate_smt_code_hash: H256,
+    pub delegate_smt_type_id:   H256,
+    pub reward_code_hash:       H256,
+    pub reward_smt_type_id:     H256,
+    pub xudt_type_hash:         H256,
+    pub xudt_owner:             H256,
+    pub withdraw_code_hash:     H256,
+    pub stake_code_hash:        H256,
+    pub delegate_code_hash:     H256,
 }
 
 impl From<TypeIds> for ATypeIds {
@@ -419,15 +421,17 @@ impl From<TypeIds> for ATypeIds {
             .metadata_type_id(to_byte32(&type_ids.metadata_type_id))
             .checkpoint_code_hash(to_byte32(&type_ids.checkpoint_code_hash))
             .checkpoint_type_id(to_byte32(&type_ids.checkpoint_type_id))
-            .stake_smt_code_hash(to_byte32(&type_ids.stake_code_hash))
+            .stake_smt_code_hash(to_byte32(&type_ids.stake_smt_code_hash))
             .stake_smt_type_id(to_byte32(&type_ids.stake_smt_type_id))
-            .delegate_smt_code_hash(to_byte32(&type_ids.delegate_code_hash))
+            .delegate_smt_code_hash(to_byte32(&type_ids.delegate_smt_code_hash))
             .delegate_smt_type_id(to_byte32(&type_ids.delegate_smt_type_id))
             .reward_code_hash(to_byte32(&type_ids.reward_code_hash))
             .reward_type_id(to_byte32(&type_ids.reward_smt_type_id))
-            .withdraw_code_hash(to_byte32(&type_ids.withdraw_code_hash))
             .xudt_type_hash(to_byte32(&type_ids.xudt_type_hash))
             .xudt_owner_lock_hash(to_byte32(&type_ids.xudt_owner))
+            .withdraw_code_hash(to_byte32(&type_ids.withdraw_code_hash))
+            .stake_at_code_hash(to_byte32(&type_ids.stake_code_hash))
+            .delegate_at_code_hash(to_byte32(&type_ids.delegate_code_hash))
             .build()
     }
 }

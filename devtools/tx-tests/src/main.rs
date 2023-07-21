@@ -69,18 +69,25 @@ async fn main() {
                 .help("Test checkpoint tx"),
         )
         .arg(
-            clap::Arg::new("stake smt")
+            clap::Arg::new("stake-smt")
                 .short('t')
                 .required(false)
                 .num_args(0)
                 .help("Test stake smt tx"),
         )
         .arg(
-            clap::Arg::new("delegate smt")
+            clap::Arg::new("delegate-smt")
                 .short('e')
                 .required(false)
                 .num_args(0)
                 .help("Test delegate smt tx"),
+        )
+        .arg(
+            clap::Arg::new("withdraw")
+                .short('w')
+                .required(false)
+                .num_args(0)
+                .help("Test withdraw tx"),
         )
         .arg(
             clap::Arg::new("reward")
@@ -98,8 +105,9 @@ async fn main() {
     let stake = matches.get_one::<String>("stake");
     let delegate = matches.get_one::<String>("delegate");
     let checkpoint = *matches.get_one::<bool>("checkpoint").unwrap();
-    let stake_smt = *matches.get_one::<bool>("stake smt").unwrap();
-    let delegate_smt = *matches.get_one::<bool>("delegate smt").unwrap();
+    let stake_smt = *matches.get_one::<bool>("stake-smt").unwrap();
+    let delegate_smt = *matches.get_one::<bool>("delegate-smt").unwrap();
+    let withdraw = *matches.get_one::<bool>("withdraw").unwrap();
     let reward = *matches.get_one::<bool>("reward").unwrap();
 
     let ckb = match net {
@@ -161,6 +169,10 @@ async fn main() {
 
     if delegate_smt {
         delegate_smt_tx(&ckb).await;
+    }
+
+    if withdraw {
+        withdraw_tx(&ckb).await;
     }
 
     if reward {
