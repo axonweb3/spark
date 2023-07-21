@@ -46,7 +46,7 @@ impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 

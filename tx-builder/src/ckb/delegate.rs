@@ -66,7 +66,7 @@ impl<'a, C: CkbRpc> IDelegateTxBuilder<'a, C> for DelegateTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         for delegate in self.delegates.iter() {
             if delegate.inauguration_epoch > self.current_epoch + INAUGURATION {
                 return Err(CkbTxErr::InaugurationEpoch {

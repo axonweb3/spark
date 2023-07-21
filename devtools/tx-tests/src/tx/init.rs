@@ -48,6 +48,13 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             validators: mock_axon_validators_v2(&staker_privkeys),
             ..Default::default()
         },
+        Metadata {
+            epoch_len: 1,
+            period_len: 100,
+            quorum: 10,
+            validators: mock_axon_validators_v2(&staker_privkeys),
+            ..Default::default()
+        },
         stakers,
     )
     .await;
@@ -57,14 +64,22 @@ pub async fn _init_tx(
     ckb: &CkbRpcClient,
     seeder_key: PrivateKey,
     checkpoint: Checkpoint,
-    metadata: Metadata,
+    epoch0_metadata: Metadata,
+    epoch1_metadata: Metadata,
     stakers: Vec<ckb_types::H160>,
 ) -> Tx<CkbRpcClient> {
-    let (tx, type_id_args) =
-        InitTxBuilder::new(ckb, seeder_key, 10000, checkpoint, metadata, stakers)
-            .build_tx()
-            .await
-            .unwrap();
+    let (tx, type_id_args) = InitTxBuilder::new(
+        ckb,
+        seeder_key,
+        10000,
+        checkpoint,
+        epoch0_metadata,
+        epoch1_metadata,
+        stakers,
+    )
+    .build_tx()
+    .await
+    .unwrap();
 
     let mut tx = Tx::new(ckb, tx);
 

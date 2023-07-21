@@ -48,7 +48,7 @@ impl<'a, C: CkbRpc> IWithdrawTxBuilder<'a, C> for WithdrawTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         let withdraw_cell = self.get_withdraw_cell().await?;
 
         // withdraw AT cell

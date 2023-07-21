@@ -78,7 +78,7 @@ where
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         let reward_smt_cell = Reward::get_cell(self.ckb, &self.type_ids.reward_smt_type_id).await?;
         let selection_cell =
             Selection::get_cell(self.ckb, &self.type_ids.selection_type_id).await?;

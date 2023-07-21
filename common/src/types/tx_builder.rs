@@ -202,6 +202,26 @@ impl From<Checkpoint> for CheckpointCellData {
     }
 }
 
+impl From<CheckpointCellData> for Checkpoint {
+    fn from(v: CheckpointCellData) -> Self {
+        Checkpoint {
+            epoch:               to_u64(&v.epoch()),
+            period:              to_u32(&v.period()),
+            state_root:          H256::from_slice(v.state_root().as_slice()).unwrap(),
+            latest_block_height: to_u64(&v.latest_block_height()),
+            latest_block_hash:   H256::from_slice(v.latest_block_hash().as_slice()).unwrap(),
+            timestamp:           to_u64(&v.timestamp()),
+            propose_count:       {
+                let mut list = Vec::with_capacity(v.propose_count().item_count());
+                for i in v.propose_count() {
+                    list.push(i.into())
+                }
+                list
+            },
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ProposeCount {
     pub proposer: H160,
@@ -214,6 +234,15 @@ impl From<ProposeCount> for AProposeCount {
             .address(Byte20::from_slice(propose.proposer.as_bytes()).unwrap())
             .count(to_uint64(propose.count))
             .build()
+    }
+}
+
+impl From<AProposeCount> for ProposeCount {
+    fn from(v: AProposeCount) -> Self {
+        ProposeCount {
+            proposer: H160::from_slice(v.address().as_slice()).unwrap(),
+            count:    to_u64(&v.count()),
+        }
     }
 }
 
@@ -388,6 +417,14 @@ pub struct DelegateSmtTypeIds {
     pub metadata_type_id:     H256,
     pub delegate_smt_type_id: H256,
     pub checkpoint_type_id:   H256,
+    pub xudt_owner:           H256,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct MetadataTypeIds {
+    pub metadata_type_id:     H256,
+    pub stake_smt_type_id:    H256,
+    pub delegate_smt_type_id: H256,
     pub xudt_owner:           H256,
 }
 

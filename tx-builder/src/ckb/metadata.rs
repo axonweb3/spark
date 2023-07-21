@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput, WitnessArgs},
+    packed::{CellDep, CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack, Reader},
 };
 use ethereum_types::H160;
@@ -15,30 +16,33 @@ use common::traits::{
     tx_builder::IMetadataTxBuilder,
 };
 use common::types::axon_types::{
+    checkpoint::CheckpointCellData,
     delegate::{
         DelegateAtCellData as ADelegateAtCellData, DelegateSmtCellData as ADelegateSmtCellData,
     },
-    metadata::{MetadataCellData as AMetadataCellData, MetadataWitness as AMetadataWitness},
+    metadata::{
+        MetadataCellData as AMetadataCellData, MetadataList, MetadataWitness as AMetadataWitness,
+        ValidatorList,
+    },
     stake::{StakeAtCellData as AStakeAtCellData, StakeSmtCellData as AStakeSmtCellData},
-    withdraw::WithdrawAtCellData as AWithdrawAtCellData,
 };
+use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
+use common::utils::convert::{to_byte32, to_u16, to_uint64};
 use molecule::prelude::Builder;
 
 use crate::ckb::define::constants::*;
 use crate::ckb::define::types::*;
 use crate::ckb::helper::{
-    AlwaysSuccess, Checkpoint as HCheckpoint, Delegate as HDelegate, Metadata as HMetadata,
-    OmniEth, Secp256k1, Stake as HStake, Withdraw, Xudt,
+    token_cell_data, AlwaysSuccess, Delegate as HDelegate, Metadata as HMetadata, OmniEth,
+    Secp256k1, Stake as HStake, Tx, Withdraw, Xudt,
 };
 
 pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
     ckb:             &'a C,
-    _kicker:         PrivateKey,
-    quorum:          u16,
-    type_ids:        TypeIds,
-    last_checkpoint: Checkpoint,
-    last_metadata:   Metadata,
+    kicker:          PrivateKey,
+    type_ids:        MetadataTypeIds,
+    last_checkpoint: Cell,
     smt:             PSmt,
 }
 
@@ -49,26 +53,22 @@ where
 {
     fn new(
         ckb: &'a C,
-        _kicker: PrivateKey,
-        quorum: u16,
-        type_ids: TypeIds,
-        last_metadata: Metadata,
-        last_checkpoint: Checkpoint,
+        kicker: PrivateKey,
+        type_ids: MetadataTypeIds,
+        last_checkpoint: Cell,
         smt: PSmt,
     ) -> Self {
         Self {
             ckb,
-            _kicker,
-            quorum,
+            kicker,
             type_ids,
             last_checkpoint,
-            last_metadata,
             smt,
         }
     }
 
     async fn build_tx(
-        &self,
+        self,
     ) -> Result<(
         TransactionView,
         Vec<(H160, u128)>,
@@ -106,15 +106,19 @@ where
         ];
 
         let mut witnesses = vec![
-            WitnessArgs::default().as_bytes(),
-            WitnessArgs::default().as_bytes(),
-            WitnessArgs::default().as_bytes(),
+            WitnessArgs::default().as_bytes(), // placeholder for metadata type
+            WitnessArgs::default().as_bytes(), // placeholder for stake smt type
+            WitnessArgs::default().as_bytes(), // placeholder for delegate smt type
         ];
+
+        let checkpoint_data = self.last_checkpoint.output_data.unwrap().into_bytes();
+        let checkpoint_data = CheckpointCellData::new_unchecked(checkpoint_data);
+        let last_checkpoint: Checkpoint = checkpoint_data.into();
 
         ProposalSmtStorage::insert(
             &self.smt,
-            self.last_checkpoint.epoch,
-            self.last_checkpoint
+            last_checkpoint.epoch,
+            last_checkpoint
                 .propose_count
                 .iter()
                 .map(|v| (v.proposer.0.into(), v.count))
@@ -124,7 +128,7 @@ where
 
         let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
         let new_proposal_count_smt_proof =
-            ProposalSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
+            ProposalSmtStorage::generate_top_proof(&self.smt, vec![last_checkpoint.epoch])
                 .await
                 .unwrap();
 
@@ -161,29 +165,64 @@ where
         }
 
         impl Eq for EpochStakeInfo {}
-        let (validators, no_top_stakers, no_top_delegators) = {
-            let stakers =
-                StakeSmtStorage::get_sub_leaves(&self.smt, self.last_checkpoint.epoch).await?;
 
+        let stakers =
+            StakeSmtStorage::get_sub_leaves(&self.smt, last_checkpoint.epoch + INAUGURATION)
+                .await?;
+
+        let mut miner_groups = Vec::with_capacity(stakers.len());
+
+        let quorum = to_u16(
+            &last_metadata_cell_data
+                .as_reader()
+                .metadata()
+                .get(1)
+                .unwrap()
+                .to_entity()
+                .quorum(),
+        );
+
+        let (validators, no_top_stakers, no_top_delegators) = {
             let mut mid = std::collections::BinaryHeap::new();
 
-            for (staker, amount) in stakers {
+            for (staker, amount) in stakers.clone().into_iter() {
                 let delegaters = DelegateSmtStorage::get_sub_leaves(
                     &self.smt,
-                    self.last_checkpoint.epoch,
+                    last_checkpoint.epoch + INAUGURATION,
                     staker,
                 )
                 .await?;
+
+                miner_groups.push(MinerGroupInfo {
+                    staker: staker.0.into(),
+                    amount,
+                    delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
+                        &self.smt,
+                        vec![last_checkpoint.epoch + INAUGURATION],
+                        staker,
+                    )
+                    .await?,
+                    delegate_infos: delegaters
+                        .iter()
+                        .map(|(k, v)| DelegateInfo {
+                            delegator_addr: k.0.into(),
+                            amount:         *v,
+                        })
+                        .collect(),
+                });
+
                 mid.push(EpochStakeInfo {
                     staker,
                     amount,
                     delegaters,
-                })
+                });
             }
 
+            let stakers_count = mid.len();
+
             let stake_infos = {
-                let mut res = Vec::with_capacity(self.quorum as usize);
-                for _ in 0..3 * self.quorum {
+                let mut res = Vec::with_capacity(quorum as usize);
+                for _ in 0..quorum {
                     match mid.pop() {
                         Some(s) => res.push(s),
                         None => break,
@@ -192,7 +231,7 @@ where
                 res
             };
 
-            if mid.is_empty() {
+            if stakers_count <= quorum as usize {
                 (stake_infos, Vec::default(), HashMap::default())
             } else {
                 let mut no_top_stakers = Vec::with_capacity(mid.len());
@@ -212,62 +251,31 @@ where
             }
         };
 
-        let old_stake_smt_proof =
-            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
-                .await
-                .unwrap();
+        let old_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
+            last_checkpoint.epoch + INAUGURATION,
+        ])
+        .await
+        .unwrap();
 
         StakeSmtStorage::remove(
             &self.smt,
-            self.last_checkpoint.epoch,
+            last_checkpoint.epoch + INAUGURATION,
             no_top_stakers.iter().map(|(a, _)| a).cloned().collect(),
         )
         .await
         .unwrap();
 
-        StakeSmtStorage::new_epoch(&self.smt, self.last_checkpoint.epoch + 1)
+        StakeSmtStorage::new_epoch(&self.smt, last_checkpoint.epoch + INAUGURATION + 1)
             .await
             .unwrap();
 
-        let new_stake_smt_proof =
-            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch + 1])
-                .await
-                .unwrap();
-
-        let stake_smt_update = {
-            StakeSmtUpdateInfo {
-                all_stake_infos: {
-                    let mut res = Vec::with_capacity(validators.len());
-
-                    for v in validators.iter() {
-                        res.push(StakeInfo {
-                            addr:   v.staker.0.into(),
-                            amount: v.amount,
-                        })
-                    }
-
-                    res
-                },
-                old_epoch_proof: old_stake_smt_proof,
-                new_epoch_proof: new_stake_smt_proof.clone(),
-            }
-        };
+        let new_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
+            last_checkpoint.epoch + INAUGURATION + 1,
+        ])
+        .await
+        .unwrap();
 
         let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
-
-        let mut old_delegator_roots = std::collections::VecDeque::with_capacity(validators.len());
-
-        for v in validators.iter() {
-            old_delegator_roots.push_back(
-                DelegateSmtStorage::generate_top_proof(
-                    &self.smt,
-                    vec![self.last_checkpoint.epoch],
-                    v.staker,
-                )
-                .await
-                .unwrap(),
-            )
-        }
 
         let delegatets_remove_keys = no_top_delegators
             .iter()
@@ -276,42 +284,27 @@ where
 
         DelegateSmtStorage::remove(
             &self.smt,
-            self.last_checkpoint.epoch,
+            last_checkpoint.epoch + INAUGURATION,
             delegatets_remove_keys,
         )
         .await
         .unwrap();
 
-        DelegateSmtStorage::new_epoch(&self.smt, self.last_checkpoint.epoch + 1)
+        DelegateSmtStorage::new_epoch(&self.smt, last_checkpoint.epoch + INAUGURATION + 1)
             .await
             .unwrap();
 
-        let mut delegator_smt_update_infos = Vec::with_capacity(validators.len());
         let mut delegator_staker_smt_roots = Vec::with_capacity(validators.len());
-        let mut miner_groups = Vec::with_capacity(validators.len());
-        let mut delegator_proofs = Vec::new();
+        let mut new_delegator_proofs = Vec::new();
         for v in validators.iter() {
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
                 &self.smt,
-                vec![self.last_checkpoint.epoch + 1],
+                vec![last_checkpoint.epoch + INAUGURATION + 1],
                 v.staker,
             )
             .await
             .unwrap();
-            miner_groups.push(MinerGroupInfo {
-                staker:               v.staker.0.into(),
-                amount:               v.amount,
-                delegate_epoch_proof: delegate_new_epoch_proof.clone(),
-                delegate_infos:       v
-                    .delegaters
-                    .iter()
-                    .map(|(k, v)| DelegateInfo {
-                        delegator_addr: k.0.into(),
-                        amount:         *v,
-                    })
-                    .collect(),
-            });
-            delegator_proofs.push(DelegateProof {
+            new_delegator_proofs.push(DelegateProof {
                 staker: v.staker.0.into(),
                 proof:  delegate_new_epoch_proof.clone(),
             });
@@ -324,24 +317,11 @@ where
                 )
                 .into(),
             });
-            delegator_smt_update_infos.push(StakeGroupInfo {
-                staker: v.staker.0.into(),
-                delegate_infos: v
-                    .delegaters
-                    .iter()
-                    .map(|v| DelegateInfo {
-                        delegator_addr: v.0 .0.into(),
-                        amount:         *v.1,
-                    })
-                    .collect(),
-                delegate_old_epoch_proof: old_delegator_roots.pop_front().unwrap(),
-                delegate_new_epoch_proof,
-            })
         }
 
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
         let new_metadata = {
-            let mut new_validators: Vec<Validator> = Vec::with_capacity(validators.len());
+            let mut new_validators = Vec::new();
 
             for v in validators {
                 let stake_lock = HStake::lock(&self.type_ids.metadata_type_id, &v.staker.0.into());
@@ -371,53 +351,56 @@ where
                     vote_weight:    1,
                     // new epoch start with all zero
                     propose_count:  0,
-                })
+                });
             }
 
-            Metadata {
-                epoch_len:       self.last_metadata.epoch_len,
-                period_len:      self.last_metadata.period_len,
-                quorum:          self.quorum,
-                gas_limit:       self.last_metadata.gas_limit,
-                gas_price:       self.last_metadata.gas_price,
-                interval:        self.last_metadata.interval,
-                validators:      new_validators,
-                propose_ratio:   self.last_metadata.propose_ratio,
-                prevote_ratio:   self.last_metadata.prevote_ratio,
-                precommit_ratio: self.last_metadata.precommit_ratio,
-                brake_ratio:     self.last_metadata.brake_ratio,
-                tx_num_limit:    self.last_metadata.tx_num_limit,
-                max_tx_size:     self.last_metadata.max_tx_size,
-                block_height:    self.last_checkpoint.latest_block_height,
-            }
+            last_metadata_cell_data
+                .metadata()
+                .get(1)
+                .unwrap()
+                .as_builder()
+                .validators({
+                    new_validators.sort();
+                    let mut validators = ValidatorList::new_builder();
+                    for v in new_validators.into_iter() {
+                        validators = validators.push(v.into());
+                    }
+                    validators.build()
+                })
+                .build()
         };
 
         // new metadata cell data
-        let metadata_cell_data = MetadataCellData {
-            metadata: vec![
-                last_metadata_cell_data
-                    .as_reader()
-                    .metadata()
-                    .get(1)
-                    .unwrap()
-                    .to_entity()
-                    .into(),
-                new_metadata,
-            ],
-
-            epoch:                  self.last_checkpoint.epoch + 2,
-            propose_count_smt_root: Into::<[u8; 32]>::into(proposal_count_smt_root).into(),
-            type_ids:               self.type_ids.clone(),
+        let metadata_cell_data = {
+            let next_metadata = last_metadata_cell_data
+                .as_reader()
+                .metadata()
+                .get(1)
+                .unwrap()
+                .to_entity();
+            last_metadata_cell_data
+                .as_builder()
+                .epoch(to_uint64(last_checkpoint.epoch + 1))
+                .propose_count_smt_root(to_byte32(
+                    &Into::<[u8; 32]>::into(proposal_count_smt_root).into(),
+                ))
+                .metadata({
+                    let mut list = MetadataList::new_builder();
+                    list = list.push(next_metadata);
+                    list = list.push(new_metadata);
+                    list.build()
+                })
+                .build()
         };
 
         let metadata_witness = {
             let stake_smt_election_info = StakeSmtElectionInfo {
                 n2:                  ElectionSmtProof {
                     miners:             miner_groups,
-                    staker_epoch_proof: new_stake_smt_proof.clone(),
+                    staker_epoch_proof: old_stake_smt_proof,
                 },
                 new_stake_proof:     new_stake_smt_proof,
-                new_delegate_proofs: delegator_proofs,
+                new_delegate_proofs: new_delegator_proofs,
             };
 
             let witness_data = MetadataWitness {
@@ -431,13 +414,13 @@ where
         };
         let stake_smt_cell_data = StakeSmtCellData {
             smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
-            metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
+            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
                 .calc_script_hash(),
         };
 
         let delegate_smt_cell_data = DelegateSmtCellData {
             smt_roots:          delegator_staker_smt_roots,
-            metadata_type_hash: HMetadata::type_(&metadata_cell_data.type_ids.metadata_type_id)
+            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
                 .calc_script_hash(),
         };
 
@@ -456,7 +439,8 @@ where
             let stake_cell = HStake::get_cell(self.ckb, stake_lock.clone(), xudt.clone())
                 .await?
                 .expect("Must have stake AT cell");
-            let mut stake_data = stake_cell.output_data.unwrap().into_bytes().to_vec();
+
+            let (total_amount, stake_data) = HStake::parse_stake_data(&stake_cell);
 
             no_top_staker_cell_inputs.push(
                 CellInput::new_builder()
@@ -464,15 +448,7 @@ where
                     .build(),
             );
 
-            let total_amount = {
-                let mut total = [0u8; 16];
-                total.copy_from_slice(&stake_data[0..16]);
-                u128::from_le_bytes(total) - amount
-            };
-
-            for (i, v) in total_amount.to_le_bytes().into_iter().enumerate() {
-                stake_data[i] = v
-            }
+            let stake_data = token_cell_data(total_amount - amount, stake_data.as_bytes());
 
             no_top_staker_cell_outputs.push(
                 CellOutput::new_builder()
@@ -481,14 +457,14 @@ where
                     .build_exact_capacity(Capacity::bytes(stake_data.len())?)?,
             );
 
-            no_top_staker_cell_datas.push(bytes::Bytes::from(stake_data));
+            no_top_staker_cell_datas.push(stake_data);
             witnesses.push(HStake::witness(1).as_bytes());
         }
 
         // remove no top delegator
         let mut no_top_delegator_cell_inputs: Vec<CellInput> =
             Vec::with_capacity(no_top_stakers.len());
-        let mut delegator_at_cell_datas = HashMap::with_capacity(no_top_stakers.len());
+        let mut delegator_at_cell_datas = HashMap::with_capacity(no_top_delegators.len());
         for (staker_address, v) in no_top_delegators.iter() {
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
@@ -497,10 +473,8 @@ where
                     match delegator_at_cell_datas.entry(*addr) {
                         std::collections::hash_map::Entry::Occupied(v) => v.into_mut(),
                         std::collections::hash_map::Entry::Vacant(v) => {
-                            let delegate_lock = HDelegate::lock(
-                                &self.type_ids.delegate_smt_code_hash,
-                                &addr.0.into(),
-                            );
+                            let delegate_lock =
+                                HDelegate::lock(&self.type_ids.metadata_type_id, &addr.0.into());
                             let delegate_cell =
                                 HDelegate::get_cell(self.ckb, delegate_lock.clone(), xudt.clone())
                                     .await?
@@ -547,7 +521,7 @@ where
         ) = delegator_at_cell_datas
             .into_values()
             .map(|(cell_output, total_amount, data)| {
-                witnesses.push(HDelegate::witness(0u8).as_bytes());
+                witnesses.push(HDelegate::witness(1u8).as_bytes());
                 let mut res = total_amount.to_le_bytes().to_vec();
                 res.extend((Into::<ADelegateAtCellData>::into(data)).as_slice());
                 (cell_output, bytes::Bytes::from(res))
@@ -563,52 +537,26 @@ where
                 .await?
                 .expect("Must have withdraw cell");
 
-            let mut withdraw_data = withdraw_cell.output_data.unwrap().into_bytes();
+            let withdraw_data =
+                Withdraw::update_cell_data(&withdraw_cell, last_checkpoint.epoch, amount);
 
             withdraw_inputs.push(
                 CellInput::new_builder()
-                    .previous_output(withdraw_cell.out_point.into())
+                    .previous_output(withdraw_cell.out_point.clone().into())
                     .build(),
             );
+
             withdraw_outputs.push(
                 CellOutput::new_builder()
                     .lock(withdraw_lock)
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(withdraw_data.len())?)?,
             );
-            let total_amount = {
-                let mut total = [0u8; 16];
-                total.copy_from_slice(&withdraw_data[0..16]);
-                u128::from_le_bytes(total) + amount
-            };
-            let mut withdraw_data = {
-                Into::<WithdrawAtCellData>::into(AWithdrawAtCellData::new_unchecked(
-                    withdraw_data.split_off(TOKEN_BYTES),
-                ))
-            };
-            if withdraw_data
-                .lock
-                .withdraw_infos
-                .last()
-                .map(|v| v.epoch == self.last_checkpoint.epoch)
-                .unwrap_or_default()
-            {
-                withdraw_data.lock.withdraw_infos.last_mut().unwrap().amount += amount;
-            } else {
-                withdraw_data.lock.withdraw_infos.push(WithdrawInfo {
-                    amount,
-                    epoch: self.last_checkpoint.epoch,
-                })
-            }
-            withdraw_output_datas.push({
-                let mut res = total_amount.to_le_bytes().to_vec();
-                res.extend(Into::<AWithdrawAtCellData>::into(withdraw_data).as_slice());
-                bytes::Bytes::from(res)
-            });
+
+            withdraw_output_datas.push(withdraw_data);
             witnesses.push(Withdraw::witness(true).as_bytes());
         }
 
-        // todo
         let mut outputs_data = vec![
             Into::<AMetadataCellData>::into(metadata_cell_data).as_bytes(),
             Into::<AStakeSmtCellData>::into(stake_smt_cell_data).as_bytes(),
@@ -616,16 +564,8 @@ where
         ];
 
         witnesses[0] = metadata_witness.as_bytes();
-        witnesses[1] = {
-            HStake::smt_witness(
-                0,
-                stake_smt_update.all_stake_infos,
-                stake_smt_update.old_epoch_proof,
-                stake_smt_update.new_epoch_proof,
-            )
-            .as_bytes()
-        };
-        witnesses[2] = HDelegate::smt_witness(0, delegator_smt_update_infos).as_bytes();
+        witnesses[1] = HStake::smt_witness(1, vec![], vec![], vec![]).as_bytes();
+        witnesses[2] = HDelegate::smt_witness(1, vec![]).as_bytes();
 
         let mut outputs = vec![
             // metadata cell
@@ -671,13 +611,15 @@ where
             HStake::lock_dep(),
             HStake::smt_type_dep(),
             Withdraw::lock_dep(),
-            HCheckpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
-            HMetadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+            HMetadata::type_dep(),
+            // checkpoint cell dep
+            CellDep::new_builder()
+                .out_point(self.last_checkpoint.out_point.into())
+                .build(),
         ];
 
         witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
 
-        // todo: balance tx, fill placeholder witnesses,
         let tx = TransactionBuilder::default()
             .inputs(inputs)
             .outputs(outputs)
@@ -686,8 +628,19 @@ where
             .witnesses(witnesses.pack())
             .build();
 
-        // todo: sign tx
+        let omni_eth = OmniEth::new(self.kicker.clone());
+        let kicker_lock = OmniEth::lock(&omni_eth.address()?);
 
-        Ok((tx, no_top_stakers, no_top_delegators))
+        let mut tx = Tx::new(self.ckb, tx);
+        tx.balance(kicker_lock.clone()).await?;
+
+        tx.sign(&omni_eth.signer()?, &ScriptGroup {
+            script:         kicker_lock,
+            group_type:     ScriptGroupType::Lock,
+            input_indices:  vec![tx.inner_ref().witnesses().len() - 1],
+            output_indices: vec![],
+        })?;
+
+        Ok((tx.inner(), no_top_stakers, no_top_delegators))
     }
 }

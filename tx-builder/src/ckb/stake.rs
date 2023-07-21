@@ -76,7 +76,7 @@ impl<'a, C: CkbRpc> IStakeTxBuilder<'a, C> for StakeTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         if self.stake.inauguration_epoch > self.current_epoch + INAUGURATION {
             return Err(CkbTxErr::InaugurationEpoch {
                 expected: self.current_epoch,

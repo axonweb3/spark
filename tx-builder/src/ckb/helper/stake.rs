@@ -5,7 +5,6 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::{H160, H256};
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::types::axon_types::basic::Byte65;
 use common::types::axon_types::stake::{
     StakeArgs, StakeAtCellData, StakeAtWitness, StakeInfoDelta, StakeSmtWitness as AStakeSmtWitness,
 };
@@ -140,12 +139,7 @@ impl Stake {
     }
 
     pub fn witness(mode: u8) -> WitnessArgs {
-        let mut lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
-
-        if mode == 0 {
-            // staker unlocking
-            lock_field = lock_field.as_builder().eth_sig(Byte65::default()).build();
-        }
+        let lock_field = StakeAtWitness::new_builder().mode(mode.into()).build();
 
         WitnessArgs::new_builder()
             .lock(Some(lock_field.as_bytes()).pack())
@@ -197,5 +191,12 @@ impl Stake {
             .requirement_type_id();
 
         Ok(H256::from_slice(&delegate_requirement_type_id.as_bytes())?)
+    }
+
+    pub fn parse_stake_data(cell: &Cell) -> (u128, StakeAtCellData) {
+        let mut cell_data_bytes = cell.output_data.clone().unwrap().into_bytes();
+        let total_stake_amount = new_u128(&cell_data_bytes[..TOKEN_BYTES]);
+        let stake_data = StakeAtCellData::new_unchecked(cell_data_bytes.split_off(TOKEN_BYTES));
+        (total_stake_amount, stake_data)
     }
 }

@@ -57,7 +57,7 @@ where
         }
     }
 
-    async fn build_tx(&self) -> Result<TransactionView> {
+    async fn build_tx(self) -> Result<TransactionView> {
         let checkpoint_type = HCheckpoint::type_(&self.type_ids.checkpoint_type_id);
 
         let last_checkpoint_cell = HCheckpoint::get_cell(self.ckb, checkpoint_type.clone()).await?;

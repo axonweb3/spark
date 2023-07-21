@@ -1,8 +1,13 @@
-# Configure private key
+# Config
 
 Create file `devtools/tx-tests/src/config/type_ids.toml`
 ```
 touch devtools/tx-tests/src/config/type_ids.toml
+```
+
+Create file `devtools/tx-tests/src/config/priv_keys.toml`
+```
+touch devtools/tx-tests/src/config/priv_keys.toml
 ```
 
 Then fill the content as follows.
@@ -47,4 +52,6 @@ cargo run -- -t  // stake smt tx
 cargo run -- -e  // delegate smt tx
 
 cargo run -- -w  // withdraw tx
+
+cargo run -- -a  // metadata tx
 ```
