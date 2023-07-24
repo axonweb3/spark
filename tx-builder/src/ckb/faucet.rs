@@ -29,7 +29,7 @@ impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
         }
     }
 
-    pub async fn build_tx(&self) -> Result<TransactionView> {
+    pub async fn build_tx(self) -> Result<TransactionView> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_omni_lock = OmniEth::lock(&omni_eth.address()?);
 

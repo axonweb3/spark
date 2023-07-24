@@ -15,20 +15,15 @@ use common::traits::{
     ckb_rpc_client::CkbRpc, smt::StakeSmtStorage, tx_builder::IStakeSmtTxBuilder,
 };
 use common::types::axon_types::basic::Byte32;
-use common::types::axon_types::stake::{StakeArgs, StakeAtCellData, StakeSmtCellData};
+use common::types::axon_types::stake::{StakeArgs, StakeSmtCellData};
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Root, Staker as SmtStaker, UserAmount};
 use common::types::tx_builder::{
     Amount, Epoch, InStakeSmt, NonTopStakers, PrivateKey, StakeItem, StakeSmtTypeIds,
     Staker as TxStaker,
 };
-use common::utils::convert::new_u128;
 
-use crate::ckb::define::{
-    constants::{INAUGURATION, TOKEN_BYTES},
-    error::CkbTxErr,
-    types::StakeInfo,
-};
+use crate::ckb::define::{constants::INAUGURATION, error::CkbTxErr, types::StakeInfo};
 use crate::ckb::helper::{
     token_cell_data, AlwaysSuccess, Checkpoint, Metadata, OmniEth, Secp256k1, Stake, Tx, Withdraw,
     Xudt,
@@ -68,7 +63,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
         }
     }
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)> {
+    async fn build_tx(self) -> Result<(TransactionView, NonTopStakers)> {
         let stake_smt_type = Stake::smt_type(&self.type_ids.stake_smt_type_id);
         let stake_smt_cell = Stake::get_smt_cell(self.ckb, stake_smt_type.clone()).await?;
 
@@ -179,7 +174,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
             witnesses.push(Stake::witness(1).as_bytes());
 
-            let (old_total_stake_amount, old_stake_data) = self.parse_stake_data(stake_cell);
+            let (old_total_stake_amount, old_stake_data) = Stake::parse_stake_data(stake_cell);
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, staker);
 
@@ -204,7 +199,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     (
                         old_total_stake_amount - withdraw_amount,
                         Some(Withdraw::update_cell_data(
-                            old_withdraw_cell,
+                            &old_withdraw_cell,
                             self.current_epoch + INAUGURATION,
                             withdraw_amount,
                         )),
@@ -251,13 +246,6 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         Ok(())
     }
 
-    fn parse_stake_data(&self, cell: &Cell) -> (Amount, StakeAtCellData) {
-        let mut cell_data_bytes = cell.output_data.clone().unwrap().into_bytes();
-        let total_stake_amount = new_u128(&cell_data_bytes[..TOKEN_BYTES]);
-        let stake_data = StakeAtCellData::new_unchecked(cell_data_bytes.split_off(TOKEN_BYTES));
-        (total_stake_amount, stake_data)
-    }
-
     async fn update_stake_smt(&self, new_smt: HashMap<SmtStaker, Amount>) -> Result<Root> {
         let new_smt_stakers = new_smt
             .iter()
@@ -294,7 +282,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     .as_bytes(),
             )?;
 
-            let (_, stake_data) = self.parse_stake_data(&cell);
+            let (_, stake_data) = Stake::parse_stake_data(&cell);
             let stake_delta = Stake::item(&stake_data.lock().delta());
 
             if stake_delta.inauguration_epoch < self.current_epoch + INAUGURATION {

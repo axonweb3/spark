@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, vec};
+use std::{path::PathBuf, vec};
 
 use ckb_types::prelude::Pack;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
@@ -13,7 +13,7 @@ use crate::config::parse_file;
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
 
-static ROCKSDB_PATH: &str = "./free-space/smt/stake";
+static ROCKSDB_PATH: &str = "./free-space/smt";
 
 pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
     let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
@@ -37,9 +37,6 @@ pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
     .unwrap();
 
     let path = PathBuf::from(ROCKSDB_PATH);
-    if std::path::Path::new(ROCKSDB_PATH).exists() {
-        fs::remove_dir_all(path.clone()).unwrap();
-    }
     let smt = SmtManager::new(path);
 
     let (tx, _) = StakeSmtTxBuilder::new(

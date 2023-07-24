@@ -72,7 +72,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         }
     }
 
-    async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)> {
+    async fn build_tx(mut self) -> Result<(TransactionView, NonTopDelegators)> {
         let delegate_smt_type = Delegate::smt_type(&self.type_ids.delegate_smt_type_id);
         let delegate_smt_cell = Delegate::get_smt_cell(self.ckb, delegate_smt_type.clone()).await?;
 
@@ -255,7 +255,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                             new_delegate_data,
                         ),
                         Some(Withdraw::update_cell_data(
-                            old_withdraw_cell,
+                            &old_withdraw_cell,
                             self.current_epoch + INAUGURATION,
                             total_withdraw_amount,
                         )),

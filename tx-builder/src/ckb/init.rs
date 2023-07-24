@@ -35,12 +35,13 @@ use crate::ckb::helper::{
 use crate::ckb::NETWORK_TYPE;
 
 pub struct InitTxBuilder<'a, C: CkbRpc> {
-    ckb:        &'a C,
-    seeder_key: PrivateKey,
-    max_supply: Amount,
-    checkpoint: Checkpoint,
-    metadata:   Metadata,
-    stakers:    Vec<StakerEthAddr>,
+    ckb:             &'a C,
+    seeder_key:      PrivateKey,
+    max_supply:      Amount,
+    checkpoint:      Checkpoint,
+    epoch0_metadata: Metadata,
+    epoch1_metadata: Metadata,
+    stakers:         Vec<StakerEthAddr>,
 }
 
 #[async_trait]
@@ -50,7 +51,8 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
-        metadata: Metadata,
+        epoch0_metadata: Metadata,
+        epoch1_metadata: Metadata,
         stakers: Vec<StakerEthAddr>,
     ) -> Self {
         Self {
@@ -58,12 +60,13 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             seeder_key,
             max_supply,
             checkpoint,
-            metadata,
+            epoch0_metadata,
+            epoch1_metadata,
             stakers,
         }
     }
 
-    async fn build_tx(&self) -> Result<(TransactionView, TypeIds)> {
+    async fn build_tx(self) -> Result<(TransactionView, TypeIds)> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 
@@ -148,7 +151,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
 
 impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
     fn build_data(&self) -> Vec<Bytes> {
-        let mut metadata = self.metadata.clone();
+        let mut metadata = self.epoch0_metadata.clone();
         metadata.validators.sort();
 
         vec![
@@ -160,7 +163,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             CheckpointCellData::new_builder().build().as_bytes(),
             // metadata cell data
             AMetadataCellData::from(MetadataCellData {
-                metadata: vec![self.metadata.clone()],
+                metadata: vec![self.epoch0_metadata.clone(), self.epoch1_metadata.clone()],
                 ..Default::default()
             })
             .as_bytes(),
@@ -365,7 +368,10 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
         outputs_data[3] = AMetadataCellData::from(MetadataCellData {
             epoch:                  START_EPOCH,
             propose_count_smt_root: H256::default(),
-            metadata:               vec![self.metadata.clone()],
+            metadata:               vec![
+                self.epoch0_metadata.clone(),
+                self.epoch1_metadata.clone(),
+            ],
             type_ids:               type_ids.clone(),
         })
         .as_bytes()

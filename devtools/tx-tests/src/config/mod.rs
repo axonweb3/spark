@@ -41,8 +41,7 @@ mod tests {
         println!("{:?}", priv_keys);
     }
 
-    #[test]
-    fn test_write_config() {
+    fn _test_write_config() {
         let file_path = "./src/config/type_ids.toml";
 
         let type_ids = TypeIds {

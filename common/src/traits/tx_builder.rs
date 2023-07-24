@@ -20,11 +20,12 @@ pub trait IInitTxBuilder<'a, C: CkbRpc> {
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
-        metadata: Metadata,
+        epoch0_metadata: Metadata,
+        epoch1_metadata: Metadata,
         stakers: Vec<StakerEthAddr>,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<(TransactionView, TypeIds)>;
+    async fn build_tx(self) -> Result<(TransactionView, TypeIds)>;
 }
 
 #[async_trait]
@@ -37,7 +38,7 @@ pub trait IMintTxBuilder<'a, C: CkbRpc> {
         issue_type_id: H256,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -51,7 +52,7 @@ pub trait IStakeTxBuilder<'a, C: CkbRpc> {
         first_stake_info: Option<FirstStakeInfo>,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -64,14 +65,14 @@ pub trait IDelegateTxBuilder<'a, C: CkbRpc> {
         delegate_info: Vec<DelegateItem>,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
 pub trait IWithdrawTxBuilder<'a, C: CkbRpc> {
     fn new(ckb: &'a C, type_ids: StakeTypeIds, user: EthAddress, current_epoch: Epoch) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -89,7 +90,7 @@ where
         current_epoch: Epoch,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -106,7 +107,7 @@ where
         proof: CheckpointProof,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<TransactionView>;
+    async fn build_tx(self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -114,15 +115,13 @@ pub trait IMetadataTxBuilder<'a, C, PSmt> {
     fn new(
         ckb: &'a C,
         kicker: PrivateKey,
-        quorum: u16,
-        type_ids: TypeIds,
-        last_metadata: Metadata,
-        last_checkpoint: Checkpoint,
+        type_ids: MetadataTypeIds,
+        last_checkpoint: Cell,
         smt: PSmt,
     ) -> Self;
 
     async fn build_tx(
-        &self,
+        self,
     ) -> Result<(
         TransactionView,
         Vec<(H160, u128)>,
@@ -142,7 +141,7 @@ pub trait IStakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage> {
         stake_smt_storage: S,
     ) -> Self;
 
-    async fn build_tx(&self) -> Result<(TransactionView, NonTopStakers)>;
+    async fn build_tx(self) -> Result<(TransactionView, NonTopStakers)>;
 }
 
 #[async_trait]
@@ -156,5 +155,5 @@ pub trait IDelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
         delegate_smt_storage: D,
     ) -> Self;
 
-    async fn build_tx(&mut self) -> Result<(TransactionView, NonTopDelegators)>;
+    async fn build_tx(mut self) -> Result<(TransactionView, NonTopDelegators)>;
 }

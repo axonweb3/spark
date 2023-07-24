@@ -90,6 +90,13 @@ async fn main() {
                 .help("Test withdraw tx"),
         )
         .arg(
+            clap::Arg::new("metadata")
+                .short('a')
+                .required(false)
+                .num_args(0)
+                .help("Test metadata tx"),
+        )
+        .arg(
             clap::Arg::new("reward")
                 .short('r')
                 .required(false)
@@ -108,6 +115,7 @@ async fn main() {
     let stake_smt = *matches.get_one::<bool>("stake-smt").unwrap();
     let delegate_smt = *matches.get_one::<bool>("delegate-smt").unwrap();
     let withdraw = *matches.get_one::<bool>("withdraw").unwrap();
+    let metadata = *matches.get_one::<bool>("metadata").unwrap();
     let reward = *matches.get_one::<bool>("reward").unwrap();
 
     let ckb = match net {
@@ -173,6 +181,10 @@ async fn main() {
 
     if withdraw {
         withdraw_tx(&ckb).await;
+    }
+
+    if metadata {
+        metadata_tx(&ckb).await;
     }
 
     if reward {

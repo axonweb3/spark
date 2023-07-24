@@ -197,10 +197,6 @@ impl Delegate {
     pub fn witness(mode: u8) -> WitnessArgs {
         let lock_field = DelegateAtWitness::new_builder().mode(mode.into()).build();
 
-        if mode == 0 { // delegator unlocking
-             // todo: eth sig placeholder
-        }
-
         WitnessArgs::new_builder()
             .lock(Some(lock_field.as_bytes()).pack())
             .build()
