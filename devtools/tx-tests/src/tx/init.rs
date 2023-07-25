@@ -1,5 +1,5 @@
 use common::traits::tx_builder::IInitTxBuilder;
-use common::types::tx_builder::{Checkpoint, Metadata, PrivateKey};
+use common::types::tx_builder::{Checkpoint, Metadata, PrivateKey, ProposeCount};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::init::InitTxBuilder;
@@ -39,6 +39,10 @@ pub async fn init_tx(ckb: &CkbRpcClient) {
             period: 0,
             latest_block_height: 10,
             timestamp: 11111,
+            propose_count: vec![ProposeCount {
+                proposer: omni_eth.address().unwrap(),
+                count:    100,
+            }],
             ..Default::default()
         },
         Metadata {

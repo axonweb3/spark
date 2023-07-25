@@ -66,7 +66,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(self) -> Result<(TransactionView, TypeIds)> {
+    async fn build_tx(mut self) -> Result<(TransactionView, TypeIds)> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 
@@ -150,9 +150,9 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
 }
 
 impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
-    fn build_data(&self) -> Vec<Bytes> {
-        let mut metadata = self.epoch0_metadata.clone();
-        metadata.validators.sort();
+    fn build_data(&mut self) -> Vec<Bytes> {
+        self.epoch0_metadata.validators.sort();
+        self.epoch1_metadata.validators.sort();
 
         vec![
             // issue cell data
@@ -160,7 +160,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             // selection cell data
             Bytes::default(),
             // checkpoint cell data
-            CheckpointCellData::new_builder().build().as_bytes(),
+            CheckpointCellData::from(self.checkpoint.clone()).as_bytes(),
             // metadata cell data
             AMetadataCellData::from(MetadataCellData {
                 metadata: vec![self.epoch0_metadata.clone(), self.epoch1_metadata.clone()],
