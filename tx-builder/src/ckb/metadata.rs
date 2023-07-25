@@ -600,7 +600,6 @@ where
         outputs.extend(withdraw_outputs);
         outputs_data.extend(withdraw_output_datas);
 
-        // todo
         let cell_deps = vec![
             Secp256k1::lock_dep(),
             OmniEth::lock_dep(),

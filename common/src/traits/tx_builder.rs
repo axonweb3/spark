@@ -25,7 +25,7 @@ pub trait IInitTxBuilder<'a, C: CkbRpc> {
         stakers: Vec<StakerEthAddr>,
     ) -> Self;
 
-    async fn build_tx(self) -> Result<(TransactionView, TypeIds)>;
+    async fn build_tx(mut self) -> Result<(TransactionView, TypeIds)>;
 }
 
 #[async_trait]

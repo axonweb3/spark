@@ -4,6 +4,7 @@ use blst::min_pk::{AggregatePublicKey, AggregateSignature, SecretKey};
 use ckb_types::H256 as CH256;
 use serde::de::DeserializeOwned;
 use tiny_keccak::{Hasher, Keccak};
+use tx_builder::ckb::helper::OmniEth;
 
 use common::types::tx_builder::{Proof as TProof, Proposal as TProposal, Validator as TValidator};
 
@@ -112,6 +113,8 @@ pub fn mock_axon_validators_v2(priv_keys: &[CH256]) -> Vec<TValidator> {
         .iter()
         .map(|k| TValidator {
             bls_pub_key: gen_bls_keypair(k.as_bytes()).1.into(),
+            address: OmniEth::new(k.to_owned()).address().unwrap(),
+            propose_count: 100,
             ..Default::default()
         })
         .collect::<Vec<_>>()
