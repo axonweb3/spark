@@ -33,8 +33,10 @@ pub async fn metadata_tx(ckb: &CkbRpcClient) {
 
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
+    // disable load context from file
+    let tmp_dir = tempfile::tempdir().unwrap();
 
-    let (tx, _, _) = MetadataSmtTxBuilder::new(
+    let tx = MetadataSmtTxBuilder::new(
         ckb,
         test_kicker_key,
         MetadataTypeIds {
@@ -45,7 +47,9 @@ pub async fn metadata_tx(ckb: &CkbRpcClient) {
         },
         checkpoint_cell,
         smt,
+        tmp_dir.path().to_path_buf(),
     )
+    .await
     .build_tx()
     .await
     .unwrap();
