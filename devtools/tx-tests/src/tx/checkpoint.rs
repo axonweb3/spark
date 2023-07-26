@@ -1,5 +1,5 @@
 use common::traits::tx_builder::ICheckpointTxBuilder;
-use common::types::tx_builder::{Checkpoint, CheckpointProof, CheckpointTypeIds};
+use common::types::tx_builder::{Checkpoint, CheckpointProof, CheckpointTypeIds, ProposeCount};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::checkpoint::CheckpointTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Tx};
@@ -38,6 +38,10 @@ pub async fn checkpoint_tx(ckb: &CkbRpcClient) {
             period: 0,
             latest_block_height: 10,
             timestamp: 11111,
+            propose_count: vec![ProposeCount {
+                proposer: omni_eth.address().unwrap(),
+                count:    100,
+            }],
             ..Default::default()
         },
         CheckpointProof {
