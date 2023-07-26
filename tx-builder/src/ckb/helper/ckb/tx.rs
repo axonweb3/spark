@@ -103,7 +103,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
                 break;
             }
 
-            async_std::task::sleep(tokio::time::Duration::from_millis(interval_ms)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(interval_ms)).await;
         }
 
         Ok(())

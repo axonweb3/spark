@@ -1,4 +1,9 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs::{copy, create_dir_all, remove_file, rename, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -38,142 +43,57 @@ use crate::ckb::helper::{
     Secp256k1, Stake as HStake, Tx, Withdraw, Xudt,
 };
 
+const DEFAULT_CONTEXT_PATH: &str = "metadata_context";
+
 pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
-    ckb:             &'a C,
-    kicker:          PrivateKey,
-    type_ids:        MetadataTypeIds,
-    last_checkpoint: Cell,
-    smt:             PSmt,
+    ckb:                     &'a C,
+    kicker:                  PrivateKey,
+    type_ids:                MetadataTypeIds,
+    last_checkpoint:         Cell,
+    smt:                     PSmt,
+    last_checkpoint_data:    Checkpoint,
+    last_metadata_cell:      Cell,
+    last_metadata_cell_data: AMetadataCellData,
+    dir:                     PathBuf,
 }
 
-#[async_trait]
-impl<'a, C: CkbRpc, PSmt> IMetadataTxBuilder<'a, C, PSmt> for MetadataSmtTxBuilder<'a, C, PSmt>
+#[derive(serde::Deserialize, serde::Serialize)]
+struct MetadataContext {
+    miner_groups:        Vec<MinerGroupInfo>,
+    validators:          Vec<EpochStakeInfo>,
+    no_top_stakers:      Vec<(H160, u128)>,
+    no_top_delegators:   HashMap<H160, HashMap<H160, u128>>,
+    old_stake_smt_proof: Vec<u8>,
+    epoch:               Epoch,
+}
+
+impl<'a, C: CkbRpc, PSmt> MetadataSmtTxBuilder<'a, C, PSmt>
 where
     PSmt: ProposalSmtStorage + StakeSmtStorage + DelegateSmtStorage + Send + 'static + Sync,
 {
-    fn new(
-        ckb: &'a C,
-        kicker: PrivateKey,
-        type_ids: MetadataTypeIds,
-        last_checkpoint: Cell,
-        smt: PSmt,
-    ) -> Self {
-        Self {
-            ckb,
-            kicker,
-            type_ids,
-            last_checkpoint,
-            smt,
+    async fn generate_context(&self) -> Result<MetadataContext> {
+        // load context from file, if it is valid, use it directly and never generate
+        if let Some(f) = load_file(&self.dir) {
+            match serde_json::from_reader::<_, MetadataContext>(f) {
+                Ok(f) => {
+                    if f.epoch == self.last_checkpoint_data.epoch {
+                        return Ok(f);
+                    }
+                }
+                Err(e) => log::debug!("parser metadata error: {}", e),
+            }
         }
-    }
 
-    async fn build_tx(
-        self,
-    ) -> Result<(
-        TransactionView,
-        Vec<(H160, u128)>,
-        HashMap<H160, HashMap<H160, u128>>,
-    )> {
-        let metadata_type = HMetadata::type_(&self.type_ids.metadata_type_id);
-
-        let last_metadata_cell = HMetadata::get_cell(self.ckb, metadata_type.clone()).await?;
-
-        let last_metadata_cell_data =
-            AMetadataCellData::new_unchecked(last_metadata_cell.output_data.unwrap().into_bytes());
-
-        let stake_smt = HStake::smt_type(&self.type_ids.stake_smt_type_id);
-
-        let last_stake_smt_cell = HStake::get_smt_cell(self.ckb, stake_smt.clone()).await?;
-
-        let delegate_smt = HDelegate::smt_type(&self.type_ids.delegate_smt_type_id);
-
-        let last_delegate_smt_cell =
-            HDelegate::get_smt_cell(self.ckb, delegate_smt.clone()).await?;
-
-        let mut inputs = vec![
-            // metadata
-            CellInput::new_builder()
-                .previous_output(last_metadata_cell.out_point.into())
-                .build(),
-            // stake smt
-            CellInput::new_builder()
-                .previous_output(last_stake_smt_cell.out_point.into())
-                .build(),
-            // delegate smt
-            CellInput::new_builder()
-                .previous_output(last_delegate_smt_cell.out_point.into())
-                .build(),
-        ];
-
-        let mut witnesses = vec![
-            WitnessArgs::default().as_bytes(), // placeholder for metadata type
-            WitnessArgs::default().as_bytes(), // placeholder for stake smt type
-            WitnessArgs::default().as_bytes(), // placeholder for delegate smt type
-        ];
-
-        let checkpoint_data = self.last_checkpoint.output_data.unwrap().into_bytes();
-        let checkpoint_data = CheckpointCellData::new_unchecked(checkpoint_data);
-        let last_checkpoint: Checkpoint = checkpoint_data.into();
-
-        ProposalSmtStorage::insert(
+        let stakers = StakeSmtStorage::get_sub_leaves(
             &self.smt,
-            last_checkpoint.epoch,
-            last_checkpoint
-                .propose_count
-                .iter()
-                .map(|v| (v.proposer.0.into(), v.count))
-                .collect(),
+            self.last_checkpoint_data.epoch + INAUGURATION,
         )
         .await?;
-
-        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
-        let new_proposal_count_smt_proof =
-            ProposalSmtStorage::generate_top_proof(&self.smt, vec![last_checkpoint.epoch])
-                .await
-                .unwrap();
-
-        struct EpochStakeInfo {
-            staker:     common::types::H160,
-            amount:     u128,
-            delegaters: HashMap<common::types::H160, u128>,
-        }
-
-        impl EpochStakeInfo {
-            fn total_stake(&self) -> u128 {
-                self.amount + self.delegaters.values().sum::<u128>()
-            }
-        }
-
-        impl PartialOrd for EpochStakeInfo {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.total_stake().cmp(&other.total_stake()))
-            }
-        }
-
-        impl Ord for EpochStakeInfo {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                self.total_stake().cmp(&other.total_stake())
-            }
-        }
-
-        impl PartialEq for EpochStakeInfo {
-            fn eq(&self, other: &Self) -> bool {
-                self.staker == other.staker
-                    && self.amount == other.amount
-                    && self.delegaters == other.delegaters
-            }
-        }
-
-        impl Eq for EpochStakeInfo {}
-
-        let stakers =
-            StakeSmtStorage::get_sub_leaves(&self.smt, last_checkpoint.epoch + INAUGURATION)
-                .await?;
-
         let mut miner_groups = Vec::with_capacity(stakers.len());
 
         let quorum = to_u16(
-            &last_metadata_cell_data
+            &self
+                .last_metadata_cell_data
                 .as_reader()
                 .metadata()
                 .get(1)
@@ -188,7 +108,7 @@ where
             for (staker, amount) in stakers.clone().into_iter() {
                 let delegaters = DelegateSmtStorage::get_sub_leaves(
                     &self.smt,
-                    last_checkpoint.epoch + INAUGURATION,
+                    self.last_checkpoint_data.epoch + INAUGURATION,
                     staker,
                 )
                 .await?;
@@ -198,7 +118,7 @@ where
                     amount,
                     delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
                         &self.smt,
-                        vec![last_checkpoint.epoch + INAUGURATION],
+                        vec![self.last_checkpoint_data.epoch + INAUGURATION],
                         staker,
                     )
                     .await?,
@@ -252,54 +172,97 @@ where
         };
 
         let old_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
-            last_checkpoint.epoch + INAUGURATION,
+            self.last_checkpoint_data.epoch + INAUGURATION,
         ])
         .await
         .unwrap();
 
+        let context = MetadataContext {
+            miner_groups,
+            validators,
+            no_top_stakers,
+            no_top_delegators,
+            old_stake_smt_proof,
+            epoch: self.last_checkpoint_data.epoch,
+        };
+
+        dump_to_dir(&context, &self.dir);
+
+        Ok(context)
+    }
+
+    async fn generate_staker(
+        &self,
+        context: &MetadataContext,
+    ) -> Result<(Vec<u8>, StakeSmtCellData)> {
         StakeSmtStorage::remove(
             &self.smt,
-            last_checkpoint.epoch + INAUGURATION,
-            no_top_stakers.iter().map(|(a, _)| a).cloned().collect(),
+            self.last_checkpoint_data.epoch + INAUGURATION,
+            context
+                .no_top_stakers
+                .iter()
+                .map(|(a, _)| a)
+                .cloned()
+                .collect(),
         )
         .await
         .unwrap();
 
-        StakeSmtStorage::new_epoch(&self.smt, last_checkpoint.epoch + INAUGURATION + 1)
-            .await
-            .unwrap();
+        StakeSmtStorage::new_epoch(
+            &self.smt,
+            self.last_checkpoint_data.epoch + INAUGURATION + 1,
+        )
+        .await
+        .unwrap();
 
         let new_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
-            last_checkpoint.epoch + INAUGURATION + 1,
+            self.last_checkpoint_data.epoch + INAUGURATION + 1,
         ])
         .await
         .unwrap();
 
         let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
 
-        let delegatets_remove_keys = no_top_delegators
+        let stake_smt_cell_data = StakeSmtCellData {
+            smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
+            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
+                .calc_script_hash(),
+        };
+
+        Ok((new_stake_smt_proof, stake_smt_cell_data))
+    }
+
+    async fn generate_delegator(
+        &self,
+        context: &MetadataContext,
+    ) -> Result<(Vec<DelegateProof>, DelegateSmtCellData)> {
+        let delegatets_remove_keys = context
+            .no_top_delegators
             .iter()
             .flat_map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(*d)))
             .collect();
 
         DelegateSmtStorage::remove(
             &self.smt,
-            last_checkpoint.epoch + INAUGURATION,
+            self.last_checkpoint_data.epoch + INAUGURATION,
             delegatets_remove_keys,
         )
         .await
         .unwrap();
 
-        DelegateSmtStorage::new_epoch(&self.smt, last_checkpoint.epoch + INAUGURATION + 1)
-            .await
-            .unwrap();
+        DelegateSmtStorage::new_epoch(
+            &self.smt,
+            self.last_checkpoint_data.epoch + INAUGURATION + 1,
+        )
+        .await
+        .unwrap();
 
-        let mut delegator_staker_smt_roots = Vec::with_capacity(validators.len());
+        let mut delegator_staker_smt_roots = Vec::with_capacity(context.validators.len());
         let mut new_delegator_proofs = Vec::new();
-        for v in validators.iter() {
+        for v in context.validators.iter() {
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
                 &self.smt,
-                vec![last_checkpoint.epoch + INAUGURATION + 1],
+                vec![self.last_checkpoint_data.epoch + INAUGURATION + 1],
                 v.staker,
             )
             .await
@@ -318,12 +281,44 @@ where
                 .into(),
             });
         }
+        let delegate_smt_cell_data = DelegateSmtCellData {
+            smt_roots:          delegator_staker_smt_roots,
+            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
+                .calc_script_hash(),
+        };
 
+        Ok((new_delegator_proofs, delegate_smt_cell_data))
+    }
+
+    async fn generate_metadata(
+        &self,
+        context: &MetadataContext,
+        new_stake_smt_proof: Vec<u8>,
+        new_delegator_proofs: Vec<DelegateProof>,
+    ) -> Result<(AMetadataCellData, WitnessArgs)> {
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
+        ProposalSmtStorage::insert(
+            &self.smt,
+            self.last_checkpoint_data.epoch,
+            self.last_checkpoint_data
+                .propose_count
+                .iter()
+                .map(|v| (v.proposer.0.into(), v.count))
+                .collect(),
+        )
+        .await?;
+
+        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
+        let new_proposal_count_smt_proof = ProposalSmtStorage::generate_top_proof(&self.smt, vec![
+            self.last_checkpoint_data.epoch,
+        ])
+        .await
+        .unwrap();
+
         let new_metadata = {
             let mut new_validators = Vec::new();
 
-            for v in validators {
+            for v in context.validators.iter() {
                 let stake_lock = HStake::lock(&self.type_ids.metadata_type_id, &v.staker.0.into());
                 let stake_cell = HStake::get_cell(self.ckb, stake_lock, xudt.clone())
                     .await?
@@ -354,7 +349,7 @@ where
                 });
             }
 
-            last_metadata_cell_data
+            self.last_metadata_cell_data
                 .metadata()
                 .get(1)
                 .unwrap()
@@ -372,15 +367,17 @@ where
 
         // new metadata cell data
         let metadata_cell_data = {
-            let next_metadata = last_metadata_cell_data
+            let next_metadata = self
+                .last_metadata_cell_data
                 .as_reader()
                 .metadata()
                 .get(1)
                 .unwrap()
                 .to_entity();
-            last_metadata_cell_data
+            self.last_metadata_cell_data
+                .clone()
                 .as_builder()
-                .epoch(to_uint64(last_checkpoint.epoch + 1))
+                .epoch(to_uint64(self.last_checkpoint_data.epoch + 1))
                 .propose_count_smt_root(to_byte32(
                     &Into::<[u8; 32]>::into(proposal_count_smt_root).into(),
                 ))
@@ -396,8 +393,8 @@ where
         let metadata_witness = {
             let stake_smt_election_info = StakeSmtElectionInfo {
                 n2:                  ElectionSmtProof {
-                    miners:             miner_groups,
-                    staker_epoch_proof: old_stake_smt_proof,
+                    miners:             context.miner_groups.clone(),
+                    staker_epoch_proof: context.old_stake_smt_proof.clone(),
                 },
                 new_stake_proof:     new_stake_smt_proof,
                 new_delegate_proofs: new_delegator_proofs,
@@ -412,27 +409,30 @@ where
                 .input_type(Some(Into::<AMetadataWitness>::into(witness_data).as_bytes()).pack())
                 .build()
         };
-        let stake_smt_cell_data = StakeSmtCellData {
-            smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
-            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
-                .calc_script_hash(),
-        };
 
-        let delegate_smt_cell_data = DelegateSmtCellData {
-            smt_roots:          delegator_staker_smt_roots,
-            metadata_type_hash: HMetadata::type_(&self.type_ids.metadata_type_id)
-                .calc_script_hash(),
-        };
+        Ok((metadata_cell_data, metadata_witness))
+    }
 
+    async fn no_top_process(
+        &self,
+        context: &MetadataContext,
+    ) -> Result<(
+        Vec<bytes::Bytes>,
+        Vec<CellInput>,
+        Vec<CellOutput>,
+        Vec<bytes::Bytes>,
+    )> {
+        let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
+        let mut witnesses = Vec::new();
         let mut withdraw_set: HashMap<H160, u128> = HashMap::default();
         // remove no top staker
-        let mut no_top_staker_cell_datas = Vec::with_capacity(no_top_stakers.len());
+        let mut no_top_staker_cell_datas = Vec::with_capacity(context.no_top_stakers.len());
         let mut no_top_staker_cell_inputs: Vec<CellInput> =
-            Vec::with_capacity(no_top_stakers.len());
+            Vec::with_capacity(context.no_top_stakers.len());
         let mut no_top_staker_cell_outputs: Vec<CellOutput> =
-            Vec::with_capacity(no_top_stakers.len());
+            Vec::with_capacity(context.no_top_stakers.len());
 
-        for (addr, amount) in no_top_stakers.iter() {
+        for (addr, amount) in context.no_top_stakers.iter() {
             *withdraw_set.entry(*addr).or_default() += amount;
 
             let stake_lock = HStake::lock(&self.type_ids.metadata_type_id, &addr.0.into());
@@ -463,9 +463,9 @@ where
 
         // remove no top delegator
         let mut no_top_delegator_cell_inputs: Vec<CellInput> =
-            Vec::with_capacity(no_top_stakers.len());
-        let mut delegator_at_cell_datas = HashMap::with_capacity(no_top_delegators.len());
-        for (staker_address, v) in no_top_delegators.iter() {
+            Vec::with_capacity(context.no_top_stakers.len());
+        let mut delegator_at_cell_datas = HashMap::with_capacity(context.no_top_delegators.len());
+        for (staker_address, v) in context.no_top_delegators.iter() {
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
 
@@ -538,7 +538,7 @@ where
                 .expect("Must have withdraw cell");
 
             let withdraw_data =
-                Withdraw::update_cell_data(&withdraw_cell, last_checkpoint.epoch, amount);
+                Withdraw::update_cell_data(&withdraw_cell, self.last_checkpoint_data.epoch, amount);
 
             withdraw_inputs.push(
                 CellInput::new_builder()
@@ -557,15 +557,78 @@ where
             witnesses.push(Withdraw::witness(true).as_bytes());
         }
 
+        let inputs = no_top_staker_cell_inputs
+            .into_iter()
+            .chain(no_top_delegator_cell_inputs.into_iter())
+            .chain(withdraw_inputs.into_iter())
+            .collect();
+
+        let outputs = no_top_staker_cell_outputs
+            .into_iter()
+            .chain(no_top_delegator_cell_outputs.into_iter())
+            .chain(withdraw_outputs.into_iter())
+            .collect();
+
+        let output_datas = no_top_staker_cell_datas
+            .into_iter()
+            .chain(no_top_delegator_cell_output_datas.into_iter())
+            .chain(withdraw_output_datas.into_iter())
+            .collect();
+
+        Ok((witnesses, inputs, outputs, output_datas))
+    }
+
+    async fn build_tx(self) -> Result<TransactionView> {
+        let context = self.generate_context().await?;
+        let (new_stake_smt_proof, stake_smt_cell_data) = self.generate_staker(&context).await?;
+        let (new_delegator_proofs, delegate_smt_cell_data) =
+            self.generate_delegator(&context).await?;
+        let (metadata_cell_data, metadata_witness) = self
+            .generate_metadata(&context, new_stake_smt_proof, new_delegator_proofs)
+            .await?;
+        let (no_top_witnesses, no_top_inputs, no_top_outputs, no_top_output_datas) =
+            self.no_top_process(&context).await?;
+
+        let metadata_type = HMetadata::type_(&self.type_ids.metadata_type_id);
+
+        let stake_smt = HStake::smt_type(&self.type_ids.stake_smt_type_id);
+
+        let last_stake_smt_cell = HStake::get_smt_cell(self.ckb, stake_smt.clone()).await?;
+
+        let delegate_smt = HDelegate::smt_type(&self.type_ids.delegate_smt_type_id);
+
+        let last_delegate_smt_cell =
+            HDelegate::get_smt_cell(self.ckb, delegate_smt.clone()).await?;
+
+        let mut inputs = vec![
+            // metadata
+            CellInput::new_builder()
+                .previous_output(self.last_metadata_cell.out_point.into())
+                .build(),
+            // stake smt
+            CellInput::new_builder()
+                .previous_output(last_stake_smt_cell.out_point.into())
+                .build(),
+            // delegate smt
+            CellInput::new_builder()
+                .previous_output(last_delegate_smt_cell.out_point.into())
+                .build(),
+        ];
+
+        let mut witnesses = vec![
+            // metadata type
+            metadata_witness.as_bytes(),
+            // stake smt type
+            HStake::smt_witness(1, vec![], vec![], vec![]).as_bytes(),
+            // delegate smt type
+            HDelegate::smt_witness(1, vec![]).as_bytes(),
+        ];
+
         let mut outputs_data = vec![
             Into::<AMetadataCellData>::into(metadata_cell_data).as_bytes(),
             Into::<AStakeSmtCellData>::into(stake_smt_cell_data).as_bytes(),
             Into::<ADelegateSmtCellData>::into(delegate_smt_cell_data).as_bytes(),
         ];
-
-        witnesses[0] = metadata_witness.as_bytes();
-        witnesses[1] = HStake::smt_witness(1, vec![], vec![], vec![]).as_bytes();
-        witnesses[2] = HDelegate::smt_witness(1, vec![]).as_bytes();
 
         let mut outputs = vec![
             // metadata cell
@@ -585,20 +648,10 @@ where
                 .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];
 
-        // add no top stakers
-        inputs.extend(no_top_staker_cell_inputs);
-        outputs.extend(no_top_staker_cell_outputs);
-        outputs_data.extend(no_top_staker_cell_datas);
-
-        // add no top delegators
-        inputs.extend(no_top_delegator_cell_inputs);
-        outputs.extend(no_top_delegator_cell_outputs);
-        outputs_data.extend(no_top_delegator_cell_output_datas);
-
-        // add withdraw cells
-        inputs.extend(withdraw_inputs);
-        outputs.extend(withdraw_outputs);
-        outputs_data.extend(withdraw_output_datas);
+        witnesses.extend(no_top_witnesses);
+        inputs.extend(no_top_inputs);
+        outputs.extend(no_top_outputs);
+        outputs_data.extend(no_top_output_datas);
 
         let cell_deps = vec![
             Secp256k1::lock_dep(),
@@ -640,6 +693,119 @@ where
             output_indices: vec![],
         })?;
 
-        Ok((tx.inner(), no_top_stakers, no_top_delegators))
+        Ok(tx.inner())
+    }
+}
+
+#[async_trait]
+impl<'a, C: CkbRpc, PSmt> IMetadataTxBuilder<'a, C, PSmt> for MetadataSmtTxBuilder<'a, C, PSmt>
+where
+    PSmt: ProposalSmtStorage + StakeSmtStorage + DelegateSmtStorage + Send + 'static + Sync,
+{
+    async fn new(
+        ckb: &'a C,
+        kicker: PrivateKey,
+        type_ids: MetadataTypeIds,
+        last_checkpoint: Cell,
+        smt: PSmt,
+        dir: PathBuf,
+    ) -> Self {
+        let checkpoint_data = last_checkpoint.output_data.clone().unwrap().into_bytes();
+        let checkpoint_data = CheckpointCellData::new_unchecked(checkpoint_data);
+        let last_checkpoint_data: Checkpoint = checkpoint_data.into();
+
+        let metadata_type = HMetadata::type_(&type_ids.metadata_type_id);
+
+        let last_metadata_cell = HMetadata::get_cell(ckb, metadata_type.clone())
+            .await
+            .unwrap();
+
+        let last_metadata_cell_data = AMetadataCellData::new_unchecked(
+            last_metadata_cell.output_data.clone().unwrap().into_bytes(),
+        );
+        Self {
+            ckb,
+            kicker,
+            type_ids,
+            last_checkpoint,
+            last_checkpoint_data,
+            smt,
+            last_metadata_cell,
+            last_metadata_cell_data,
+            dir,
+        }
+    }
+
+    async fn build_tx(self) -> Result<TransactionView> {
+        self.build_tx().await
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct EpochStakeInfo {
+    staker:     common::types::H160,
+    amount:     u128,
+    delegaters: HashMap<common::types::H160, u128>,
+}
+
+impl EpochStakeInfo {
+    fn total_stake(&self) -> u128 {
+        self.amount + self.delegaters.values().sum::<u128>()
+    }
+}
+
+impl PartialOrd for EpochStakeInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.total_stake().cmp(&other.total_stake()))
+    }
+}
+
+impl Ord for EpochStakeInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.total_stake().cmp(&other.total_stake())
+    }
+}
+
+impl PartialEq for EpochStakeInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.staker == other.staker
+            && self.amount == other.amount
+            && self.delegaters == other.delegaters
+    }
+}
+
+impl Eq for EpochStakeInfo {}
+
+fn load_file(dir: &PathBuf) -> Option<std::io::BufReader<File>> {
+    create_dir_all(dir).unwrap();
+    let path = dir.join(DEFAULT_CONTEXT_PATH);
+
+    File::open(path).map(std::io::BufReader::new).ok()
+}
+
+fn dump_to_dir(context: &MetadataContext, dir: &PathBuf) {
+    create_dir_all(dir).unwrap();
+    let tmp_dir = dir.join("tmp");
+    create_dir_all(&tmp_dir).unwrap();
+
+    let tmp_file = tmp_dir.join(DEFAULT_CONTEXT_PATH);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(false)
+        .open(&tmp_file)
+        .unwrap();
+    file.set_len(0)
+        .and_then(|_| serde_json::to_string(&context).map_err(Into::into))
+        .and_then(|json_string| file.write_all(json_string.as_bytes()))
+        .and_then(|_| file.sync_all())
+        .unwrap();
+    move_file(tmp_file, dir.join(DEFAULT_CONTEXT_PATH));
+}
+
+fn move_file<P: AsRef<std::path::Path>>(src: P, dst: P) {
+    if rename(&src, &dst).is_err() {
+        copy(&src, &dst).unwrap();
+        remove_file(&src).unwrap();
     }
 }

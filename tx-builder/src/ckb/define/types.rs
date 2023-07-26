@@ -99,7 +99,7 @@ impl From<StakeGroupInfo> for AStakeGroupInfo {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct DelegateInfo {
     pub delegator_addr: H160,
     pub amount:         u128,
@@ -547,7 +547,7 @@ impl From<DelegateProof> for ADelegateProof {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, serde::Deserialize, serde::Serialize)]
 pub struct MinerGroupInfo {
     pub staker:               H160,
     pub amount:               u128,
