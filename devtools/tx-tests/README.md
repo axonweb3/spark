@@ -54,4 +54,6 @@ cargo run -- -e  // delegate smt tx
 cargo run -- -w  // withdraw tx
 
 cargo run -- -a  // metadata tx
+
+cargo run -- -r  // reward tx
 ```

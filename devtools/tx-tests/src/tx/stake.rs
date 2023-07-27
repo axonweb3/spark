@@ -30,7 +30,7 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient) {
             l1_pub_key,
             bls_pub_key,
             delegate: DelegateRequirement {
-                commission_rate:    80,
+                commission_rate:    20,
                 maximum_delegators: 2,
                 threshold:          0,
             },

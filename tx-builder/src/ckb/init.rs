@@ -252,7 +252,7 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
 
         // reward smt cell
         let reward_smt_type_id = TypeId::calc(&first_input, 6);
-        let reward_type = TypeId::script(&reward_smt_type_id); // todo
+        let reward_type = Reward::smt_type(&reward_smt_type_id);
         let reward_type_hash = reward_type.calc_script_hash();
         outputs[6] = tx
             .output(6)

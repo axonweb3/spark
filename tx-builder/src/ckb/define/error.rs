@@ -54,7 +54,7 @@ pub enum CkbTxErr {
     #[error("The minimum value of the current epoch should be 2")]
     EpochTooSmall,
 
-    #[error("Stake amount not found in stack SMT")]
+    #[error("Stake amount not found in stack SMT. staker: {0}")]
     StakeAmountNotFound(H160),
 
     #[error(
