@@ -1,21 +1,15 @@
 pub mod types;
 
 use std::fs;
-use std::io;
 use std::io::Write;
 use std::path::Path;
 
 use serde::{de, ser};
 
-pub fn parse_reader<R: io::Read, T: de::DeserializeOwned>(r: &mut R) -> T {
-    let mut buf = String::new();
-    r.read_to_string(&mut buf).unwrap();
-    toml::from_str(&buf).unwrap()
-}
+use common::config_parser::parse_file as cparse_file;
 
 pub fn parse_file<T: de::DeserializeOwned>(path: impl AsRef<Path>) -> T {
-    let mut f = fs::File::open(path).unwrap();
-    parse_reader(&mut f)
+    cparse_file(path, false).unwrap()
 }
 
 pub fn write_file<T: ser::Serialize>(path: impl AsRef<Path>, content: &T) {

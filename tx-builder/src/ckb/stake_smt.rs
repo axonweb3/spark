@@ -175,6 +175,11 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             witnesses.push(Stake::witness(1).as_bytes());
 
             let (old_total_stake_amount, old_stake_data) = Stake::parse_stake_data(stake_cell);
+            log::info!(
+                "[stake smt] staker: {}, old total stake amount: {}",
+                staker.to_string(),
+                old_total_stake_amount,
+            );
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, staker);
 
@@ -196,6 +201,13 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     );
                     witnesses.push(Withdraw::witness(true).as_bytes());
 
+                    log::info!(
+                        "[stake smt] staker: {}, new total stake amount: {}, withdraw amount: {}",
+                        staker.to_string(),
+                        old_total_stake_amount - withdraw_amount,
+                        withdraw_amount,
+                    );
+
                     (
                         old_total_stake_amount - withdraw_amount,
                         Some(Withdraw::update_cell_data(
@@ -205,6 +217,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                         )),
                     )
                 } else {
+                    log::info!(
+                        "[stake smt] staker: {}, new total stake amount: {}, withdraw amount: {}",
+                        staker.to_string(),
+                        old_total_stake_amount,
+                        0,
+                    );
                     (old_total_stake_amount, None)
                 };
 
@@ -249,10 +267,17 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
     async fn update_stake_smt(&self, new_smt: HashMap<SmtStaker, Amount>) -> Result<Root> {
         let new_smt_stakers = new_smt
             .iter()
-            .map(|(k, v)| UserAmount {
-                user:        k.to_owned(),
-                amount:      v.to_owned(),
-                is_increase: true,
+            .map(|(k, v)| {
+                log::info!(
+                    "[stake smt] new smt, user: {}, amount: {}",
+                    k.to_string(),
+                    v,
+                );
+                UserAmount {
+                    user:        k.to_owned(),
+                    amount:      v.to_owned(),
+                    is_increase: true,
+                }
             })
             .collect();
 
@@ -285,6 +310,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             let (_, stake_data) = Stake::parse_stake_data(&cell);
             let stake_delta = Stake::item(&stake_data.lock().delta());
 
+            log::info!(
+                "[stake smt] staker: {}, stake item: {}",
+                staker.to_string(),
+                stake_data
+            );
+
             if stake_delta.inauguration_epoch < self.current_epoch + INAUGURATION {
                 continue;
             }
@@ -293,6 +324,10 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
             let smt_staker = SmtStaker::from(staker.0);
             if new_smt.contains_key(&smt_staker) {
+                log::info!(
+                    "[stake smt] staker {} exists in the stake smt",
+                    staker.to_string(),
+                );
                 let origin_stake_amount = new_smt.get(&smt_staker).unwrap().to_owned();
                 if stake_delta.is_increase {
                     new_smt.insert(smt_staker, origin_stake_amount + stake_delta.amount);
@@ -303,6 +338,10 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     withdraw_amounts.insert(staker, stake_delta.amount);
                 };
             } else {
+                log::info!(
+                    "[stake smt] staker {} does not exists in the stake smt",
+                    staker.to_string(),
+                );
                 if !stake_delta.is_increase {
                     return Err(CkbTxErr::Increase(stake_delta.is_increase).into());
                 }
@@ -394,10 +433,17 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
         let delete_count = all_stakes.len() - 3 * self.quorum as usize;
         let non_top_stakers = &all_stakes[..delete_count];
+        log::info!(
+            "[stake smt] 3 * quorum: {}, stakers count: {}, none top stakers count: {}",
+            3 * self.quorum,
+            all_stakes.len(),
+            non_top_stakers.len(),
+        );
 
         non_top_stakers
             .iter()
             .map(|(staker, _)| {
+                log::info!("[stake smt] none top staker: {}", staker.to_string());
                 new_smt.remove(staker);
                 (TxStaker::from(staker.0), old_smt.contains_key(staker))
             })

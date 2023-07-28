@@ -14,3 +14,5 @@ free-space
 
 /devtools/tx-tests/src/config/priv_keys*.toml
 /devtools/tx-tests/src/config/type_ids*.toml
+
+*.log

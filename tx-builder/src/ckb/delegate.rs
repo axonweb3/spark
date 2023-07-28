@@ -254,6 +254,12 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
     }
 
     fn first_delegate_data(&self, mut wallet_amount: Amount) -> CkbTxResult<Vec<Bytes>> {
+        log::info!(
+            "[first delegate] delegator: {}, old wallet amount: {}",
+            self.delegator.to_string(),
+            wallet_amount
+        );
+
         let mut total_delegate_amount = 0;
         let mut delegates = vec![];
 
@@ -262,6 +268,13 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
                 return Err(CkbTxErr::Increase(item.is_increase));
             }
             total_delegate_amount += item.amount;
+
+            log::info!(
+                "[first delegate] delegator: {}, delegate to: {}, delegate amount: {}",
+                self.delegator.to_string(),
+                item.staker.to_string(),
+                item.amount,
+            );
 
             let mut item = item.to_owned();
             item.total_amount = item.amount;
@@ -275,6 +288,13 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
             });
         }
         wallet_amount -= total_delegate_amount;
+
+        log::info!(
+            "[first delegate] delegator: {}, new total delegate amount: {}, new wallet amount: {}",
+            self.delegator.to_string(),
+            total_delegate_amount,
+            wallet_amount,
+        );
 
         Ok(vec![
             // AT cell data
@@ -300,25 +320,37 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
     ) -> CkbTxResult<Vec<Bytes>> {
         let mut total_delegate_amount = new_u128(&delegate_data[..TOKEN_BYTES]);
 
+        log::info!(
+            "[update delegate] delegator: {}, old wallet amount: {}, old total delegate amount: {}",
+            self.delegator.to_string(),
+            wallet_amount,
+            total_delegate_amount,
+        );
+
         let mut delegate_data = delegate_data;
         let delegate_data = DelegateAtCellData::new_unchecked(delegate_data.split_off(TOKEN_BYTES));
 
-        let (updated_delegates, new_stakers) = self.process_new_delegates(
+        let (mut updated_delegates, new_stakers) = self.process_new_delegates(
             &delegate_data.lock(),
             &mut wallet_amount,
             &mut total_delegate_amount,
         )?;
 
         // process rest delegate infos in delegate AT cell
-        let updated_delegates = self
-            .process_rest_delegates(
-                &delegate_data.lock(),
-                &new_stakers,
-                &mut wallet_amount,
-                &mut total_delegate_amount,
-                updated_delegates,
-            )?
-            .build();
+        self.process_rest_delegates(
+            &delegate_data.lock(),
+            &new_stakers,
+            &mut wallet_amount,
+            &mut total_delegate_amount,
+            &mut updated_delegates,
+        )?;
+
+        log::info!(
+            "[update delegate] delegator: {}, new wallet amount: {}, new total delegate amount: {}",
+            self.delegator.to_string(),
+            wallet_amount,
+            total_delegate_amount,
+        );
 
         let inner_delegate_data = delegate_data.lock();
 
@@ -331,7 +363,11 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
                     .lock(
                         inner_delegate_data
                             .as_builder()
-                            .delegator_infos(updated_delegates)
+                            .delegator_infos({
+                                DelegateInfoDeltas::new_builder()
+                                    .extend(updated_delegates.into_iter().map(Into::into))
+                                    .build()
+                            })
                             .build(),
                     )
                     .build()
@@ -347,30 +383,39 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         cell_delegates: &DelegateAtCellLockData,
         wallet_amount: &mut u128,
         total_delegate_amount: &mut u128,
-    ) -> CkbTxResult<(DelegateInfoDeltasBuilder, HashSet<EthAddress>)> {
+    ) -> CkbTxResult<(Vec<DelegateItem>, HashSet<EthAddress>)> {
         let mut last_delegates = HashMap::new();
         for delegate in cell_delegates.delegator_infos() {
-            last_delegates.insert(to_h160(&delegate.staker()), delegate);
+            let delegate_item = DelegateItem::from(delegate);
+
+            log::info!(
+                "[update delegate] delegator: {}, old delegate info: {}",
+                self.delegator.to_string(),
+                delegate_item,
+            );
+
+            last_delegates.insert(delegate_item.staker.clone(), delegate_item);
         }
 
         let mut stakers = HashSet::new();
-        let mut updated_delegates = DelegateInfoDeltas::new_builder();
+        let mut updated_delegates = Vec::new();
 
         for delegate in self.delegates.iter() {
+            log::info!("[update delegate] new delegate info: {}", delegate);
+
             stakers.insert(delegate.staker.clone());
 
             if last_delegates.contains_key(&delegate.staker) {
-                let last_delegate_info = last_delegates.get(&delegate.staker).unwrap();
+                let last_delegate = last_delegates.get(&delegate.staker).unwrap();
 
-                if to_u128(&last_delegate_info.amount()) == 0 {
+                if last_delegate.amount == 0 {
                     continue;
                 }
 
-                let mut total_delegat_to_staker_amount =
-                    to_u128(&last_delegate_info.total_amount());
+                let mut total_delegat_to_staker_amount = last_delegate.total_amount;
 
                 let actual_info = self.update_delegate(
-                    last_delegate_info,
+                    last_delegate,
                     delegate,
                     wallet_amount,
                     total_delegate_amount,
@@ -381,23 +426,33 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
                     total_delegat_to_staker_amount = actual_info.total_elect_amount;
                 }
 
-                updated_delegates = updated_delegates.push(
-                    DelegateItem {
-                        staker:             delegate.staker.clone(),
-                        total_amount:       total_delegat_to_staker_amount,
-                        is_increase:        actual_info.is_increase,
-                        amount:             actual_info.amount,
-                        inauguration_epoch: delegate.inauguration_epoch,
-                    }
-                    .into(),
+                log::info!(
+                    "[update delegate] exists in cell, actual delegate info: {}, wallet amount: {}, total delegate amount: {}",
+                    actual_info,
+                    wallet_amount,
+                    total_delegate_amount,
                 );
+
+                updated_delegates.push(DelegateItem {
+                    staker:             delegate.staker.clone(),
+                    total_amount:       total_delegat_to_staker_amount,
+                    is_increase:        actual_info.is_increase,
+                    amount:             actual_info.amount,
+                    inauguration_epoch: delegate.inauguration_epoch,
+                });
             } else {
                 if delegate.is_increase {
                     process_new_delegate(delegate.amount, wallet_amount, total_delegate_amount)?;
                 }
                 let mut delegate = delegate.to_owned();
                 delegate.total_amount = delegate.amount;
-                updated_delegates = updated_delegates.push(delegate.into());
+
+                log::info!(
+                    "[update delegate] not exists in cell, actual delegate info: {}",
+                    delegate
+                );
+
+                updated_delegates.push(delegate);
             }
         }
 
@@ -410,39 +465,33 @@ impl<'a, C: CkbRpc> DelegateTxBuilder<'a, C> {
         new_stakers: &HashSet<EthAddress>,
         wallet_amount: &mut u128,
         total_amount: &mut u128,
-        updated_delegates: DelegateInfoDeltasBuilder,
-    ) -> CkbTxResult<DelegateInfoDeltasBuilder> {
-        let mut updated_delegates = updated_delegates;
-
+        updated_delegates: &mut Vec<DelegateItem>,
+    ) -> CkbTxResult<()> {
         for delegate in cell_delegates.delegator_infos() {
-            let delta = Delegate::item(&delegate);
+            let mut delta = DelegateItem::from(delegate);
             if !new_stakers.contains(&delta.staker)
                 && (delta.total_amount != 0 || delta.amount != 0)
             {
-                let delta = if delta.inauguration_epoch < self.current_epoch + INAUGURATION {
+                if delta.inauguration_epoch < self.current_epoch + INAUGURATION {
                     let total_staker_amount = process_expired_delegate(
                         &delta,
                         wallet_amount,
                         total_amount,
                         delta.total_amount,
                     )?;
-                    delegate
-                        .as_builder()
-                        .total_amount(to_uint128(total_staker_amount))
-                        .build()
-                } else {
-                    delegate
-                };
-                updated_delegates = updated_delegates.push(delta);
+                    delta.total_amount = total_staker_amount;
+                    log::info!("[update delegate] rest delegates, delegate info: {}", delta);
+                }
+                updated_delegates.push(delta);
             }
         }
 
-        Ok(updated_delegates)
+        Ok(())
     }
 
     fn update_delegate(
         &self,
-        last_delegate: &DelegateInfoDelta,
+        last_delegate: &DelegateItem,
         new_delegate: &DelegateItem,
         wallet_amount: &mut u128,
         total_delegate_amount: &mut u128,
