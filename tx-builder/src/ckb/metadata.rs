@@ -33,7 +33,7 @@ use common::types::axon_types::{
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
-use common::utils::convert::{to_byte32, to_u16, to_uint64};
+use common::utils::convert::{to_byte32, to_uint64};
 use molecule::prelude::Builder;
 
 use crate::ckb::define::constants::*;
@@ -92,16 +92,7 @@ where
         .await?;
         let mut miner_groups = Vec::with_capacity(stakers.len());
 
-        let quorum = to_u16(
-            &self
-                .last_metadata_cell_data
-                .as_reader()
-                .metadata()
-                .get(1)
-                .unwrap()
-                .to_entity()
-                .quorum(),
-        );
+        let quorum = HMetadata::parse_quorum(&self.last_metadata_cell_data);
         log::info!(
             "[metadta] quorum: {}, stakers count: {}",
             quorum,

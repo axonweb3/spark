@@ -144,7 +144,16 @@ impl<'a, C: CkbRpc> MintTxBuilder<'a, C> {
                 }
                 .into());
             }
+
+            log::info!("[mint] mint to {}, amount: {}", staker, amount);
         }
+
+        log::info!(
+            "[mint] max supply: {}, current supply: {}, total mint: {}",
+            max_supply,
+            current_supply,
+            total_mint
+        );
 
         // selection cell
         outputs_data.push(Bytes::default());

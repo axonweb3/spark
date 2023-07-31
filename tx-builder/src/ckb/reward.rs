@@ -1,11 +1,12 @@
 use std::cmp::min;
+use std::collections::HashMap;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellDep, CellInput, CellOutput, Script, WitnessArgs},
+    packed::{CellDep, CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
     H160,
 };
@@ -17,9 +18,10 @@ use common::{
     traits::tx_builder::IRewardTxBuilder,
     types::axon_types::{
         delegate::DelegateRequirement,
+        metadata::MetadataCellData,
         reward::{RewardSmtCellData as ARewardSmtCellData, RewardWitness as ARewardWitness},
     },
-    types::tx_builder::{Amount, Epoch, EthAddress, RewardInfo, RewardTypeIds},
+    types::tx_builder::{Amount, Epoch, EthAddress, RewardMeta, RewardTypeIds},
     utils::convert::{to_ckb_h160, to_eth_h160},
 };
 
@@ -39,14 +41,18 @@ where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
-    ckb:           &'a C,
-    type_ids:      RewardTypeIds,
-    smt:           S,
-    info:          RewardInfo,
-    user:          EthAddress,
-    current_epoch: Epoch,
-    token_lock:    Script,
-    xudt:          Script,
+    ckb:                   &'a C,
+    type_ids:              RewardTypeIds,
+    reward_meta:           RewardMeta,
+    smt:                   S,
+    user:                  EthAddress,
+    current_epoch:         Epoch,
+    epoch_count:           u64,
+    metadata_outpoint:     ckb_jsonrpc_types::OutPoint,
+    minimum_propose_count: u64,
+    commission_rates:      HashMap<H160, u8>,
+    stake_cell_deps:       Vec<CellDep>,
+    requirement_cell_deps: Vec<CellDep>,
 }
 
 #[async_trait]
@@ -55,30 +61,38 @@ where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
-    fn new(
+    async fn new(
         ckb: &'a C,
         type_ids: RewardTypeIds,
         smt: S,
-        info: RewardInfo,
         user: EthAddress,
         current_epoch: Epoch,
+        epoch_count: u64,
     ) -> Self {
-        let token_lock = OmniEth::lock(&user);
-        let xudt = Xudt::type_(&type_ids.xudt_owner.pack());
+        let metadata_cell = Metadata::get_cell(ckb, Metadata::type_(&type_ids.metadata_type_id))
+            .await
+            .expect("Metadata cell not found");
+        let metadata_cell_data = MetadataCellData::new_unchecked(
+            metadata_cell.output_data.clone().unwrap().into_bytes(),
+        );
 
         Self {
             ckb,
             type_ids,
+            reward_meta: Metadata::parse_reward_meta(&metadata_cell_data),
             smt,
-            info,
             user,
             current_epoch,
-            token_lock,
-            xudt,
+            epoch_count,
+            metadata_outpoint: metadata_cell.out_point,
+            minimum_propose_count: Metadata::calc_minimum_propose_count(&metadata_cell_data),
+            commission_rates: HashMap::new(),
+            stake_cell_deps: Vec::new(),
+            requirement_cell_deps: Vec::new(),
         }
     }
 
-    async fn build_tx(self) -> Result<TransactionView> {
+    async fn build_tx(mut self) -> Result<TransactionView> {
         let reward_smt_cell = Reward::get_cell(self.ckb, &self.type_ids.reward_smt_type_id).await?;
         let selection_cell =
             Selection::get_cell(self.ckb, &self.type_ids.selection_type_id).await?;
@@ -97,24 +111,11 @@ where
         // AT cell
         let token_amount = self.add_token_to_inputs(&mut inputs).await?;
 
-        let mut cell_deps = vec![
-            OmniEth::lock_dep(),
-            Secp256k1::lock_dep(),
-            AlwaysSuccess::lock_dep(),
-            Xudt::type_dep(),
-            Reward::smt_type_dep(),
-            Selection::lock_dep(),
-            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
-            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
-            Stake::smt_cell_dep(self.ckb, &self.type_ids.stake_smt_type_id).await?,
-            Delegate::smt_cell_dep(self.ckb, &self.type_ids.delegate_smt_type_id).await?,
-        ];
-
         // 1. Build outputs data.
-        // 2. Add each staker's delegate requrement cell dep.
+        // 2. Add each staker's stake AT cell and delegate requrement cell dep.
         // 3. Build witness for reward smt cell.
         let (outputs_data, reward_witness) = self
-            .build_data_and_witness(token_amount.unwrap_or(0), &mut cell_deps)
+            .build_data_and_witness(token_amount.unwrap_or(0))
             .await?;
 
         let outputs = vec![
@@ -130,10 +131,28 @@ where
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // AT cell
             CellOutput::new_builder()
-                .lock(self.token_lock.clone())
-                .type_(Some(self.xudt.clone()).pack())
+                .lock(OmniEth::lock(&self.user))
+                .type_(Some(Xudt::type_(&self.type_ids.xudt_owner.pack())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];
+
+        let mut cell_deps = vec![
+            OmniEth::lock_dep(),
+            Secp256k1::lock_dep(),
+            AlwaysSuccess::lock_dep(),
+            Xudt::type_dep(),
+            Reward::smt_type_dep(),
+            Selection::lock_dep(),
+            Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
+            Stake::smt_cell_dep(self.ckb, &self.type_ids.stake_smt_type_id).await?,
+            Delegate::smt_cell_dep(self.ckb, &self.type_ids.delegate_smt_type_id).await?,
+            // metadata cell dep
+            CellDep::new_builder()
+                .out_point(self.metadata_outpoint.clone().into())
+                .build(),
+        ];
+        cell_deps.extend(self.stake_cell_deps);
+        cell_deps.extend(self.requirement_cell_deps);
 
         let mut witnesses = vec![
             WitnessArgs::new_builder()
@@ -156,7 +175,7 @@ where
             .build();
 
         let mut tx = Tx::new(self.ckb, tx);
-        tx.balance(self.token_lock.clone()).await?;
+        tx.balance(OmniEth::lock(&self.user)).await?;
 
         Ok(tx.inner())
     }
@@ -168,8 +187,13 @@ where
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
     async fn add_token_to_inputs(&self, inputs: &mut Vec<CellInput>) -> Result<Option<Amount>> {
-        let (token_cells, amount) =
-            Xudt::collect(self.ckb, self.token_lock.clone(), self.xudt.clone(), 1).await?;
+        let (token_cells, amount) = Xudt::collect(
+            self.ckb,
+            OmniEth::lock(&self.user),
+            Xudt::type_(&self.type_ids.xudt_owner.pack()),
+            1,
+        )
+        .await?;
 
         if token_cells.is_empty() {
             return Ok(None);
@@ -186,9 +210,8 @@ where
     }
 
     async fn build_data_and_witness(
-        &self,
+        &mut self,
         mut wallet_amount: Amount,
-        cell_deps: &mut Vec<CellDep>,
     ) -> Result<(Vec<Bytes>, RewardWitness)> {
         log::info!(
             "[reward] user: {}, old wallet amount: {}",
@@ -208,7 +231,7 @@ where
         let start_reward_epoch = self.get_start_epoch(&mut witness).await?;
         let end_reward_epoch = min(
             self.current_epoch - INAUGURATION,
-            start_reward_epoch + self.info.epoch_count - 1,
+            start_reward_epoch + self.epoch_count - 1,
         );
 
         log::info!(
@@ -226,108 +249,15 @@ where
             let mut epoch_reward_witness = EpochRewardStakeInfo::default();
             let mut validators = vec![];
 
-            for (validator, propose_count) in propose_counts.into_iter() {
-                validators.push(validator);
-
-                let is_validator = user == validator;
-
-                let delegate_amount = DelegateSmtStorage::get_amount(
-                    &self.smt,
-                    epoch + INAUGURATION,
-                    validator,
+            total_reward_amount += self
+                .calc_epoch_reward(
                     user,
+                    epoch,
+                    propose_counts,
+                    &mut epoch_reward_witness,
+                    &mut validators,
                 )
                 .await?;
-
-                let in_delegate_smt = delegate_amount.is_some();
-
-                let commission_rate = self
-                    .commission_rate(&to_ckb_h160(&validator), cell_deps)
-                    .await? as u128;
-
-                log::info!(
-                    "[reward] epoch: {}, validator: {}, commission_rate: {}, propose count: {}",
-                    epoch,
-                    validator.to_string(),
-                    commission_rate,
-                    propose_count,
-                );
-
-                let coef = if propose_count
-                    >= self.info.minimum_propose_count * self.info.propose_discount_rate as u64
-                        / 100
-                {
-                    100
-                } else {
-                    propose_count as u128 * 100 / self.info.minimum_propose_count as u128
-                };
-                let total_reward = coef * self.info.base_reward
-                    / 100
-                    / (2_u64.pow((self.current_epoch / self.info.half_reward_cycle) as u32))
-                        as u128;
-
-                let stake_amount = StakeSmtStorage::get_amount(&self.smt, epoch, validator).await?;
-                if stake_amount.is_none() {
-                    return Err(CkbTxErr::StakeAmountNotFound(validator).into());
-                }
-                let stake_amount = stake_amount.unwrap();
-
-                let all_delegates =
-                    DelegateSmtStorage::get_sub_leaves(&self.smt, epoch, validator).await?;
-                let total_delegate_amount = all_delegates.values().sum::<Amount>();
-
-                let total_amount = stake_amount + total_delegate_amount;
-                let staker_reward = total_reward * stake_amount / total_amount;
-                let delegators_reward = total_reward - staker_reward;
-
-                log::info!(
-                    "[reward] epoch: {}, stake amount: {}, total delegate amount: {}, total reward: {}, staker reward: {}, delegators reward: {}",
-                    epoch, stake_amount, total_delegate_amount, total_reward, staker_reward, delegators_reward,
-                );
-
-                if is_validator {
-                    let staker_fee_reward = delegators_reward * commission_rate / 100;
-                    total_reward_amount += staker_reward + staker_fee_reward;
-                    log::info!(
-                        "[reward] epoch: {}, is a validator, reward: {}",
-                        epoch,
-                        staker_reward + staker_fee_reward,
-                    );
-                } else if in_delegate_smt {
-                    let delegate_reward = delegators_reward * delegate_amount.unwrap()
-                        / total_delegate_amount
-                        * (100 - commission_rate)
-                        / 100;
-                    total_reward_amount += delegate_reward;
-                    log::info!(
-                        "[reward] epoch: {}, delegate amount: {}, reward: {}",
-                        epoch,
-                        delegate_amount.unwrap(),
-                        delegate_reward,
-                    );
-                }
-
-                epoch_reward_witness
-                    .reward_stake_infos
-                    .push(RewardStakeInfo {
-                        validator: to_ckb_h160(&validator),
-                        propose_count,
-                        stake_amount,
-                        delegate_infos: all_delegates
-                            .into_iter()
-                            .map(|(delegator_addr, amount)| RewardDelegateInfo {
-                                delegator_addr,
-                                amount,
-                            })
-                            .collect(),
-                        delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
-                            &self.smt,
-                            vec![epoch],
-                            validator,
-                        )
-                        .await?,
-                    });
-            }
 
             epoch_reward_witness.count_proof =
                 ProposalSmtStorage::generate_sub_proof(&self.smt, epoch, validators.clone())
@@ -405,8 +335,12 @@ where
         Ok(start_reward_epoch.unwrap() + 1)
     }
 
-    async fn commission_rate(&self, staker: &H160, cell_deps: &mut Vec<CellDep>) -> Result<u8> {
-        let requirement_type_id = Stake::get_delegate_requirement_type_id(
+    async fn commission_rate(&mut self, staker: &H160) -> Result<u8> {
+        if self.commission_rates.contains_key(staker) {
+            return Ok(*self.commission_rates.get(staker).unwrap());
+        }
+
+        let (requirement_type_id, stake_cell_outpoint) = Stake::get_delegate_requirement_type_id(
             self.ckb,
             &self.type_ids.metadata_type_id,
             staker,
@@ -420,9 +354,15 @@ where
         )
         .await?;
 
-        cell_deps.push(
+        self.stake_cell_deps.push(
             CellDep::new_builder()
                 .out_point(delegate_requirement_cell.out_point.clone().into())
+                .build(),
+        );
+
+        self.requirement_cell_deps.push(
+            CellDep::new_builder()
+                .out_point(stake_cell_outpoint.into())
                 .build(),
         );
 
@@ -430,5 +370,113 @@ where
         let delegate_requirement = DelegateRequirement::new_unchecked(data);
 
         Ok(delegate_requirement.commission_rate().into())
+    }
+
+    async fn calc_epoch_reward(
+        &mut self,
+        user: ethereum_types::H160,
+        epoch: u64,
+        propose_counts: HashMap<ethereum_types::H160, u64>,
+        epoch_reward_witness: &mut EpochRewardStakeInfo,
+        validators: &mut Vec<ethereum_types::H160>,
+    ) -> Result<u128> {
+        let mut epoch_reward = 0;
+
+        for (validator, propose_count) in propose_counts.into_iter() {
+            validators.push(validator);
+
+            let is_validator = user == validator;
+
+            let delegate_amount =
+                DelegateSmtStorage::get_amount(&self.smt, epoch + INAUGURATION, validator, user)
+                    .await?;
+
+            let in_delegate_smt = delegate_amount.is_some();
+
+            let commission_rate = self.commission_rate(&to_ckb_h160(&validator)).await? as u128;
+
+            log::info!(
+                "[reward] epoch: {}, validator: {}, commission_rate: {}, propose count: {}",
+                epoch,
+                validator.to_string(),
+                commission_rate,
+                propose_count,
+            );
+
+            let coef = if propose_count
+                >= self.minimum_propose_count * self.reward_meta.propose_discount_rate as u64 / 100
+            {
+                100
+            } else {
+                propose_count as u128 * 100 / self.reward_meta.propose_minimum_rate as u128
+            };
+            let total_reward = coef * self.reward_meta.base_reward
+                / 100
+                / (2_u64.pow((self.current_epoch / self.reward_meta.half_reward_cycle) as u32))
+                    as u128;
+
+            let stake_amount = StakeSmtStorage::get_amount(&self.smt, epoch, validator).await?;
+            if stake_amount.is_none() {
+                return Err(CkbTxErr::StakeAmountNotFound(validator).into());
+            }
+            let stake_amount = stake_amount.unwrap();
+
+            let all_delegates =
+                DelegateSmtStorage::get_sub_leaves(&self.smt, epoch, validator).await?;
+            let total_delegate_amount = all_delegates.values().sum::<Amount>();
+
+            let total_amount = stake_amount + total_delegate_amount;
+            let staker_reward = total_reward * stake_amount / total_amount;
+            let delegators_reward = total_reward - staker_reward;
+
+            log::info!(
+                "[reward] epoch: {}, stake amount: {}, total delegate amount: {}, total reward: {}, staker reward: {}, delegators reward: {}",
+                epoch, stake_amount, total_delegate_amount, total_reward, staker_reward, delegators_reward,
+            );
+
+            if is_validator {
+                let staker_fee_reward = delegators_reward * commission_rate / 100;
+                epoch_reward += staker_reward + staker_fee_reward;
+                log::info!(
+                    "[reward] epoch: {}, is a validator, reward: {}",
+                    epoch,
+                    staker_reward + staker_fee_reward,
+                );
+            } else if in_delegate_smt {
+                let delegate_reward = delegators_reward * delegate_amount.unwrap()
+                    / total_delegate_amount
+                    * (100 - commission_rate)
+                    / 100;
+                epoch_reward += delegate_reward;
+                log::info!(
+                    "[reward] epoch: {}, delegate amount: {}, reward: {}",
+                    epoch,
+                    delegate_amount.unwrap(),
+                    delegate_reward,
+                );
+            }
+
+            epoch_reward_witness
+                .reward_stake_infos
+                .push(RewardStakeInfo {
+                    validator: to_ckb_h160(&validator),
+                    propose_count,
+                    stake_amount,
+                    delegate_infos: all_delegates
+                        .into_iter()
+                        .map(|(delegator_addr, amount)| RewardDelegateInfo {
+                            delegator_addr,
+                            amount,
+                        })
+                        .collect(),
+                    delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
+                        &self.smt,
+                        vec![epoch],
+                        validator,
+                    )
+                    .await?,
+                });
+        }
+        Ok(epoch_reward)
     }
 }

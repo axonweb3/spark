@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "33e1736" }
+axon-types = { git = "https://github.com/axonweb3/axon-contract", rev = "991eaa0" }
 bytes = "1.0"
 chrono = "0.4"
 ckb-fixed-hash-core = "0.109"

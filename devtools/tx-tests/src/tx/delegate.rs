@@ -1,35 +1,28 @@
-use ckb_types::H160;
+use ckb_types::H256;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use common::traits::tx_builder::IDelegateTxBuilder;
-use common::types::tx_builder::{DelegateItem, StakeTypeIds};
+use common::types::tx_builder::{DelegateItem, EthAddress, StakeTypeIds};
 use tx_builder::ckb::delegate::DelegateTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 
-use crate::config::parse_file;
-use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
-use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
+use crate::config::parse_type_ids;
+use crate::TYPE_IDS_PATH;
 
-fn stakers() -> Vec<H160> {
-    let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let mut stakers = vec![];
-
-    for priv_key in priv_keys.staker_privkeys {
-        let test_delegator_key = priv_key.into_h256().unwrap();
-        stakers.push(OmniEth::new(test_delegator_key.clone()).address().unwrap())
-    }
-    stakers
-}
-
-pub async fn first_delegate_tx(ckb: &CkbRpcClient) {
+pub async fn first_delegate_tx(
+    ckb: &CkbRpcClient,
+    delegator_key: H256,
+    staker_eth_addr: EthAddress,
+) {
     println!("first delegate");
 
     delegate_tx(
         ckb,
+        delegator_key,
         vec![DelegateItem {
-            staker: stakers()[0].clone(),
+            staker: staker_eth_addr,
             is_increase: true,
-            amount: 10,
+            amount: 100,
             inauguration_epoch: 2,
             ..Default::default()
         }],
@@ -39,15 +32,16 @@ pub async fn first_delegate_tx(ckb: &CkbRpcClient) {
     .await;
 }
 
-pub async fn add_delegate_tx(ckb: &CkbRpcClient) {
+pub async fn add_delegate_tx(ckb: &CkbRpcClient, delegator_key: H256, staker_eth_addr: EthAddress) {
     println!("add delegate");
 
     delegate_tx(
         ckb,
+        delegator_key,
         vec![DelegateItem {
-            staker: stakers()[0].clone(),
+            staker: staker_eth_addr,
             is_increase: true,
-            amount: 5,
+            amount: 10,
             inauguration_epoch: 2,
             ..Default::default()
         }],
@@ -57,15 +51,20 @@ pub async fn add_delegate_tx(ckb: &CkbRpcClient) {
     .await;
 }
 
-pub async fn reedem_delegate_tx(ckb: &CkbRpcClient) {
+pub async fn reedem_delegate_tx(
+    ckb: &CkbRpcClient,
+    delegator_key: H256,
+    staker_eth_addr: EthAddress,
+) {
     println!("redeem delegate");
 
     delegate_tx(
         ckb,
+        delegator_key,
         vec![DelegateItem {
-            staker: stakers()[0].clone(),
+            staker: staker_eth_addr,
             is_increase: false,
-            amount: 1,
+            amount: 10,
             inauguration_epoch: 2,
             ..Default::default()
         }],
@@ -77,19 +76,19 @@ pub async fn reedem_delegate_tx(ckb: &CkbRpcClient) {
 
 async fn delegate_tx(
     ckb: &CkbRpcClient,
+    delegator_key: H256,
     delegates: Vec<DelegateItem>,
     current_epoch: u64,
     first_delegate: bool,
 ) {
-    let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let test_delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
-    let omni_eth = OmniEth::new(test_delegator_key.clone());
+    let type_ids = parse_type_ids(TYPE_IDS_PATH);
+
+    let omni_eth = OmniEth::new(delegator_key.clone());
     println!(
         "delegatorr ckb addres: {}\n",
         omni_eth.ckb_address().unwrap()
     );
 
-    let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let xudt_args = type_ids.xudt_owner.into_h256().unwrap();
@@ -129,9 +128,11 @@ async fn delegate_tx(
     }
 
     match tx.send().await {
-        Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
+        Ok(tx_hash) => println!("delegate tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }
 
-    // println!("\ntx: {}", tx.inner());
+    println!("delegate tx ready");
+    tx.wait_until_committed(1000, 10).await.unwrap();
+    println!("delegate tx committed");
 }

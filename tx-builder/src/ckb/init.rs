@@ -35,13 +35,12 @@ use crate::ckb::helper::{
 use crate::ckb::NETWORK_TYPE;
 
 pub struct InitTxBuilder<'a, C: CkbRpc> {
-    ckb:             &'a C,
-    seeder_key:      PrivateKey,
-    max_supply:      Amount,
-    checkpoint:      Checkpoint,
-    epoch0_metadata: Metadata,
-    epoch1_metadata: Metadata,
-    stakers:         Vec<StakerEthAddr>,
+    ckb:        &'a C,
+    seeder_key: PrivateKey,
+    max_supply: Amount,
+    checkpoint: Checkpoint,
+    metadata:   MetadataInfo,
+    stakers:    Vec<StakerEthAddr>,
 }
 
 #[async_trait]
@@ -51,8 +50,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
-        epoch0_metadata: Metadata,
-        epoch1_metadata: Metadata,
+        metadata: MetadataInfo,
         stakers: Vec<StakerEthAddr>,
     ) -> Self {
         Self {
@@ -60,8 +58,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
             seeder_key,
             max_supply,
             checkpoint,
-            epoch0_metadata,
-            epoch1_metadata,
+            metadata,
             stakers,
         }
     }
@@ -151,8 +148,8 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
 
 impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
     fn build_data(&mut self) -> Vec<Bytes> {
-        self.epoch0_metadata.validators.sort();
-        self.epoch1_metadata.validators.sort();
+        self.metadata.epoch0_metadata.validators.sort();
+        self.metadata.epoch1_metadata.validators.sort();
 
         vec![
             // issue cell data
@@ -163,7 +160,10 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
             CheckpointCellData::from(self.checkpoint.clone()).as_bytes(),
             // metadata cell data
             AMetadataCellData::from(MetadataCellData {
-                metadata: vec![self.epoch0_metadata.clone(), self.epoch1_metadata.clone()],
+                metadata: vec![
+                    self.metadata.epoch0_metadata.clone(),
+                    self.metadata.epoch1_metadata.clone(),
+                ],
                 ..Default::default()
             })
             .as_bytes(),
@@ -368,9 +368,10 @@ impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
         outputs_data[3] = AMetadataCellData::from(MetadataCellData {
             epoch:                  START_EPOCH,
             propose_count_smt_root: H256::default(),
+            reward_meta:            self.metadata.reward_meta.clone(),
             metadata:               vec![
-                self.epoch0_metadata.clone(),
-                self.epoch1_metadata.clone(),
+                self.metadata.epoch0_metadata.clone(),
+                self.metadata.epoch1_metadata.clone(),
             ],
             type_ids:               type_ids.clone(),
         })

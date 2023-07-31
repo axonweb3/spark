@@ -452,6 +452,7 @@ pub struct MetadataCellData {
     pub propose_count_smt_root: H256,
     pub type_ids:               TypeIds,
     pub metadata:               Vec<Metadata>,
+    pub reward_meta:            RewardMeta,
 }
 
 impl From<MetadataCellData> for AMetadataCellData {
@@ -461,6 +462,10 @@ impl From<MetadataCellData> for AMetadataCellData {
             .epoch(to_uint64(v.epoch))
             .propose_count_smt_root(to_byte32(&v.propose_count_smt_root))
             .type_ids((v.type_ids).into())
+            .base_reward(to_uint128(v.reward_meta.base_reward))
+            .half_epoch(to_uint64(v.reward_meta.half_reward_cycle))
+            .propose_minimum_rate(v.reward_meta.propose_minimum_rate.into())
+            .propose_discount_rate(v.reward_meta.propose_discount_rate.into())
             .metadata({
                 let mut list = MetadataList::new_builder();
                 for m in v.metadata.into_iter() {

@@ -6,7 +6,7 @@ use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput, WitnessArgs},
+    packed::{CellDep, CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
 use molecule::prelude::Builder;
@@ -47,6 +47,9 @@ pub struct DelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
     delegate_cells:        Vec<Cell>,
     delegate_smt_storage:  D,
     inputs_delegate_cells: HashMap<Delegator, Cell>,
+    maximum_delegators:    HashMap<TxStaker, usize>,
+    stake_cell_deps:       Vec<CellDep>,
+    requirement_cell_deps: Vec<CellDep>,
 }
 
 #[async_trait]
@@ -69,6 +72,9 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
             delegate_cells,
             delegate_smt_storage,
             inputs_delegate_cells: HashMap::new(),
+            maximum_delegators: HashMap::new(),
+            stake_cell_deps: Vec::new(),
+            requirement_cell_deps: Vec::new(),
         }
     }
 
@@ -110,9 +116,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         )
         .await?;
 
-        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
-
-        let cell_deps = vec![
+        let mut cell_deps = vec![
             Secp256k1::lock_dep(),
             OmniEth::lock_dep(),
             AlwaysSuccess::lock_dep(),
@@ -123,6 +127,10 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
             Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
             Withdraw::lock_dep(),
         ];
+        cell_deps.extend(self.stake_cell_deps);
+        cell_deps.extend(self.requirement_cell_deps);
+
+        witnesses.push(OmniEth::witness_placeholder().as_bytes()); // capacity provider lock
 
         let tx = TransactionBuilder::default()
             .inputs(inputs)
@@ -510,6 +518,13 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
     ) -> Result<()> {
         let maximum_delegators = self.get_maximum_delegators(&staker).await?;
 
+        log::info!(
+            "[delegate smt] staker: {}, maximum delegators: {}, delegators count: {}",
+            staker.to_string(),
+            maximum_delegators,
+            new_smt.len(),
+        );
+
         if new_smt.len() <= maximum_delegators {
             return Ok(());
         }
@@ -521,13 +536,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             .collect::<Vec<(SmtDelegator, Amount)>>();
 
         all_delegates.sort_unstable_by_key(|v| v.1);
-
-        log::info!(
-            "[delegate smt] staker: {}, maximum delegators: {}, delegators count: {}",
-            staker.to_string(),
-            maximum_delegators,
-            all_delegates.len(),
-        );
 
         let delete_count = all_delegates.len() - maximum_delegators;
         let deleted_delegators = &all_delegates[..delete_count];
@@ -617,8 +625,12 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         })
     }
 
-    async fn get_maximum_delegators(&self, staker: &TxStaker) -> Result<usize> {
-        let requirement_type_id = Stake::get_delegate_requirement_type_id(
+    async fn get_maximum_delegators(&mut self, staker: &TxStaker) -> Result<usize> {
+        if self.maximum_delegators.contains_key(staker) {
+            return Ok(*self.maximum_delegators.get(staker).unwrap());
+        }
+
+        let (requirement_type_id, stake_cell_outpoint) = Stake::get_delegate_requirement_type_id(
             self.ckb,
             &self.type_ids.metadata_type_id,
             staker,
@@ -626,11 +638,23 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         )
         .await?;
 
+        self.stake_cell_deps.push(
+            CellDep::new_builder()
+                .out_point(stake_cell_outpoint.into())
+                .build(),
+        );
+
         let delegate_requirement_cell = Delegate::get_requirement_cell(
             self.ckb,
             Delegate::requirement_type(&self.type_ids.metadata_type_id, &requirement_type_id),
         )
         .await?;
+
+        self.requirement_cell_deps.push(
+            CellDep::new_builder()
+                .out_point(delegate_requirement_cell.out_point.into())
+                .build(),
+        );
 
         let delegate_requirement_cell_bytes =
             delegate_requirement_cell.output_data.unwrap().into_bytes();
