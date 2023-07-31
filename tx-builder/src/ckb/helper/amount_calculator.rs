@@ -1,6 +1,7 @@
+use std::fmt::{self, Display};
+
 use ckb_types::bytes::Bytes;
 
-use common::types::axon_types::delegate::DelegateInfoDelta;
 use common::types::axon_types::stake::StakeInfoDelta;
 use common::types::tx_builder::{Amount, DelegateItem, Epoch, StakeItem};
 use common::utils::convert::*;
@@ -33,6 +34,16 @@ pub struct ActualAmount {
     pub total_elect_amount: Amount,
     pub amount:             Amount,
     pub is_increase:        bool,
+}
+
+impl Display for ActualAmount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "wallet amount: {}, total amount: {}, amount: {}, is increase: {}",
+            self.wallet_amount, self.total_elect_amount, self.amount, self.is_increase,
+        )
+    }
 }
 
 impl<'a> ElectAmountCalculator<'a> {
@@ -79,11 +90,11 @@ impl<'a> ElectAmountCalculator<'a> {
         }
     }
 
-    pub fn last_delegate_info(delegate: &DelegateInfoDelta, current_epoch: Epoch) -> LastElectItem {
+    pub fn last_delegate_info(delegate: &DelegateItem, current_epoch: Epoch) -> LastElectItem {
         LastElectItem {
-            amount:      to_u128(&delegate.amount()),
-            is_increase: to_bool(&delegate.is_increase()),
-            has_expired: to_u64(&delegate.inauguration_epoch()) < current_epoch + INAUGURATION,
+            amount:      delegate.amount,
+            is_increase: delegate.is_increase,
+            has_expired: delegate.inauguration_epoch < current_epoch + INAUGURATION,
         }
     }
 

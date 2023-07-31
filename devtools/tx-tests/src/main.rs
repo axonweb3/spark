@@ -2,14 +2,20 @@ mod config;
 mod mock;
 mod tx;
 
+use std::path::Path;
+
+use common::config_parser::types::ConfigLogger;
+use common::logger;
 use common::types::tx_builder::NetworkType;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::set_network_type;
 
+use crate::config::parse_file;
 use crate::tx::*;
 
 pub const PRIV_KEYS_PATH: &str = "./src/config/priv_keys.toml";
 pub const TYPE_IDS_PATH: &str = "./src/config/type_ids.toml";
+pub const LOG_CONFIG_PATH: &str = "./src/config/log.toml";
 
 #[tokio::main]
 async fn main() {
@@ -104,6 +110,8 @@ async fn main() {
                 .help("Test reward tx"),
         );
 
+    register_log();
+
     let matches = cmd.get_matches();
     let net = matches.get_one::<String>("net").unwrap().as_str();
     let faucet = *matches.get_one::<bool>("faucet").unwrap();
@@ -190,4 +198,18 @@ async fn main() {
     if reward {
         reward_tx(&ckb).await;
     }
+}
+
+fn register_log() {
+    let path = Path::new(LOG_CONFIG_PATH);
+    let config: ConfigLogger = parse_file(path);
+
+    logger::init(
+        config.filter.clone(),
+        config.log_to_console,
+        config.console_show_file_and_line,
+        config.log_to_file,
+        config.log_path.clone(),
+        config.file_size_limit,
+    );
 }

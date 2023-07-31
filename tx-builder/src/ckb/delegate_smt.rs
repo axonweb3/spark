@@ -191,106 +191,128 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             let (old_total_delegate_amount, old_delegate_data) =
                 self.parse_delegate_data(delegate_cell);
 
+            log::info!(
+                "[delegate smt] delegator: {}, old total delegate amount: {}",
+                delegator.to_string(),
+                old_total_delegate_amount,
+            );
+
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, delegator);
 
-            let (new_delegate_data, new_withdraw_data) =
-                if statistics.withdraw_amounts.contains_key(delegator) {
-                    let old_withdraw_cell =
-                        Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
-                            .await?
-                            .unwrap();
+            let (new_delegate_data, new_withdraw_data) = if statistics
+                .withdraw_amounts
+                .contains_key(delegator)
+            {
+                let old_withdraw_cell =
+                    Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
+                        .await?
+                        .unwrap();
 
-                    // inputs: withdraw AT cell
-                    inputs.push(
-                        CellInput::new_builder()
-                            .previous_output(old_withdraw_cell.out_point.clone().into())
+                // inputs: withdraw AT cell
+                inputs.push(
+                    CellInput::new_builder()
+                        .previous_output(old_withdraw_cell.out_point.clone().into())
+                        .build(),
+                );
+                witnesses.push(Withdraw::witness(true).as_bytes());
+
+                let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
+                let mut delegator_infos: Vec<DelegateItem> = Vec::new();
+
+                for delegate in old_delegate_data.lock().delegator_infos() {
+                    let mut delegate_item = Delegate::item(&delegate);
+                    delegate_item.amount = 0;
+
+                    if withdraw_amounts.contains_key(&delegate_item.staker) {
+                        let withdraw_amount = withdraw_amounts
+                            .get(&delegate_item.staker)
+                            .unwrap()
+                            .to_owned();
+                        if delegate_item.total_amount < withdraw_amount {
+                            return Err(CkbTxErr::ExceedTotalAmount {
+                                total_amount: delegate_item.total_amount,
+                                new_amount:   withdraw_amount,
+                            }
+                            .into());
+                        }
+                        delegate_item.total_amount -= withdraw_amount;
+                    }
+
+                    if delegate_item.total_amount > 0 {
+                        delegator_infos.push(delegate_item);
+                    }
+                }
+
+                let delegator_addr = old_delegate_data.lock().l1_address();
+                let new_delegate_data = old_delegate_data
+                    .as_builder()
+                    .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
+                        l2_address: to_h160(&delegator_addr),
+                        delegator_infos,
+                    }))
+                    .build()
+                    .as_bytes();
+
+                let total_withdraw_amount = withdraw_amounts
+                    .values()
+                    .fold(0_u128, |acc, x| acc + x.to_owned());
+
+                log::info!(
+                        "[delegate smt] delegator: {}, new total delegate amount: {}, withdraw amount: {}",
+                        delegator.to_string(),
+                        old_total_delegate_amount - total_withdraw_amount,
+                        total_withdraw_amount,
+                    );
+
+                (
+                    token_cell_data(
+                        old_total_delegate_amount - total_withdraw_amount,
+                        new_delegate_data,
+                    ),
+                    Some(Withdraw::update_cell_data(
+                        &old_withdraw_cell,
+                        self.current_epoch + INAUGURATION,
+                        total_withdraw_amount,
+                    )),
+                )
+            } else {
+                let mut new_delegates = DelegateInfoDeltas::new_builder();
+
+                for delegate in old_delegate_data.lock().delegator_infos() {
+                    new_delegates = new_delegates.push(
+                        delegate
+                            .as_builder()
+                            .amount(to_uint128(0))
+                            .inauguration_epoch(Uint64::default())
+                            .is_increase(0.into())
                             .build(),
                     );
-                    witnesses.push(Withdraw::witness(true).as_bytes());
+                }
 
-                    let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
-                    let mut delegator_infos: Vec<DelegateItem> = Vec::new();
-
-                    for delegate in old_delegate_data.lock().delegator_infos() {
-                        let mut delegate_item = Delegate::item(&delegate);
-                        delegate_item.amount = 0;
-
-                        if withdraw_amounts.contains_key(&delegate_item.staker) {
-                            let withdraw_amount = withdraw_amounts
-                                .get(&delegate_item.staker)
-                                .unwrap()
-                                .to_owned();
-                            if delegate_item.total_amount < withdraw_amount {
-                                return Err(CkbTxErr::ExceedTotalAmount {
-                                    total_amount: delegate_item.total_amount,
-                                    new_amount:   withdraw_amount,
-                                }
-                                .into());
-                            }
-                            delegate_item.total_amount -= withdraw_amount;
-                        }
-
-                        if delegate_item.total_amount > 0 {
-                            delegator_infos.push(delegate_item);
-                        }
-                    }
-
-                    let delegator_addr = old_delegate_data.lock().l1_address();
-                    let new_delegate_data = old_delegate_data
-                        .as_builder()
-                        .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
-                            l2_address: to_h160(&delegator_addr),
-                            delegator_infos,
-                        }))
-                        .build()
-                        .as_bytes();
-
-                    let total_withdraw_amount = withdraw_amounts
-                        .values()
-                        .fold(0_u128, |acc, x| acc + x.to_owned());
-
-                    (
-                        token_cell_data(
-                            old_total_delegate_amount - total_withdraw_amount,
-                            new_delegate_data,
-                        ),
-                        Some(Withdraw::update_cell_data(
-                            &old_withdraw_cell,
-                            self.current_epoch + INAUGURATION,
-                            total_withdraw_amount,
-                        )),
+                let inner_delegate_data = old_delegate_data.lock();
+                let new_delegate_data = old_delegate_data
+                    .as_builder()
+                    .lock(
+                        inner_delegate_data
+                            .as_builder()
+                            .delegator_infos(new_delegates.build())
+                            .build(),
                     )
-                } else {
-                    let mut new_delegates = DelegateInfoDeltas::new_builder();
+                    .build()
+                    .as_bytes();
 
-                    for delegate in old_delegate_data.lock().delegator_infos() {
-                        new_delegates = new_delegates.push(
-                            delegate
-                                .as_builder()
-                                .amount(to_uint128(0))
-                                .inauguration_epoch(Uint64::default())
-                                .is_increase(0.into())
-                                .build(),
-                        );
-                    }
+                log::info!(
+                        "[delegate smt] delegator: {}, new total delegate amount: {}, withdraw amount: {}",
+                        delegator.to_string(),
+                        old_total_delegate_amount,
+                        0,
+                    );
 
-                    let inner_delegate_data = old_delegate_data.lock();
-                    let new_delegate_data = old_delegate_data
-                        .as_builder()
-                        .lock(
-                            inner_delegate_data
-                                .as_builder()
-                                .delegator_infos(new_delegates.build())
-                                .build(),
-                        )
-                        .build()
-                        .as_bytes();
-
-                    (
-                        token_cell_data(old_total_delegate_amount.to_owned(), new_delegate_data),
-                        None,
-                    )
-                };
+                (
+                    token_cell_data(old_total_delegate_amount.to_owned(), new_delegate_data),
+                    None,
+                )
+            };
 
             // outputs: delegate AT cell
             outputs.push(
@@ -446,6 +468,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .as_bytes(),
             )?;
 
+            log::info!("[delegate smt] delegator: {}", delegator.to_string());
+
             let mut cell_bytes = cell.output_data.clone().unwrap().into_bytes();
 
             let delegate = DelegateAtCellData::new_unchecked(cell_bytes.split_off(TOKEN_BYTES));
@@ -498,17 +522,32 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
         all_delegates.sort_unstable_by_key(|v| v.1);
 
+        log::info!(
+            "[delegate smt] staker: {}, maximum delegators: {}, delegators count: {}",
+            staker.to_string(),
+            maximum_delegators,
+            all_delegates.len(),
+        );
+
         let delete_count = all_delegates.len() - maximum_delegators;
         let deleted_delegators = &all_delegates[..delete_count];
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
         for (delegator, amount) in deleted_delegators {
+            log::info!(
+                "[delegate smt] none top delegator: {}, smt amount: {}",
+                delegator.to_string(),
+                amount
+            );
+
             new_smt.remove(delegator);
 
             let tx_delegator = Delegator::from_slice(delegator.as_bytes()).unwrap();
             let mut in_smt = false;
 
             if old_smt.contains_key(delegator) {
+                log::info!("[delegate smt] in delegate smt");
+
                 in_smt = true;
 
                 withdraw_amounts
@@ -549,12 +588,16 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         staker: TxStaker,
         new_smt: HashMap<SmtDelegator, Amount>,
     ) -> Result<StakerSmtRoot> {
+        log::info!("[delegate smt] staker: {}, new smt: ", staker.to_string());
         let new_delegators = new_smt
             .into_iter()
-            .map(|(k, v)| UserAmount {
-                user:        k,
-                amount:      v,
-                is_increase: true,
+            .map(|(k, v)| {
+                log::info!("[delegae smt] delegator: {}, amount: {}", k.to_string(), v);
+                UserAmount {
+                    user:        k,
+                    amount:      v,
+                    is_increase: true,
+                }
             })
             .collect();
 

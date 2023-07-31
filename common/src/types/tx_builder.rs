@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{self, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
 use axon_types::{
@@ -167,6 +167,28 @@ impl From<DelegateItem> for DelegateInfoDelta {
             .amount(to_uint128(delegate.amount))
             .inauguration_epoch(to_uint64(delegate.inauguration_epoch))
             .build()
+    }
+}
+
+impl From<DelegateInfoDelta> for DelegateItem {
+    fn from(delegate: DelegateInfoDelta) -> Self {
+        DelegateItem {
+            staker:             to_h160(&delegate.staker()),
+            total_amount:       to_u128(&delegate.total_amount()),
+            is_increase:        to_bool(&delegate.is_increase()),
+            amount:             to_u128(&delegate.amount()),
+            inauguration_epoch: to_u64(&delegate.inauguration_epoch()),
+        }
+    }
+}
+
+impl Display for DelegateItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "staker: {}, total amount: {}, amount: {}, is increase: {}, inaugration epoch: {}",
+            self.staker, self.total_amount, self.amount, self.is_increase, self.inauguration_epoch,
+        )
     }
 }
 
@@ -501,8 +523,9 @@ impl From<Metadata> for AMetadata {
 }
 
 pub struct RewardInfo {
-    pub base_reward:               Amount,
-    pub half_reward_cycle:         Epoch,
-    pub theoretical_propose_count: u64,
-    pub epoch_count:               u64,
+    pub base_reward:           Amount,
+    pub half_reward_cycle:     Epoch,
+    pub minimum_propose_count: u64,
+    pub propose_discount_rate: u8,
+    pub epoch_count:           u64,
 }

@@ -190,6 +190,12 @@ where
         mut wallet_amount: Amount,
         cell_deps: &mut Vec<CellDep>,
     ) -> Result<(Vec<Bytes>, RewardWitness)> {
+        log::info!(
+            "[reward] user: {}, old wallet amount: {}",
+            self.user.to_string(),
+            wallet_amount,
+        );
+
         if self.current_epoch < INAUGURATION {
             return Err(CkbTxErr::EpochTooSmall.into());
         }
@@ -203,6 +209,12 @@ where
         let end_reward_epoch = min(
             self.current_epoch - INAUGURATION,
             start_reward_epoch + self.info.epoch_count - 1,
+        );
+
+        log::info!(
+            "[reward] start epoch: {}, end epoch: {}",
+            start_reward_epoch,
+            end_reward_epoch,
         );
 
         let mut total_reward_amount = 0_u128;
@@ -233,10 +245,21 @@ where
                     .commission_rate(&to_ckb_h160(&validator), cell_deps)
                     .await? as u128;
 
-                let coef = if propose_count >= self.info.theoretical_propose_count * 95 / 100 {
+                log::info!(
+                    "[reward] epoch: {}, validator: {}, commission_rate: {}, propose count: {}",
+                    epoch,
+                    validator.to_string(),
+                    commission_rate,
+                    propose_count,
+                );
+
+                let coef = if propose_count
+                    >= self.info.minimum_propose_count * self.info.propose_discount_rate as u64
+                        / 100
+                {
                     100
                 } else {
-                    propose_count as u128 * 100 / self.info.theoretical_propose_count as u128
+                    propose_count as u128 * 100 / self.info.minimum_propose_count as u128
                 };
                 let total_reward = coef * self.info.base_reward
                     / 100
@@ -257,14 +280,31 @@ where
                 let staker_reward = total_reward * stake_amount / total_amount;
                 let delegators_reward = total_reward - staker_reward;
 
+                log::info!(
+                    "[reward] epoch: {}, stake amount: {}, total delegate amount: {}, total reward: {}, staker reward: {}, delegators reward: {}",
+                    epoch, stake_amount, total_delegate_amount, total_reward, staker_reward, delegators_reward,
+                );
+
                 if is_validator {
                     let staker_fee_reward = delegators_reward * commission_rate / 100;
                     total_reward_amount += staker_reward + staker_fee_reward;
+                    log::info!(
+                        "[reward] epoch: {}, is a validator, reward: {}",
+                        epoch,
+                        staker_reward + staker_fee_reward,
+                    );
                 } else if in_delegate_smt {
-                    total_reward_amount += delegators_reward * delegate_amount.unwrap()
+                    let delegate_reward = delegators_reward * delegate_amount.unwrap()
                         / total_delegate_amount
                         * (100 - commission_rate)
                         / 100;
+                    total_reward_amount += delegate_reward;
+                    log::info!(
+                        "[reward] epoch: {}, delegate amount: {}, reward: {}",
+                        epoch,
+                        delegate_amount.unwrap(),
+                        delegate_reward,
+                    );
                 }
 
                 epoch_reward_witness
@@ -309,6 +349,12 @@ where
         }
 
         wallet_amount += total_reward_amount;
+
+        log::info!(
+            "[reward] user: {}, new wallet amount: {}",
+            self.user.to_string(),
+            wallet_amount,
+        );
 
         RewardSmtStorage::insert(&self.smt, end_reward_epoch, user).await?;
         witness.new_not_claim_info = NotClaimInfo {

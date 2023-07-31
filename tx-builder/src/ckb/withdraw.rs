@@ -26,6 +26,7 @@ pub struct WithdrawTxBuilder<'a, C: CkbRpc> {
     ckb:           &'a C,
     type_ids:      StakeTypeIds,
     current_epoch: Epoch,
+    user:          EthAddress,
     withdraw_lock: Script,
     token_lock:    Script,
     xudt:          Script,
@@ -42,6 +43,7 @@ impl<'a, C: CkbRpc> IWithdrawTxBuilder<'a, C> for WithdrawTxBuilder<'a, C> {
             ckb,
             type_ids,
             current_epoch,
+            user,
             withdraw_lock,
             token_lock,
             xudt,
@@ -142,6 +144,13 @@ impl<'a, C: CkbRpc> WithdrawTxBuilder<'a, C> {
     ) -> CkbTxResult<Vec<Bytes>> {
         let mut total_withdraw_amount = new_u128(&withdraw_data[..TOKEN_BYTES]);
 
+        log::info!(
+            "[withdraw] user: {}, old wallet amount: {}, old total withdraw amount: {}",
+            self.user.to_string(),
+            wallet_amount,
+            total_withdraw_amount,
+        );
+
         let withdraw_data = WithdrawAtCellData::new_unchecked(withdraw_data.split_off(TOKEN_BYTES));
 
         let mut output_withdraw_infos = WithdrawInfos::new_builder();
@@ -151,6 +160,11 @@ impl<'a, C: CkbRpc> WithdrawTxBuilder<'a, C> {
             let epoch = to_u64(&withdraw_info.unlock_epoch());
             if epoch <= self.current_epoch {
                 unlock_amount += to_u128(&withdraw_info.amount());
+                log::info!(
+                    "[withdraw] epoch: {}, can be unlocked amount: {}",
+                    epoch,
+                    to_u128(&withdraw_info.amount()),
+                );
             } else {
                 output_withdraw_infos = output_withdraw_infos.push(withdraw_info);
             }
@@ -158,6 +172,13 @@ impl<'a, C: CkbRpc> WithdrawTxBuilder<'a, C> {
 
         wallet_amount += unlock_amount;
         total_withdraw_amount -= unlock_amount;
+
+        log::info!(
+            "[withdraw] user: {}, new wallet amount: {}, new total withdraw amount: {}",
+            self.user.to_string(),
+            wallet_amount,
+            total_withdraw_amount,
+        );
 
         let inner_withdraw_data = withdraw_data.lock();
 

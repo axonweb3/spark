@@ -77,6 +77,7 @@ where
             match serde_json::from_reader::<_, MetadataContext>(f) {
                 Ok(f) => {
                     if f.epoch == self.last_checkpoint_data.epoch {
+                        log::info!("[metadata] epoch: {}, load data from file.", f.epoch);
                         return Ok(f);
                     }
                 }
@@ -100,6 +101,11 @@ where
                 .unwrap()
                 .to_entity()
                 .quorum(),
+        );
+        log::info!(
+            "[metadta] quorum: {}, stakers count: {}",
+            quorum,
+            stakers.len(),
         );
 
         let (validators, no_top_stakers, no_top_delegators) = {
@@ -260,6 +266,12 @@ where
         let mut delegator_staker_smt_roots = Vec::with_capacity(context.validators.len());
         let mut new_delegator_proofs = Vec::new();
         for v in context.validators.iter() {
+            log::info!(
+                "[metadata] validator: {}, amount: {}",
+                v.staker.to_string(),
+                v.amount,
+            );
+
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
                 &self.smt,
                 vec![self.last_checkpoint_data.epoch + INAUGURATION + 1],
@@ -449,6 +461,10 @@ where
             );
 
             let stake_data = token_cell_data(total_amount - amount, stake_data.as_bytes());
+            log::info!(
+                "[metadata] none top staker: {}, smt amount: {}, old total stake amount: {}, withdraw amount: {}",
+                addr.to_string(), amount, total_amount, amount,
+            );
 
             no_top_staker_cell_outputs.push(
                 CellOutput::new_builder()
@@ -466,6 +482,10 @@ where
             Vec::with_capacity(context.no_top_stakers.len());
         let mut delegator_at_cell_datas = HashMap::with_capacity(context.no_top_delegators.len());
         for (staker_address, v) in context.no_top_delegators.iter() {
+            log::info!(
+                "[metadata] staker: {}, none delegators: ",
+                staker_address.to_string()
+            );
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
 
@@ -512,6 +532,11 @@ where
                         i.total_amount -= amount;
                     }
                 }
+
+                log::info!(
+                    "[metadata] none top delegator: {}, smt amount: {}, old total stake amount: {}, withdraw amount: {}",
+                    addr.to_string(), amount, total_amount, amount,
+                );
             }
         }
 

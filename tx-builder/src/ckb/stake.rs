@@ -328,6 +328,12 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             return Err(CkbTxErr::Increase(self.stake.is_increase));
         }
 
+        log::info!(
+            "[first stake] staker: {}, old wallet amount: {}",
+            self.staker.to_string(),
+            wallet_amount,
+        );
+
         if wallet_amount < self.stake.amount {
             return Err(CkbTxErr::ExceedWalletAmount {
                 wallet_amount,
@@ -337,6 +343,13 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         wallet_amount -= self.stake.amount;
 
         let first_stake = self.first_stake_info.as_ref().ok_or(CkbTxErr::FirstStake)?;
+
+        log::info!(
+            "[first stake] staker: {}, new stake amount: {}, new wallet amount: {}",
+            self.staker.to_string(),
+            self.stake.amount,
+            wallet_amount,
+        );
 
         Ok(vec![
             // AT cell data
@@ -370,10 +383,23 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
     ) -> CkbTxResult<Vec<Bytes>> {
         let mut total_stake_amount = new_u128(&stake_data[..TOKEN_BYTES]);
 
+        log::info!(
+            "[update stake] staker: {}, old wallet amount: {}, old total stake amount: {}",
+            self.staker.to_string(),
+            wallet_amount,
+            total_stake_amount,
+        );
+
         let mut stake_data = stake_data;
         let stake_data = AStakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
         let last_info =
             ElectAmountCalculator::last_stake_info(&stake_data.lock().delta(), self.current_epoch);
+
+        log::info!(
+            "[update stake] staker: {}, last stake info: {:?}",
+            self.staker.to_string(),
+            last_info,
+        );
 
         let actual_info = ElectAmountCalculator::new(
             wallet_amount,
@@ -387,6 +413,15 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             total_stake_amount = actual_info.total_elect_amount;
             wallet_amount = actual_info.wallet_amount;
         }
+
+        log::info!(
+            "[update stake] staker: {}, new stake: {:?}, actual stake: {:?}, new wallet amount: {}, new total stake amount: {}",
+            self.staker.to_string(),
+            self.stake,
+            actual_info,
+            wallet_amount,
+            total_stake_amount,
+        );
 
         let inner_stake_data = stake_data.lock();
 
