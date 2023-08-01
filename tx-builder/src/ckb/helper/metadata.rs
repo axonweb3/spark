@@ -5,8 +5,10 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 use ckb_types::H256;
 
 use common::traits::ckb_rpc_client::CkbRpc;
+use common::types::axon_types::metadata::MetadataCellData;
 use common::types::ckb_rpc_client::Cell;
-use common::types::tx_builder::NetworkType;
+use common::types::tx_builder::{NetworkType, RewardMeta};
+use common::utils::convert::{to_u128, to_u16, to_u32, to_u64};
 
 use crate::ckb::define::scripts::*;
 use crate::ckb::helper::ckb::cell_collector::get_cell_by_type;
@@ -64,5 +66,26 @@ impl Metadata {
 
     pub async fn get_cell(ckb_rpc: &impl CkbRpc, metadata_type: Script) -> Result<Cell> {
         get_cell_by_type(ckb_rpc, metadata_type).await
+    }
+
+    pub fn parse_quorum(metadata_cell_data: &MetadataCellData) -> u16 {
+        to_u16(&metadata_cell_data.metadata().get(1).unwrap().quorum())
+    }
+
+    pub fn parse_reward_meta(metadata_cell_data: &MetadataCellData) -> RewardMeta {
+        RewardMeta {
+            base_reward:           to_u128(&metadata_cell_data.base_reward()),
+            half_reward_cycle:     to_u64(&metadata_cell_data.half_epoch()),
+            propose_minimum_rate:  metadata_cell_data.propose_minimum_rate().into(),
+            propose_discount_rate: metadata_cell_data.propose_discount_rate().into(),
+        }
+    }
+
+    pub fn calc_minimum_propose_count(metadata: &MetadataCellData) -> u64 {
+        let propose_minimum_rate: u8 = metadata.propose_minimum_rate().into();
+        let metadata = metadata.metadata().get(0).unwrap();
+        let epoch_block_count = to_u32(&metadata.epoch_len()) * to_u32(&metadata.period_len());
+        let validator_num = metadata.validators().len();
+        (epoch_block_count * propose_minimum_rate as u32 / validator_num as u32 / 100).into()
     }
 }

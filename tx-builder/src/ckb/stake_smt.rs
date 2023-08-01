@@ -6,7 +6,7 @@ use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, TransactionBuilder, TransactionView},
-    packed::{CellInput, CellOutput, WitnessArgs},
+    packed::{CellDep, CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
 };
 use molecule::prelude::Builder;
@@ -15,6 +15,7 @@ use common::traits::{
     ckb_rpc_client::CkbRpc, smt::StakeSmtStorage, tx_builder::IStakeSmtTxBuilder,
 };
 use common::types::axon_types::basic::Byte32;
+use common::types::axon_types::metadata::MetadataCellData;
 use common::types::axon_types::stake::{StakeArgs, StakeSmtCellData};
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Root, Staker as SmtStaker, UserAmount};
@@ -33,7 +34,6 @@ pub struct StakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
     ckb:               &'a C,
     kicker:            PrivateKey,
     current_epoch:     Epoch,
-    quorum:            u16,
     stake_cells:       Vec<Cell>,
     stake_smt_storage: S,
     type_ids:          StakeSmtTypeIds,
@@ -48,7 +48,6 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
-        quorum: u16,
         stake_cells: Vec<Cell>,
         stake_smt_storage: S,
     ) -> Self {
@@ -56,7 +55,6 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
             ckb,
             kicker,
             current_epoch,
-            quorum,
             stake_cells,
             stake_smt_storage,
             type_ids,
@@ -64,6 +62,15 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
     }
 
     async fn build_tx(self) -> Result<(TransactionView, NonTopStakers)> {
+        let metadata_cell =
+            Metadata::get_cell(self.ckb, Metadata::type_(&self.type_ids.metadata_type_id))
+                .await
+                .expect("Metadata cell not found");
+        let metadata_cell_data = MetadataCellData::new_unchecked(
+            metadata_cell.output_data.clone().unwrap().into_bytes(),
+        );
+        let quorum = Metadata::parse_quorum(&metadata_cell_data);
+
         let stake_smt_type = Stake::smt_type(&self.type_ids.stake_smt_type_id);
         let stake_smt_cell = Stake::get_smt_cell(self.ckb, stake_smt_type.clone()).await?;
 
@@ -74,7 +81,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
                 .build(),
         ];
 
-        let (new_smt_root, cells, statistics, smt_witness) = self.collect().await?;
+        let (new_smt_root, cells, statistics, smt_witness) = self.collect(quorum).await?;
 
         let old_stake_smt_cell_bytes = stake_smt_cell.output_data.unwrap().into_bytes();
         let old_stake_smt_cell_data = StakeSmtCellData::new_unchecked(old_stake_smt_cell_bytes);
@@ -116,7 +123,10 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
             Stake::lock_dep(),
             Stake::smt_type_dep(),
             Checkpoint::cell_dep(self.ckb, &self.type_ids.checkpoint_type_id).await?,
-            Metadata::cell_dep(self.ckb, &self.type_ids.metadata_type_id).await?,
+            // metadata cell dep
+            CellDep::new_builder()
+                .out_point(metadata_cell.out_point.into())
+                .build(),
         ];
 
         if !statistics.withdraw_amounts.is_empty() {
@@ -288,7 +298,10 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         self.stake_smt_storage.get_top_root().await
     }
 
-    async fn collect(&self) -> Result<(Root, HashMap<TxStaker, Cell>, Statistics, WitnessArgs)> {
+    async fn collect(
+        &self,
+        quorum: u16,
+    ) -> Result<(Root, HashMap<TxStaker, Cell>, Statistics, WitnessArgs)> {
         let old_smt = self
             .stake_smt_storage
             .get_sub_leaves(self.current_epoch + INAUGURATION)
@@ -349,7 +362,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             }
         }
 
-        let non_top_stakers = self.collect_non_top_stakers(&old_smt, &mut new_smt);
+        let non_top_stakers = self.collect_non_top_stakers(quorum, &old_smt, &mut new_smt);
 
         for (staker, in_smt) in non_top_stakers.iter() {
             let smt_staker = SmtStaker::from(staker.0);
@@ -417,10 +430,17 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
     fn collect_non_top_stakers(
         &self,
+        quorum: u16,
         old_smt: &HashMap<SmtStaker, Amount>,
         new_smt: &mut HashMap<SmtStaker, Amount>,
     ) -> NonTopStakers {
-        if new_smt.len() <= 3 * self.quorum as usize {
+        log::info!(
+            "[stake smt] 3 * quorum: {}, stakers count: {}",
+            3 * quorum,
+            new_smt.len(),
+        );
+
+        if new_smt.len() <= 3 * quorum as usize {
             return HashMap::default();
         }
 
@@ -431,14 +451,8 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .collect::<Vec<(SmtStaker, Amount)>>();
         all_stakes.sort_unstable_by_key(|v| v.1);
 
-        let delete_count = all_stakes.len() - 3 * self.quorum as usize;
+        let delete_count = all_stakes.len() - 3 * quorum as usize;
         let non_top_stakers = &all_stakes[..delete_count];
-        log::info!(
-            "[stake smt] 3 * quorum: {}, stakers count: {}, none top stakers count: {}",
-            3 * self.quorum,
-            all_stakes.len(),
-            non_top_stakers.len(),
-        );
 
         non_top_stakers
             .iter()

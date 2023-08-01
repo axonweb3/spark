@@ -17,30 +17,31 @@ use super::helper::sighash::Sighash;
 pub struct FaucetTxBuilder<'a, C: CkbRpc> {
     ckb:        &'a C,
     seeder_key: PrivateKey,
-    ckb_bytes:  u128,
+    stakers:    Vec<(StakerEthAddr, Amount)>,
 }
 
 impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
-    pub fn new(ckb: &'a C, seeder_key: PrivateKey, ckb_bytes: u128) -> Self {
+    pub fn new(ckb: &'a C, seeder_key: PrivateKey, stakers: Vec<(StakerEthAddr, Amount)>) -> Self {
         Self {
             ckb,
             seeder_key,
-            ckb_bytes,
+            stakers,
         }
     }
 
     pub async fn build_tx(self) -> Result<TransactionView> {
-        let omni_eth = OmniEth::new(self.seeder_key.clone());
-        let seeder_omni_lock = OmniEth::lock(&omni_eth.address()?);
+        let mut outputs = vec![];
+        let mut outputs_data = vec![];
 
-        let outputs = vec![
-            // omni eth lock cell
-            CellOutput::new_builder()
-                .lock(seeder_omni_lock)
-                .build_exact_capacity(Capacity::bytes(self.ckb_bytes as usize)?)?,
-        ];
-
-        let outputs_data = vec![Bytes::default()];
+        // omni eth lock cells
+        for (staker, ckb_bytes) in self.stakers.into_iter() {
+            outputs.push(
+                CellOutput::new_builder()
+                    .lock(OmniEth::lock(&staker))
+                    .build_exact_capacity(Capacity::bytes(ckb_bytes as usize)?)?,
+            );
+            outputs_data.push(Bytes::default());
+        }
 
         let cell_deps = vec![Secp256k1::lock_dep()];
 

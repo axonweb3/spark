@@ -28,32 +28,42 @@ delegator_privkeys = [
 ```
 
 # Run
+
+## Run cases
+
 ```
 cd spark/devtools/tx-tests
 
-cargo run -- -f  // faucet (only used on the dev chain)
+cargo run -- cases -n test -1
+```
 
-cargo run -- -i  // init tx
+## Run single tx
+```
+cd spark/devtools/tx-tests
 
-cargo run -- -m  // mint tx
+cargo run -- single-tx -n test -f  // faucet (only used on the dev chain)
+
+cargo run -- single-tx -n test -i  // init tx
+
+cargo run -- single-tx -n test -m  // mint tx
 
 // stake tx
-cargo run -- -s first   // first stake
-cargo run -- -s add     // add stake
-cargo run -- -s redeem  // redeem stake
+cargo run -- single-tx -n test -s first   // first stake
+cargo run -- single-tx -n test -s add     // add stake
+cargo run -- single-tx -n test -s redeem  // redeem stake
 
 // delegate tx
-cargo run -- -s first   // first delegate
-cargo run -- -s add     // add delegate
-cargo run -- -s redeem  // redeem delegate
+cargo run -- single-tx -n test -s first   // first delegate
+cargo run -- single-tx -n test -s add     // add delegate
+cargo run -- single-tx -n test -s redeem  // redeem delegate
 
-cargo run -- -t  // stake smt tx
+cargo run -- single-tx -n test -t  // stake smt tx
 
-cargo run -- -e  // delegate smt tx
+cargo run -- single-tx -n test -e  // delegate smt tx
 
-cargo run -- -w  // withdraw tx
+cargo run -- single-tx -n test -w  // withdraw tx
 
-cargo run -- -a  // metadata tx
+cargo run -- single-tx -n test -a  // metadata tx
 
-cargo run -- -r  // reward tx
+cargo run -- single-tx -n test -r  // reward tx
 ```

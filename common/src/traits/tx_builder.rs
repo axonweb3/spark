@@ -17,8 +17,7 @@ pub trait IInitTxBuilder<'a, C: CkbRpc> {
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
-        epoch0_metadata: Metadata,
-        epoch1_metadata: Metadata,
+        metadata: MetadataInfo,
         stakers: Vec<StakerEthAddr>,
     ) -> Self;
 
@@ -78,16 +77,16 @@ where
     C: CkbRpc,
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
-    fn new(
+    async fn new(
         ckb: &'a C,
         type_ids: RewardTypeIds,
         smt: S,
-        info: RewardInfo,
         user: EthAddress,
         current_epoch: Epoch,
+        epoch_count: u64,
     ) -> Self;
 
-    async fn build_tx(self) -> Result<TransactionView>;
+    async fn build_tx(mut self) -> Result<TransactionView>;
 }
 
 #[async_trait]
@@ -128,7 +127,6 @@ pub trait IStakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage> {
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
-        quorum: u16,
         stake_cells: Vec<Cell>,
         stake_smt_storage: S,
     ) -> Self;

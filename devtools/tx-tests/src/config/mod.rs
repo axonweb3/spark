@@ -4,12 +4,25 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use serde::{de, ser};
+use serde::ser;
 
-use common::config_parser::parse_file as cparse_file;
+use common::config_parser::{parse_file, types::ConfigLogger};
 
-pub fn parse_file<T: de::DeserializeOwned>(path: impl AsRef<Path>) -> T {
-    cparse_file(path, false).unwrap()
+use crate::config::types::{PrivKeys, TypeIds};
+
+pub fn parse_priv_keys(path: impl AsRef<Path>) -> PrivKeys {
+    let priv_keys: PrivKeys = parse_file(path, false).expect("priv keys");
+    priv_keys
+}
+
+pub fn parse_type_ids(path: impl AsRef<Path>) -> TypeIds {
+    let type_ids: TypeIds = parse_file(path, false).expect("type ids");
+    type_ids
+}
+
+pub fn parse_log_config(path: impl AsRef<Path>) -> ConfigLogger {
+    let config: ConfigLogger = parse_file(path, false).expect("log config");
+    config
 }
 
 pub fn write_file<T: ser::Serialize>(path: impl AsRef<Path>, content: &T) {
@@ -27,11 +40,11 @@ pub fn write_file<T: ser::Serialize>(path: impl AsRef<Path>, content: &T) {
 #[cfg(test)]
 mod tests {
     use super::types::*;
-    use super::{parse_file, write_file};
+    use super::{parse_priv_keys, parse_type_ids, write_file};
 
     fn _test_parse_config() {
         let file_path = "./src/config/priv_keys.toml";
-        let priv_keys: PrivKeys = parse_file(file_path);
+        let priv_keys: PrivKeys = parse_priv_keys(file_path);
         println!("{:?}", priv_keys);
     }
 
@@ -66,7 +79,7 @@ mod tests {
         };
         write_file(file_path, &type_ids);
 
-        let type_ids: TypeIds = parse_file(file_path);
+        let type_ids: TypeIds = parse_type_ids(file_path);
         println!("{:?}", type_ids);
     }
 }

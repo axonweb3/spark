@@ -121,7 +121,7 @@ pub fn mock_axon_validators_v2(priv_keys: &[CH256]) -> Vec<TValidator> {
 }
 
 #[allow(dead_code)]
-fn gen_bls_keypair(privkey: &[u8]) -> (SecretKey, Vec<u8>) {
+pub fn gen_bls_keypair(privkey: &[u8]) -> (SecretKey, Vec<u8>) {
     let privkey = SecretKey::key_gen(privkey, &[]).unwrap();
     let pubkey = privkey.sk_to_pk();
     (privkey, pubkey.compress().to_vec())

@@ -1,20 +1,20 @@
+use ckb_types::H256;
+
 use common::traits::tx_builder::IWithdrawTxBuilder;
 use common::types::tx_builder::StakeTypeIds;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::withdraw::WithdrawTxBuilder;
 
-use crate::config::parse_file;
-use crate::config::types::{PrivKeys, TypeIds};
-use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
+use crate::config::parse_type_ids;
+use crate::TYPE_IDS_PATH;
 
-pub async fn withdraw_tx(ckb: &CkbRpcClient) {
-    let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let test_staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-    let omni_eth = OmniEth::new(test_staker_key.clone());
+pub async fn run_withdraw_tx(ckb: &CkbRpcClient, user_key: H256) {
+    let type_ids = parse_type_ids(TYPE_IDS_PATH);
+
+    let omni_eth = OmniEth::new(user_key.clone());
     println!("staker0 ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
-    let type_ids: TypeIds = parse_file(TYPE_IDS_PATH);
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let xudt_args = type_ids.xudt_owner.into_h256().unwrap();
@@ -47,7 +47,11 @@ pub async fn withdraw_tx(ckb: &CkbRpcClient) {
     }
 
     match tx.send().await {
-        Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
+        Ok(tx_hash) => println!("withdraw tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }
+
+    println!("withdraw tx ready");
+    tx.wait_until_committed(1000, 10).await.unwrap();
+    println!("withdraw tx committed");
 }

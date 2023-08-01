@@ -148,6 +148,14 @@ where
     C: CkbRpc,
 {
     async fn check_occasion(&self, last_epoch: u64, last_period: u32) -> Result<(), CkbTxErr> {
+        log::info!(
+            "[checkpoint] last epoch: {}, last period: {}, current epoch: {}, current period: {}",
+            last_epoch,
+            last_period,
+            self.new_checkpoint.epoch,
+            self.new_checkpoint.period,
+        );
+
         if (last_period as u64) == self.epoch_len - 1 {
             if self.new_checkpoint.period != 0 || self.new_checkpoint.epoch != last_epoch + 1 {
                 Err(CkbTxErr::NotCheckpointOccasion {

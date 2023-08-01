@@ -1,33 +1,23 @@
 use std::path::PathBuf;
 
+use ckb_types::H256;
+
 use common::traits::tx_builder::IRewardTxBuilder;
-use common::types::tx_builder::{RewardInfo, RewardTypeIds};
+use common::types::tx_builder::RewardTypeIds;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::SmtManager;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::reward::RewardTxBuilder;
 
-use crate::config::parse_file;
-use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
-use crate::{PRIV_KEYS_PATH, TYPE_IDS_PATH};
+use crate::config::parse_type_ids;
+use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
 
-static ROCKSDB_PATH: &str = "./free-space/smt";
+pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256) {
+    let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
-pub async fn reward_tx(ckb: &CkbRpcClient) {
-    let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-
-    let test_seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
-    println!(
-        "seeder ckb addres: {}\n",
-        OmniEth::new(test_seeder_key.clone()).ckb_address().unwrap()
-    );
-
-    let test_staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-    let omni_eth = OmniEth::new(test_staker_key.clone());
+    let omni_eth = OmniEth::new(user_key.clone());
     println!("staker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
     let staker = omni_eth.address().unwrap();
-
-    let type_ids: CTypeIds = parse_file(TYPE_IDS_PATH);
 
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
@@ -44,16 +34,11 @@ pub async fn reward_tx(ckb: &CkbRpcClient) {
             xudt_owner:           type_ids.xudt_owner.into_h256().unwrap(),
         },
         smt,
-        RewardInfo {
-            base_reward:           1000,
-            half_reward_cycle:     200,
-            minimum_propose_count: 100,
-            propose_discount_rate: 95,
-            epoch_count:           1,
-        },
         staker,
         2,
+        1,
     )
+    .await
     .build_tx()
     .await
     .unwrap();
@@ -76,7 +61,11 @@ pub async fn reward_tx(ckb: &CkbRpcClient) {
     }
 
     match tx.send().await {
-        Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
+        Ok(tx_hash) => println!("reward tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }
+
+    println!("reward tx ready");
+    tx.wait_until_committed(1000, 10).await.unwrap();
+    println!("reward tx committed");
 }

@@ -170,7 +170,7 @@ impl Stake {
         metadata_type_id: &H256,
         staker: &H160,
         xudt_owner: &H256,
-    ) -> Result<H256> {
+    ) -> Result<(H256, ckb_jsonrpc_types::OutPoint)> {
         let stake_cell = Stake::get_cell(
             ckb_rpc,
             Self::lock(metadata_type_id, staker),
@@ -182,7 +182,13 @@ impl Stake {
             return Err(CkbTxErr::CellNotFound("StakeAT".to_owned()).into());
         }
 
-        let mut stake_data = stake_cell.unwrap().output_data.unwrap().into_bytes();
+        let mut stake_data = stake_cell
+            .as_ref()
+            .unwrap()
+            .output_data
+            .clone()
+            .unwrap()
+            .into_bytes();
         let stake_data = StakeAtCellData::new_unchecked(stake_data.split_off(TOKEN_BYTES));
         let delegate_requirement_type_id = stake_data
             .lock()
@@ -190,7 +196,10 @@ impl Stake {
             .requirement()
             .requirement_type_id();
 
-        Ok(H256::from_slice(&delegate_requirement_type_id.as_bytes())?)
+        Ok((
+            H256::from_slice(&delegate_requirement_type_id.as_bytes())?,
+            stake_cell.unwrap().out_point,
+        ))
     }
 
     pub fn parse_stake_data(cell: &Cell) -> (u128, StakeAtCellData) {

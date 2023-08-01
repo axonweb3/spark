@@ -2,27 +2,36 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::faucet::FaucetTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Sighash, Tx};
 
-use crate::config::parse_file;
 use crate::config::types::PrivKeys;
-use crate::PRIV_KEYS_PATH;
 
-pub async fn faucet_tx(ckb: &CkbRpcClient) {
-    let priv_keys: PrivKeys = parse_file(PRIV_KEYS_PATH);
-    let test_seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
+pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
+    let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
 
-    let omni_eth = OmniEth::new(test_seeder_key.clone());
+    let omni_eth = OmniEth::new(seeder_key.clone());
     println!(
         "seeder omni eth ckb addres: {}\n",
         omni_eth.ckb_address().unwrap()
     );
 
-    let sig_hash = Sighash::new(test_seeder_key.clone());
+    let mut stakers = vec![];
+    for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
+        let privkey = staker_privkey.clone().into_h256().unwrap();
+        let omni_eth = OmniEth::new(privkey);
+        println!(
+            "staker{} ckb addres: {}",
+            i,
+            omni_eth.ckb_address().unwrap()
+        );
+        stakers.push((omni_eth.address().unwrap(), 1000000));
+    }
+
+    let sig_hash = Sighash::new(seeder_key.clone());
     println!(
         "seeder secp256k1 ckb addres: {}\n",
         sig_hash.address().unwrap()
     );
 
-    let tx = FaucetTxBuilder::new(ckb, test_seeder_key, 1000000)
+    let tx = FaucetTxBuilder::new(ckb, seeder_key, stakers)
         .build_tx()
         .await
         .unwrap();
@@ -30,7 +39,11 @@ pub async fn faucet_tx(ckb: &CkbRpcClient) {
     let mut tx = Tx::new(ckb, tx);
 
     match tx.send().await {
-        Ok(tx_hash) => println!("tx hash: 0x{}", tx_hash),
+        Ok(tx_hash) => println!("faucet tx hash: 0x{}", tx_hash),
         Err(e) => println!("{}", e),
     }
+
+    println!("faucet tx ready");
+    tx.wait_until_committed(1000, 10).await.unwrap();
+    println!("faucet tx committed");
 }

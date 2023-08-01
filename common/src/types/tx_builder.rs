@@ -522,10 +522,16 @@ impl From<Metadata> for AMetadata {
     }
 }
 
-pub struct RewardInfo {
+#[derive(Clone, Default)]
+pub struct RewardMeta {
     pub base_reward:           Amount,
     pub half_reward_cycle:     Epoch,
-    pub minimum_propose_count: u64,
+    pub propose_minimum_rate:  u8,
     pub propose_discount_rate: u8,
-    pub epoch_count:           u64,
+}
+
+pub struct MetadataInfo {
+    pub reward_meta:     RewardMeta,
+    pub epoch0_metadata: Metadata,
+    pub epoch1_metadata: Metadata,
 }
