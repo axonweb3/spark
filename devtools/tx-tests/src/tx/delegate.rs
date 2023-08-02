@@ -10,7 +10,7 @@ use tx_builder::ckb::delegate::DelegateTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 
 use crate::config::parse_type_ids;
-use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn first_delegate_tx(
     ckb: &CkbRpcClient,
@@ -137,6 +137,6 @@ async fn delegate_tx(
     }
 
     println!("delegate tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("delegate tx committed");
 }

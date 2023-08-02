@@ -37,33 +37,33 @@ cd spark/devtools/tx-tests
 cargo run -- cases -n test -1
 ```
 
-## Run single tx
+## Run tx
 ```
 cd spark/devtools/tx-tests
 
-cargo run -- single-tx -n test -f  // faucet (only used on the dev chain)
+cargo run -- tx -n test -f  // faucet (only used on the dev chain)
 
-cargo run -- single-tx -n test -i  // init tx
+cargo run -- tx -n test -i  // init tx
 
-cargo run -- single-tx -n test -m  // mint tx
+cargo run -- tx -n test -m  // mint tx
 
 // stake tx
-cargo run -- single-tx -n test -s first   // first stake
-cargo run -- single-tx -n test -s add     // add stake
-cargo run -- single-tx -n test -s redeem  // redeem stake
+cargo run -- tx -n test -s first   // first stake
+cargo run -- tx -n test -s add     // add stake
+cargo run -- tx -n test -s redeem  // redeem stake
 
 // delegate tx
-cargo run -- single-tx -n test -s first   // first delegate
-cargo run -- single-tx -n test -s add     // add delegate
-cargo run -- single-tx -n test -s redeem  // redeem delegate
+cargo run -- tx -n test -s first   // first delegate
+cargo run -- tx -n test -s add     // add delegate
+cargo run -- tx -n test -s redeem  // redeem delegate
 
-cargo run -- single-tx -n test -t  // stake smt tx
+cargo run -- tx -n test -t  // stake smt tx
 
-cargo run -- single-tx -n test -e  // delegate smt tx
+cargo run -- tx -n test -e  // delegate smt tx
 
-cargo run -- single-tx -n test -w  // withdraw tx
+cargo run -- tx -n test -w  // withdraw tx
 
-cargo run -- single-tx -n test -a  // metadata tx
+cargo run -- tx -n test -a  // metadata tx
 
-cargo run -- single-tx -n test -r  // reward tx
+cargo run -- tx -n test -r  // reward tx
 ```

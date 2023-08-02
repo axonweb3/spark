@@ -23,7 +23,7 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, staker_key.clone()).await;
-    add_stake_tx(ckb, staker_key.clone()).await;
+    add_stake_tx(ckb, staker_key.clone(), 2).await;
     run_stake_smt_tx(ckb, kicker_key.clone()).await;
 
     reedem_stake_tx(ckb, staker_key.clone()).await;
@@ -39,7 +39,10 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_metadata_tx(ckb, kicker_key.clone()).await;
 
     run_checkpoint_tx(ckb, priv_keys.clone(), 1).await;
+    run_metadata_tx(ckb, kicker_key.clone()).await;
+
     run_checkpoint_tx(ckb, priv_keys.clone(), 2).await;
+    run_metadata_tx(ckb, kicker_key.clone()).await;
 
     run_reward_tx(ckb, staker_key.clone()).await;
 

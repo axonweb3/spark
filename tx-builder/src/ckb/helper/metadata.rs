@@ -85,7 +85,13 @@ impl Metadata {
         let propose_minimum_rate: u8 = metadata.propose_minimum_rate().into();
         let metadata = metadata.metadata().get(0).unwrap();
         let epoch_block_count = to_u32(&metadata.epoch_len()) * to_u32(&metadata.period_len());
-        let validator_num = metadata.validators().len();
-        (epoch_block_count * propose_minimum_rate as u32 / validator_num as u32 / 100).into()
+        let validator_count = metadata.validators().len();
+        log::info!(
+            "propose minimum rate: {}, epoch block count: {}, validator count: {}",
+            propose_minimum_rate,
+            epoch_block_count,
+            validator_count,
+        );
+        (epoch_block_count * propose_minimum_rate as u32 / validator_count as u32 / 100).into()
     }
 }

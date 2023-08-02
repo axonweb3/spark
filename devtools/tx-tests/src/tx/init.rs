@@ -9,8 +9,7 @@ use tx_builder::ckb::init::InitTxBuilder;
 use crate::config::types::{PrivKeys, TypeIds as CTypeIds};
 use crate::config::write_file;
 use crate::mock::mock_axon_validators_v2;
-
-use crate::TYPE_IDS_PATH;
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn run_init_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
@@ -97,7 +96,7 @@ pub async fn init_tx(
     }
 
     println!("init tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("init tx committed");
 
     let type_ids: CTypeIds = type_id_args.into();

@@ -18,6 +18,7 @@ pub const PRIV_KEYS_PATH: &str = "./src/config/priv_keys.toml";
 pub const TYPE_IDS_PATH: &str = "./src/config/type_ids.toml";
 pub const LOG_CONFIG_PATH: &str = "./src/config/log.toml";
 pub const ROCKSDB_PATH: &str = "./free-space/smt";
+pub const MAX_TRY: u64 = 100;
 
 #[tokio::main]
 async fn main() {
@@ -45,7 +46,7 @@ async fn main() {
                 ),
         )
         .subcommand(
-            clap::Command::new("single-tx")
+            clap::Command::new("tx")
                 .about("Test single tx")
                 .arg(
                     clap::Arg::new("net")
@@ -144,7 +145,7 @@ async fn main() {
     let matches = cmd.get_matches();
     match matches.subcommand() {
         Some(("cases", matches)) => run_test_cases(matches, priv_keys).await,
-        Some(("single-tx", matches)) => run_single_tx(matches, priv_keys).await,
+        Some(("tx", matches)) => run_single_tx(matches, priv_keys).await,
         _ => unimplemented!(),
     }
 }
@@ -190,7 +191,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
             "first" => first_stake_tx(&ckb, staker_key).await,
-            "add" => add_stake_tx(&ckb, staker_key).await,
+            "add" => add_stake_tx(&ckb, staker_key, 2).await,
             "redeem" => reedem_stake_tx(&ckb, staker_key).await,
             _ => unimplemented!(),
         }

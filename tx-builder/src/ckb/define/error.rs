@@ -54,8 +54,11 @@ pub enum CkbTxErr {
     #[error("The minimum value of the current epoch should be 2")]
     EpochTooSmall,
 
-    #[error("Stake amount not found in stack SMT. staker: {0}")]
-    StakeAmountNotFound(H160),
+    #[error("Starting epoch is less than ending epoch. start epoch: {0}, end epoch: {1}")]
+    RewardEpoch(u64, u64),
+
+    #[error("Stake amount not found in stack SMT. epoch: {0}, staker: {1}")]
+    StakeAmountNotFound(u64, H160),
 
     #[error(
         "Not right checkpoint occassion, latest epoch {current_epoch:?} and period {current_period:?}, recorded epoch {recorded_epoch:?} and period {recorded_period:?} is not meet the condition"

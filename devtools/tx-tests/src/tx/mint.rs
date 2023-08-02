@@ -5,7 +5,7 @@ use tx_builder::ckb::mint::MintTxBuilder;
 
 use crate::config::parse_type_ids;
 use crate::config::types::PrivKeys;
-use crate::TYPE_IDS_PATH;
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
@@ -42,6 +42,6 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     }
 
     println!("mint tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("mint tx committed");
 }

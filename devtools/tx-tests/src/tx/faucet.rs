@@ -3,6 +3,7 @@ use tx_builder::ckb::faucet::FaucetTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Sighash, Tx};
 
 use crate::config::types::PrivKeys;
+use crate::MAX_TRY;
 
 pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
@@ -44,6 +45,6 @@ pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     }
 
     println!("faucet tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("faucet tx committed");
 }
