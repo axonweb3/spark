@@ -324,9 +324,9 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             let stake_delta = Stake::item(&stake_data.lock().delta());
 
             log::info!(
-                "[stake smt] staker: {}, stake item: {}",
+                "[stake smt] staker: {}, stake item: {:?}",
                 staker.to_string(),
-                stake_data
+                stake_delta,
             );
 
             if stake_delta.inauguration_epoch < self.current_epoch + INAUGURATION {

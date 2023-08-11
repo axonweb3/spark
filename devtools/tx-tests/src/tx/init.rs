@@ -97,7 +97,7 @@ pub async fn init_tx(
     }
 
     println!("init tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("init tx committed");
 
     let type_ids: CTypeIds = type_id_args.into();

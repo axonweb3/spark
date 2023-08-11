@@ -14,11 +14,9 @@ use molecule::prelude::Builder;
 use common::traits::{
     ckb_rpc_client::CkbRpc, smt::DelegateSmtStorage, tx_builder::IDelegateSmtTxBuilder,
 };
-use common::types::axon_types::basic::Uint64;
 use common::types::axon_types::delegate::{
     DelegateArgs, DelegateAtCellData, DelegateAtCellLockData as ADelegateAtCellLockData,
-    DelegateCellData, DelegateInfoDeltas, DelegateSmtCellData as ADelegateSmtCellData,
-    StakerSmtRoots,
+    DelegateCellData, DelegateSmtCellData as ADelegateSmtCellData, StakerSmtRoots,
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::smt::{Delegator as SmtDelegator, UserAmount};
@@ -26,7 +24,7 @@ use common::types::tx_builder::{
     Amount, DelegateItem, DelegateSmtTypeIds, Delegator, Epoch, InDelegateSmt, InStakeSmt,
     NonTopDelegators, PrivateKey, Staker as TxStaker,
 };
-use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_h160, to_uint128, to_usize};
+use common::utils::convert::{new_u128, to_ckb_h160, to_eth_h160, to_h160, to_usize};
 
 use crate::ckb::define::types::{DelegateInfo, StakeGroupInfo};
 use crate::ckb::define::{
@@ -91,7 +89,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
 
         let smt_bytes = delegate_smt_cell.output_data.unwrap().into_bytes();
         let delegate_smt_data = ADelegateSmtCellData::new_unchecked(smt_bytes);
-        let roots = self.get_old_roots(delegate_smt_data.smt_roots());
+        let roots = self.parse_old_roots(delegate_smt_data.smt_roots());
 
         let (root, statistics, smt_witness) = self.collect(roots).await?;
 
@@ -163,7 +161,7 @@ struct Statistics {
 }
 
 impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
-    fn get_old_roots(
+    fn parse_old_roots(
         &self,
         old_smt_roots: StakerSmtRoots,
     ) -> HashMap<ckb_types::H160, StakerSmtRoot> {
@@ -207,7 +205,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, delegator);
 
-            let (new_delegate_data, new_withdraw_data) = if statistics
+            let (new_withdraw_data, total_withdraw_amount) = if statistics
                 .withdraw_amounts
                 .contains_key(delegator)
             {
@@ -225,42 +223,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 witnesses.push(Withdraw::witness(true).as_bytes());
 
                 let withdraw_amounts = statistics.withdraw_amounts.get(delegator).unwrap();
-                let mut delegator_infos: Vec<DelegateItem> = Vec::new();
-
-                for delegate in old_delegate_data.lock().delegator_infos() {
-                    let mut delegate_item = Delegate::item(&delegate);
-                    delegate_item.amount = 0;
-
-                    if withdraw_amounts.contains_key(&delegate_item.staker) {
-                        let withdraw_amount = withdraw_amounts
-                            .get(&delegate_item.staker)
-                            .unwrap()
-                            .to_owned();
-                        if delegate_item.total_amount < withdraw_amount {
-                            return Err(CkbTxErr::ExceedTotalAmount {
-                                total_amount: delegate_item.total_amount,
-                                new_amount:   withdraw_amount,
-                            }
-                            .into());
-                        }
-                        delegate_item.total_amount -= withdraw_amount;
-                    }
-
-                    if delegate_item.total_amount > 0 {
-                        delegator_infos.push(delegate_item);
-                    }
-                }
-
-                let delegator_addr = old_delegate_data.lock().l1_address();
-                let new_delegate_data = old_delegate_data
-                    .as_builder()
-                    .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
-                        l2_address: to_h160(&delegator_addr),
-                        delegator_infos,
-                    }))
-                    .build()
-                    .as_bytes();
-
                 let total_withdraw_amount = withdraw_amounts
                     .values()
                     .fold(0_u128, |acc, x| acc + x.to_owned());
@@ -273,52 +235,36 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     );
 
                 (
-                    token_cell_data(
-                        old_total_delegate_amount - total_withdraw_amount,
-                        new_delegate_data,
-                    ),
                     Some(Withdraw::update_cell_data(
                         &old_withdraw_cell,
                         self.current_epoch + INAUGURATION,
                         total_withdraw_amount,
                     )),
+                    total_withdraw_amount,
                 )
             } else {
-                let mut new_delegates = DelegateInfoDeltas::new_builder();
-
-                for delegate in old_delegate_data.lock().delegator_infos() {
-                    new_delegates = new_delegates.push(
-                        delegate
-                            .as_builder()
-                            .amount(to_uint128(0))
-                            .inauguration_epoch(Uint64::default())
-                            .is_increase(0.into())
-                            .build(),
-                    );
-                }
-
-                let inner_delegate_data = old_delegate_data.lock();
-                let new_delegate_data = old_delegate_data
-                    .as_builder()
-                    .lock(
-                        inner_delegate_data
-                            .as_builder()
-                            .delegator_infos(new_delegates.build())
-                            .build(),
-                    )
-                    .build()
-                    .as_bytes();
-
                 log::info!(
                         "[delegate smt] delegator: {}, new total delegate amount: {}, withdraw amount: {}",
                         delegator.to_string(),
                         old_total_delegate_amount,
                         0,
                     );
+                (None, 0)
+            };
 
-                (
-                    token_cell_data(old_total_delegate_amount.to_owned(), new_delegate_data),
-                    None,
+            let new_delegate_data = {
+                let delegator_addr = old_delegate_data.lock().l2_address();
+                let new_delegate_data = old_delegate_data
+                    .as_builder()
+                    .lock(ADelegateAtCellLockData::from(DelegateAtCellLockData {
+                        l2_address:      to_h160(&delegator_addr),
+                        delegator_infos: vec![],
+                    }))
+                    .build()
+                    .as_bytes();
+                token_cell_data(
+                    old_total_delegate_amount.to_owned() - total_withdraw_amount,
+                    new_delegate_data,
                 )
             };
 
@@ -379,12 +325,15 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             for (delegator, delegate) in delegators.iter() {
                 let smt_delegator = to_eth_h160(delegator);
                 if new_smt.contains_key(&smt_delegator) {
-                    let origin_amount = new_smt.get(&smt_delegator).unwrap().to_owned();
+                    // previously delegated
+                    let smt_amount = new_smt.get(&smt_delegator).unwrap().to_owned();
                     if delegate.is_increase {
-                        new_smt.insert(smt_delegator, origin_amount + delegate.amount);
+                        // add delegation
+                        new_smt.insert(smt_delegator, smt_amount + delegate.amount);
                     } else {
-                        let withdraw_amount = if origin_amount < delegate.amount {
-                            origin_amount
+                        // redeem delegation
+                        let withdraw_amount = if smt_amount < delegate.amount {
+                            smt_amount
                         } else {
                             delegate.amount
                         };
@@ -395,9 +344,10 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                             })
                             .or_insert_with(HashMap::new)
                             .insert(staker.clone(), withdraw_amount);
-                        new_smt.insert(smt_delegator, origin_amount - withdraw_amount);
+                        new_smt.insert(smt_delegator, smt_amount - withdraw_amount);
                     }
                 } else {
+                    // The first delegation must be an increase in amount.
                     if !delegate.is_increase {
                         return Err(CkbTxErr::Increase(delegate.is_increase).into());
                     }
@@ -446,6 +396,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             });
         }
 
+        // Collect new roots.
         for new_root in new_roots.into_iter() {
             old_smt_roots.insert(new_root.staker.clone(), new_root.clone());
         }
@@ -479,13 +430,12 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             log::info!("[delegate smt] delegator: {}", delegator.to_string());
 
             let mut cell_bytes = cell.output_data.clone().unwrap().into_bytes();
-
             let delegate = DelegateAtCellData::new_unchecked(cell_bytes.split_off(TOKEN_BYTES));
             let delegate_infos = delegate.lock().delegator_infos();
             let mut expired = false;
 
             for info in delegate_infos.into_iter() {
-                let item = Delegate::item(&info);
+                let item = DelegateItem::from(info);
                 if item.inauguration_epoch < self.current_epoch + INAUGURATION {
                     expired = true;
                     break;
@@ -553,6 +503,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             let tx_delegator = Delegator::from_slice(delegator.as_bytes()).unwrap();
             let mut in_smt = false;
 
+            // Refund all users' money.
             if old_smt.contains_key(delegator) {
                 log::info!("[delegate smt] in delegate smt");
 

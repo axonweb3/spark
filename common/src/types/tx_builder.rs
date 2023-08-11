@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Formatter};
 use std::str::FromStr;
 
 use axon_types::{
@@ -130,28 +130,21 @@ impl From<StakeItem> for StakeInfoDelta {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct DelegateItem {
     pub staker:             H160,
-    pub total_amount:       Amount, // delegate tx does not need to fill this field
     pub is_increase:        bool,
     pub amount:             Amount,
     pub inauguration_epoch: Epoch,
 }
 
 impl DelegateItem {
-    pub fn new_for_delegate(
-        staker: H160,
-        is_increase: bool,
-        amount: Amount,
-        inauguration_epoch: Epoch,
-    ) -> Self {
+    pub fn new(staker: H160, is_increase: bool, amount: Amount, inauguration_epoch: Epoch) -> Self {
         Self {
             staker,
             is_increase,
             amount,
             inauguration_epoch,
-            total_amount: 0,
         }
     }
 }
@@ -162,7 +155,6 @@ impl From<DelegateItem> for DelegateInfoDelta {
             .staker(Identity::new_unchecked(
                 delegate.staker.as_bytes().to_owned().into(),
             ))
-            .total_amount(to_uint128(delegate.total_amount))
             .is_increase(Byte::new(delegate.is_increase.into()))
             .amount(to_uint128(delegate.amount))
             .inauguration_epoch(to_uint64(delegate.inauguration_epoch))
@@ -174,21 +166,10 @@ impl From<DelegateInfoDelta> for DelegateItem {
     fn from(delegate: DelegateInfoDelta) -> Self {
         DelegateItem {
             staker:             to_h160(&delegate.staker()),
-            total_amount:       to_u128(&delegate.total_amount()),
             is_increase:        to_bool(&delegate.is_increase()),
             amount:             to_u128(&delegate.amount()),
             inauguration_epoch: to_u64(&delegate.inauguration_epoch()),
         }
-    }
-}
-
-impl Display for DelegateItem {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "staker: {}, total amount: {}, amount: {}, is increase: {}, inaugration epoch: {}",
-            self.staker, self.total_amount, self.amount, self.is_increase, self.inauguration_epoch,
-        )
     }
 }
 

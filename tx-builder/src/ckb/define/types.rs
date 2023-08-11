@@ -358,7 +358,6 @@ impl From<ADelegateAtCellLockData> for DelegateAtCellLockData {
         for i in value.delegator_infos().into_iter() {
             res.push(DelegateItem {
                 staker:             H160::from_slice(&i.staker().raw_data()).unwrap(),
-                total_amount:       to_u128(&i.total_amount()),
                 is_increase:        to_bool(&i.is_increase()),
                 amount:             to_u128(&i.amount()),
                 inauguration_epoch: to_u64(&i.inauguration_epoch()),

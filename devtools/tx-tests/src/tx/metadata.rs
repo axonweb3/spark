@@ -58,6 +58,6 @@ pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     }
 
     println!("metadata tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("metadata tx committed");
 }

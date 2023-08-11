@@ -335,10 +335,10 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         );
 
         if wallet_amount < self.stake.amount {
-            return Err(CkbTxErr::ExceedWalletAmount {
+            return Err(CkbTxErr::ExceedWalletAmount(
                 wallet_amount,
-                amount: self.stake.amount,
-            });
+                self.stake.amount,
+            ));
         }
         wallet_amount -= self.stake.amount;
 
@@ -410,7 +410,7 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         .calc_actual_amount()?;
 
         if actual_info.is_increase {
-            total_stake_amount = actual_info.total_elect_amount;
+            total_stake_amount = actual_info.total_amount;
             wallet_amount = actual_info.wallet_amount;
         }
 

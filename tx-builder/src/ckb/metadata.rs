@@ -480,7 +480,7 @@ where
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
 
-                let (_cell_output, total_amount, delegator_at_cell_data) =
+                let (_cell_output, total_amount, _delegator_at_cell_data) =
                     match delegator_at_cell_datas.entry(*addr) {
                         std::collections::hash_map::Entry::Occupied(v) => v.into_mut(),
                         std::collections::hash_map::Entry::Vacant(v) => {
@@ -518,11 +518,6 @@ where
                     };
 
                 *total_amount -= amount;
-                for i in delegator_at_cell_data.lock.delegator_infos.iter_mut() {
-                    if i.staker == staker_address.0.into() {
-                        i.total_amount -= amount;
-                    }
-                }
 
                 log::info!(
                     "[metadata] none top delegator: {}, smt amount: {}, old total stake amount: {}, withdraw amount: {}",

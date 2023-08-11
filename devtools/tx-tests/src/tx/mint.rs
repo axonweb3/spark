@@ -42,6 +42,6 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     }
 
     println!("mint tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("mint tx committed");
 }
