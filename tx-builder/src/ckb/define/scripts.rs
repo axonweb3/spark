@@ -206,7 +206,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_LOCK_DEVNET: Script = Script {
         code_hash: h256!("0x42cea6c9708371ec9b91d19dacab6d4ac71029d36affac025f21cd8ddb1237bb"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xd457bca47654c28b2b1417b87e875643857f4e27e55379f470e6182df59aecc9"),
+        tx_hash: h256!("0x02feb3dabb005271c0d607ce670f18ac88d059261f83633ffebb9d1acc3d2c64"),
         index: 0,
         dep_type: DepType::Code,
     };

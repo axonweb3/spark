@@ -9,6 +9,7 @@ use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::stake::StakeTxBuilder;
 
 use crate::config::parse_type_ids;
+use crate::helper::signer::{EthSigner, UnlockMode};
 use crate::mock::gen_bls_keypair;
 use crate::{MAX_TRY, TYPE_IDS_PATH};
 
@@ -111,19 +112,21 @@ async fn stake_tx(
 
     let mut tx = Tx::new(ckb, tx);
     let script_groups = tx.gen_script_group().await.unwrap();
-    let signer = omni_eth.signer().unwrap();
+    let omni_signer = omni_eth.signer().unwrap();
+    let eth_signer = EthSigner::new(staker_key, UnlockMode::Stake);
 
     if first_stake {
         for group in script_groups.lock_groups.iter() {
-            tx.sign(&signer, group.1).unwrap();
+            tx.sign(&omni_signer, group.1).unwrap();
         }
     } else {
         for (i, group) in script_groups.lock_groups.iter().enumerate() {
             if i == 0 {
-                println!("not sign; stake AT cell: {:?}", group.1.input_indices);
+                println!("stake AT cell: {:?}", group.1.input_indices);
+                tx.sign(&eth_signer, group.1).unwrap();
             } else {
-                println!("sign; other cell: {:?}", group.1.input_indices);
-                tx.sign(&signer, group.1).unwrap();
+                println!("other cells: {:?}", group.1.input_indices);
+                tx.sign(&omni_signer, group.1).unwrap();
             }
         }
     }
