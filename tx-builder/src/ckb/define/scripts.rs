@@ -275,7 +275,7 @@ lazy_static::lazy_static! {
     pub static ref DELEGATE_LOCK_DEVNET: Script = Script {
         code_hash: h256!("0xe464566d6d99e58d4a1c0074a00bf7648218c81b55f3efca288c2c22eef0e6f5"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xe5cd04a1f39bade919a976bacc1f4615bc06bd6e3a56a8f078c7620e4a93bde1"),
+        tx_hash: h256!("0x942cc224e8944e05460b128e13d64b466a8d344f783e3696dff7b912c457e891"),
         index: 0,
         dep_type: DepType::Code,
     };
