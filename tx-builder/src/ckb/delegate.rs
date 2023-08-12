@@ -475,9 +475,9 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                 delta
             );
             if !new_stakers.contains(&delta.staker) && delta.amount != 0 {
+                // expired
                 if delta.inauguration_epoch < self.current_epoch + INAUGURATION && delta.is_increase
                 {
-                    // expired
                     *wallet_amount += delta.amount;
                     *total_delegate_amount -= delta.amount;
                 } else {

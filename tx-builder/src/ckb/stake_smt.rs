@@ -8,6 +8,7 @@ use ckb_types::{
     core::{Capacity, TransactionBuilder, TransactionView},
     packed::{CellDep, CellInput, CellOutput, WitnessArgs},
     prelude::{Entity, Pack},
+    H160,
 };
 use molecule::prelude::Builder;
 
@@ -81,7 +82,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
                 .build(),
         ];
 
-        let (new_smt_root, cells, statistics, smt_witness) = self.collect(quorum).await?;
+        let (new_smt_root, cells, statistics, smt_witness) = self.process_stake(quorum).await?;
 
         let old_stake_smt_cell_bytes = stake_smt_cell.output_data.unwrap().into_bytes();
         let old_stake_smt_cell_data = StakeSmtCellData::new_unchecked(old_stake_smt_cell_bytes);
@@ -192,49 +193,46 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             );
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, staker);
+            let mut new_total_stake_amount = old_total_stake_amount;
 
-            let (new_total_stake_amount, withdraw_data) =
-                if statistics.withdraw_amounts.contains_key(staker) {
-                    let withdraw_amount =
-                        statistics.withdraw_amounts.get(staker).unwrap().to_owned();
+            if statistics.withdraw_amounts.contains_key(staker) {
+                let withdraw_amount = statistics.withdraw_amounts.get(staker).unwrap().to_owned();
+                new_total_stake_amount = old_total_stake_amount - withdraw_amount;
+                log::info!(
+                    "[stake smt] staker: {}, new total stake amount: {}, withdraw amount: {}",
+                    staker.to_string(),
+                    new_total_stake_amount,
+                    withdraw_amount,
+                );
 
-                    let old_withdraw_cell =
-                        Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
-                            .await?
-                            .unwrap();
+                let old_withdraw_cell =
+                    Withdraw::get_cell(self.ckb, withdraw_lock.clone(), xudt.clone())
+                        .await?
+                        .unwrap();
 
-                    // inputs: withdraw AT cell
-                    inputs.push(
-                        CellInput::new_builder()
-                            .previous_output(old_withdraw_cell.out_point.clone().into())
-                            .build(),
-                    );
-                    witnesses.push(Withdraw::witness(true).as_bytes());
+                // inputs: withdraw AT cell
+                inputs.push(
+                    CellInput::new_builder()
+                        .previous_output(old_withdraw_cell.out_point.clone().into())
+                        .build(),
+                );
+                witnesses.push(Withdraw::witness(true).as_bytes());
 
-                    log::info!(
-                        "[stake smt] staker: {}, new total stake amount: {}, withdraw amount: {}",
-                        staker.to_string(),
-                        old_total_stake_amount - withdraw_amount,
-                        withdraw_amount,
-                    );
-
-                    (
-                        old_total_stake_amount - withdraw_amount,
-                        Some(Withdraw::update_cell_data(
-                            &old_withdraw_cell,
-                            self.current_epoch + INAUGURATION,
-                            withdraw_amount,
-                        )),
-                    )
-                } else {
-                    log::info!(
-                        "[stake smt] staker: {}, new total stake amount: {}, withdraw amount: {}",
-                        staker.to_string(),
-                        old_total_stake_amount,
-                        0,
-                    );
-                    (old_total_stake_amount, None)
-                };
+                // outputs: withdraw AT cell
+                outputs_data.push(Withdraw::update_cell_data(
+                    &old_withdraw_cell,
+                    self.current_epoch + INAUGURATION,
+                    withdraw_amount,
+                ));
+                outputs.push(
+                    CellOutput::new_builder()
+                        .lock(withdraw_lock)
+                        .type_(Some(xudt.clone()).pack())
+                        .build_exact_capacity(Capacity::bytes(
+                            outputs_data.last().unwrap().len(),
+                        )?)?,
+                );
+            }
 
             let inner_stake_data = old_stake_data.lock();
             let new_stake_data = old_stake_data
@@ -256,49 +254,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                     .type_(Some(xudt.clone()).pack())
                     .build_exact_capacity(Capacity::bytes(outputs_data.last().unwrap().len())?)?,
             );
-
-            // outputs: withdraw AT cell
-            if withdraw_data.is_some() {
-                outputs.push(
-                    CellOutput::new_builder()
-                        .lock(withdraw_lock)
-                        .type_(Some(xudt.clone()).pack())
-                        .build_exact_capacity(Capacity::bytes(
-                            withdraw_data.as_ref().unwrap().len(),
-                        )?)?,
-                );
-                outputs_data.push(withdraw_data.unwrap());
-            }
         }
 
         Ok(())
     }
 
-    async fn update_stake_smt(&self, new_smt: HashMap<SmtStaker, Amount>) -> Result<Root> {
-        let new_smt_stakers = new_smt
-            .iter()
-            .map(|(k, v)| {
-                log::info!(
-                    "[stake smt] new smt, user: {}, amount: {}",
-                    k.to_string(),
-                    v,
-                );
-                UserAmount {
-                    user:        k.to_owned(),
-                    amount:      v.to_owned(),
-                    is_increase: true,
-                }
-            })
-            .collect();
-
-        self.stake_smt_storage
-            .insert(self.current_epoch + INAUGURATION, new_smt_stakers)
-            .await?;
-
-        self.stake_smt_storage.get_top_root().await
-    }
-
-    async fn collect(
+    async fn process_stake(
         &self,
         quorum: u16,
     ) -> Result<(Root, HashMap<TxStaker, Cell>, Statistics, WitnessArgs)> {
@@ -335,38 +296,21 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
             inputs_stake_cells.insert(staker.clone(), cell);
 
-            let smt_staker = SmtStaker::from(staker.0);
-            if new_smt.contains_key(&smt_staker) {
-                log::info!(
-                    "[stake smt] staker {} exists in the stake smt",
-                    staker.to_string(),
-                );
-                let origin_stake_amount = new_smt.get(&smt_staker).unwrap().to_owned();
-                if stake_delta.is_increase {
-                    new_smt.insert(smt_staker, origin_stake_amount + stake_delta.amount);
-                } else if origin_stake_amount < stake_delta.amount {
-                    withdraw_amounts.insert(staker, origin_stake_amount);
-                } else {
-                    new_smt.insert(smt_staker, origin_stake_amount - stake_delta.amount);
-                    withdraw_amounts.insert(staker, stake_delta.amount);
-                };
-            } else {
-                log::info!(
-                    "[stake smt] staker {} does not exists in the stake smt",
-                    staker.to_string(),
-                );
-                if !stake_delta.is_increase {
-                    return Err(CkbTxErr::Increase(stake_delta.is_increase).into());
-                }
-                new_smt.insert(smt_staker, stake_delta.amount);
-            }
+            self.update_amount(
+                staker.clone(),
+                &stake_delta,
+                &mut new_smt,
+                &mut withdraw_amounts,
+            )?;
         }
 
         let non_top_stakers = self.collect_non_top_stakers(quorum, &old_smt, &mut new_smt);
 
         for (staker, in_smt) in non_top_stakers.iter() {
             let smt_staker = SmtStaker::from(staker.0);
+
             if *in_smt {
+                // Refund all stakers' money.
                 withdraw_amounts
                     .insert(staker.clone(), old_smt.get(&smt_staker).unwrap().to_owned());
 
@@ -428,6 +372,41 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
         ))
     }
 
+    fn update_amount(
+        &self,
+        staker: H160,
+        stake_delta: &StakeItem,
+        new_smt: &mut HashMap<SmtStaker, u128>,
+        withdraw_amounts: &mut HashMap<H160, u128>,
+    ) -> Result<()> {
+        let smt_staker = SmtStaker::from(staker.0);
+        if new_smt.contains_key(&smt_staker) {
+            log::info!(
+                "[stake smt] staker {} exists in the stake smt",
+                staker.to_string(),
+            );
+            let origin_stake_amount = new_smt.get(&smt_staker).unwrap().to_owned();
+            if stake_delta.is_increase {
+                new_smt.insert(smt_staker, origin_stake_amount + stake_delta.amount);
+            } else if origin_stake_amount < stake_delta.amount {
+                withdraw_amounts.insert(staker, origin_stake_amount);
+            } else {
+                new_smt.insert(smt_staker, origin_stake_amount - stake_delta.amount);
+                withdraw_amounts.insert(staker, stake_delta.amount);
+            };
+        } else {
+            log::info!(
+                "[stake smt] staker {} does not exists in the stake smt",
+                staker.to_string(),
+            );
+            if !stake_delta.is_increase {
+                return Err(CkbTxErr::Increase(stake_delta.is_increase).into());
+            }
+            new_smt.insert(smt_staker, stake_delta.amount);
+        }
+        Ok(())
+    }
+
     fn collect_non_top_stakers(
         &self,
         quorum: u16,
@@ -462,5 +441,29 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                 (TxStaker::from(staker.0), old_smt.contains_key(staker))
             })
             .collect()
+    }
+
+    async fn update_stake_smt(&self, new_smt: HashMap<SmtStaker, Amount>) -> Result<Root> {
+        let new_smt_stakers = new_smt
+            .iter()
+            .map(|(k, v)| {
+                log::info!(
+                    "[stake smt] new smt, user: {}, amount: {}",
+                    k.to_string(),
+                    v,
+                );
+                UserAmount {
+                    user:        k.to_owned(),
+                    amount:      v.to_owned(),
+                    is_increase: true,
+                }
+            })
+            .collect();
+
+        self.stake_smt_storage
+            .insert(self.current_epoch + INAUGURATION, new_smt_stakers)
+            .await?;
+
+        self.stake_smt_storage.get_top_root().await
     }
 }

@@ -284,7 +284,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
             let mut new_smt = old_smt.clone();
 
-            self.calc_total_delegate_amount(staker, delegate, &mut new_smt, &mut withdraw_amounts)?;
+            self.update_amount(staker, delegate, &mut new_smt, &mut withdraw_amounts)?;
 
             self.collect_non_top_delegators(
                 staker.clone(),
@@ -380,7 +380,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         Ok(())
     }
 
-    fn calc_total_delegate_amount(
+    fn update_amount(
         &mut self,
         staker: &Staker,
         delegation: &HashMap<H160, DelegateItem>,
@@ -467,7 +467,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             let tx_delegator = Delegator::from_slice(delegator.as_bytes()).unwrap();
             let mut in_smt = false;
 
-            // Refund all users' money.
+            // Refund all delegators' money.
             if old_smt.contains_key(delegator) {
                 log::info!("[delegate smt] in delegate smt");
 
