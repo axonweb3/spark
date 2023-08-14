@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::faucet::FaucetTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Sighash, Tx};
@@ -14,17 +16,31 @@ pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         omni_eth.ckb_address().unwrap()
     );
 
-    let mut stakers = vec![];
+    let mut users = HashMap::new();
+
     for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
         println!(
             "staker{} ckb addres: {}",
             i,
-            omni_eth.ckb_address().unwrap()
+            omni_eth.ckb_address().unwrap(),
         );
-        stakers.push((omni_eth.address().unwrap(), 1000000));
+        users.insert(omni_eth.address().unwrap(), 10000);
     }
+
+    for (i, delegator_privkey) in priv_keys.delegator_privkeys.into_iter().enumerate() {
+        let privkey = delegator_privkey.clone().into_h256().unwrap();
+        let omni_eth = OmniEth::new(privkey);
+        println!(
+            "staker{} ckb addres: {}",
+            i,
+            omni_eth.ckb_address().unwrap(),
+        );
+        users.insert(omni_eth.address().unwrap(), 10000);
+    }
+
+    let users = users.into_iter().collect();
 
     let sig_hash = Sighash::new(seeder_key.clone());
     println!(
@@ -32,7 +48,7 @@ pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         sig_hash.address().unwrap()
     );
 
-    let tx = FaucetTxBuilder::new(ckb, seeder_key, stakers)
+    let tx = FaucetTxBuilder::new(ckb, seeder_key, users)
         .build_tx()
         .await
         .unwrap();

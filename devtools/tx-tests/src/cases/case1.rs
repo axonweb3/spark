@@ -19,6 +19,10 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let staker_eth_addr = OmniEth::new(staker_key.clone()).address().unwrap();
 
+    if staker_key == delegator_key {
+        panic!("Stakers can't delegate themselves.");
+    }
+
     run_init_tx(ckb, priv_keys.clone()).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 

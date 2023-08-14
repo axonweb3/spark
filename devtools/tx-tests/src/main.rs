@@ -18,7 +18,7 @@ pub const PRIV_KEYS_PATH: &str = "./src/config/priv_keys.toml";
 pub const TYPE_IDS_PATH: &str = "./src/config/type_ids.toml";
 pub const LOG_CONFIG_PATH: &str = "./src/config/log.toml";
 pub const ROCKSDB_PATH: &str = "./free-space/smt";
-pub const MAX_TRY: u64 = 100;
+pub const MAX_TRY: u64 = 1000;
 
 #[tokio::main]
 async fn main() {

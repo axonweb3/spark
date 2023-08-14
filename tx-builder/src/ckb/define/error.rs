@@ -77,4 +77,7 @@ pub enum CkbTxErr {
         "Invalid delegate, staker: {0}, delegator: {1}, redeem amount: {2}, total amount: {3}"
     )]
     RedeemDelegate(CH160, CH160, Amount, Amount),
+
+    #[error("Do not delegate to yourself!")]
+    DelegateYourself,
 }
