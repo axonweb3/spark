@@ -30,10 +30,10 @@ pub enum ElectItem<'a> {
 
 #[derive(Debug)]
 pub struct ActualAmount {
-    pub wallet_amount:      Amount,
-    pub total_elect_amount: Amount,
-    pub amount:             Amount,
-    pub is_increase:        bool,
+    pub wallet_amount: Amount,
+    pub total_amount:  Amount,
+    pub amount:        Amount,
+    pub is_increase:   bool,
 }
 
 impl Display for ActualAmount {
@@ -41,7 +41,7 @@ impl Display for ActualAmount {
         write!(
             f,
             "wallet amount: {}, total amount: {}, amount: {}, is increase: {}",
-            self.wallet_amount, self.total_elect_amount, self.amount, self.is_increase,
+            self.wallet_amount, self.total_amount, self.amount, self.is_increase,
         )
     }
 }
@@ -107,10 +107,7 @@ impl<'a> ElectAmountCalculator<'a> {
 
         if self.last_info.amount == 0 {
             if wallet_amount < new_amount {
-                return Err(CkbTxErr::ExceedWalletAmount {
-                    wallet_amount,
-                    amount: new_amount,
-                });
+                return Err(CkbTxErr::ExceedWalletAmount(wallet_amount, new_amount));
             }
             wallet_amount -= new_amount;
             total_elect_amount += new_amount;
@@ -124,10 +121,10 @@ impl<'a> ElectAmountCalculator<'a> {
                     self.last_info.amount - new_amount
                 };
                 if wallet_amount < diff_amount {
-                    return Err(CkbTxErr::ExceedWalletAmount {
-                        wallet_amount: self.wallet_amount,
-                        amount:        diff_amount,
-                    });
+                    return Err(CkbTxErr::ExceedWalletAmount(
+                        self.wallet_amount,
+                        diff_amount,
+                    ));
                 }
                 wallet_amount -= diff_amount;
                 total_elect_amount += diff_amount;
@@ -135,20 +132,17 @@ impl<'a> ElectAmountCalculator<'a> {
         } else if self.last_info.is_increase {
             actual_amount = new_amount + self.last_info.amount;
             if wallet_amount < new_amount {
-                return Err(CkbTxErr::ExceedWalletAmount {
-                    wallet_amount: self.wallet_amount,
-                    amount:        new_amount,
-                });
+                return Err(CkbTxErr::ExceedWalletAmount(self.wallet_amount, new_amount));
             }
             wallet_amount -= new_amount;
             total_elect_amount += new_amount;
         } else if new_amount >= self.last_info.amount {
             actual_amount = new_amount - self.last_info.amount;
             if wallet_amount < actual_amount {
-                return Err(CkbTxErr::ExceedWalletAmount {
-                    wallet_amount: self.wallet_amount,
-                    amount:        actual_amount,
-                });
+                return Err(CkbTxErr::ExceedWalletAmount(
+                    self.wallet_amount,
+                    actual_amount,
+                ));
             }
             wallet_amount -= actual_amount;
             total_elect_amount += actual_amount;
@@ -158,7 +152,7 @@ impl<'a> ElectAmountCalculator<'a> {
         }
         Ok(ActualAmount {
             wallet_amount,
-            total_elect_amount,
+            total_amount: total_elect_amount,
             amount: actual_amount,
             is_increase: actual_is_increase,
         })
@@ -224,7 +218,7 @@ impl<'a> ElectAmountCalculator<'a> {
         }
         Ok(ActualAmount {
             wallet_amount,
-            total_elect_amount,
+            total_amount: total_elect_amount,
             amount: actual_amount,
             is_increase: actual_is_increase,
         })

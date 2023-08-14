@@ -59,6 +59,6 @@ pub async fn run_stake_smt_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     }
 
     println!("stake smt tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("stake smt tx committed");
 }

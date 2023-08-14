@@ -134,6 +134,6 @@ async fn stake_tx(
     }
 
     println!("stake tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("stake tx committed");
 }

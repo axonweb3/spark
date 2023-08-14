@@ -1,13 +1,16 @@
+use std::path::PathBuf;
+
 use ckb_types::H256;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use common::traits::tx_builder::IDelegateTxBuilder;
 use common::types::tx_builder::{DelegateItem, EthAddress, StakeTypeIds};
+use storage::SmtManager;
 use tx_builder::ckb::delegate::DelegateTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 
 use crate::config::parse_type_ids;
-use crate::TYPE_IDS_PATH;
+use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn first_delegate_tx(
     ckb: &CkbRpcClient,
@@ -20,11 +23,10 @@ pub async fn first_delegate_tx(
         ckb,
         delegator_key,
         vec![DelegateItem {
-            staker: staker_eth_addr,
-            is_increase: true,
-            amount: 100,
+            staker:             staker_eth_addr,
+            is_increase:        true,
+            amount:             100,
             inauguration_epoch: 2,
-            ..Default::default()
         }],
         0,
         true,
@@ -39,11 +41,10 @@ pub async fn add_delegate_tx(ckb: &CkbRpcClient, delegator_key: H256, staker_eth
         ckb,
         delegator_key,
         vec![DelegateItem {
-            staker: staker_eth_addr,
-            is_increase: true,
-            amount: 10,
+            staker:             staker_eth_addr,
+            is_increase:        true,
+            amount:             10,
             inauguration_epoch: 2,
-            ..Default::default()
         }],
         0,
         false,
@@ -62,11 +63,10 @@ pub async fn reedem_delegate_tx(
         ckb,
         delegator_key,
         vec![DelegateItem {
-            staker: staker_eth_addr,
-            is_increase: false,
-            amount: 10,
+            staker:             staker_eth_addr,
+            is_increase:        false,
+            amount:             10,
             inauguration_epoch: 2,
-            ..Default::default()
         }],
         0,
         false,
@@ -93,6 +93,9 @@ async fn delegate_tx(
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let xudt_args = type_ids.xudt_owner.into_h256().unwrap();
 
+    let path = PathBuf::from(ROCKSDB_PATH);
+    let smt = SmtManager::new(path);
+
     let tx = DelegateTxBuilder::new(
         ckb,
         StakeTypeIds {
@@ -103,6 +106,7 @@ async fn delegate_tx(
         omni_eth.address().unwrap(),
         current_epoch,
         delegates,
+        smt,
     )
     .build_tx()
     .await
@@ -133,6 +137,6 @@ async fn delegate_tx(
     }
 
     println!("delegate tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, 100).await.unwrap();
     println!("delegate tx committed");
 }

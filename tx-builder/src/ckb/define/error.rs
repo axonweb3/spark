@@ -1,3 +1,4 @@
+use ckb_types::H160 as CH160;
 use ethereum_types::H160;
 use thiserror::Error;
 
@@ -13,11 +14,10 @@ pub enum CkbTxErr {
     #[error("Invalid inaugration epoch, expected: {expected:?}, found: {found:?}")]
     InaugurationEpoch { expected: Epoch, found: Epoch },
 
-    #[error("The stake/delegate amount is too large, wallet amount: {wallet_amount:?}, stake/delegate amount: {amount:?}")]
-    ExceedWalletAmount {
-        wallet_amount: Amount,
-        amount:        Amount,
-    },
+    #[error(
+        "The stake/delegate amount is too large, wallet amount: {0}, stake/delegate amount: {1}"
+    )]
+    ExceedWalletAmount(Amount, Amount),
 
     #[error("The stake/delegate amount is too large, total elect amount: {total_amount:?}, stake/delegate amount: {new_amount:?}")]
     ExceedTotalAmount {
@@ -67,6 +67,11 @@ pub enum CkbTxErr {
         recorded_period: u32,
     },
 
-    #[error("there should be only one smt cell for the tx, found: {0}")]
+    #[error("There should be only one smt cell for the tx, found: {0}")]
     SmtCellNum(usize),
+
+    #[error(
+        "Invalid delegate, staker: {0}, delegator: {1}, redeem amount: {2}, total amount: {3}"
+    )]
+    RedeemDelegate(CH160, CH160, Amount, Amount),
 }
