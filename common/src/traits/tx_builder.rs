@@ -1,7 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ckb_types::core::TransactionView;
-use ckb_types::H256;
 
 use crate::traits::ckb_rpc_client::CkbRpc;
 use crate::traits::smt::{
@@ -9,33 +8,6 @@ use crate::traits::smt::{
 };
 use crate::types::ckb_rpc_client::Cell;
 use crate::types::tx_builder::*;
-
-#[async_trait]
-pub trait IInitTxBuilder<'a, C: CkbRpc> {
-    fn new(
-        ckb: &'a C,
-        seeder_key: PrivateKey,
-        max_supply: Amount,
-        checkpoint: Checkpoint,
-        metadata: MetadataInfo,
-        stakers: Vec<StakerEthAddr>,
-    ) -> Self;
-
-    async fn build_tx(mut self) -> Result<(TransactionView, TypeIds)>;
-}
-
-#[async_trait]
-pub trait IMintTxBuilder<'a, C: CkbRpc> {
-    fn new(
-        ckb: &'a C,
-        seeder_key: PrivateKey,
-        stakers: Vec<(StakerEthAddr, Amount)>,
-        selection_type_id: H256,
-        issue_type_id: H256,
-    ) -> Self;
-
-    async fn build_tx(self) -> Result<TransactionView>;
-}
 
 #[async_trait]
 pub trait IStakeTxBuilder<'a, C: CkbRpc> {

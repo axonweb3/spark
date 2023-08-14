@@ -1,5 +1,6 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
-use async_trait::async_trait;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::{
     bytes::Bytes,
@@ -11,7 +12,6 @@ use ckb_types::{
 use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::traits::tx_builder::IMintTxBuilder;
 use common::types::axon_types::issue::IssueCellData;
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
@@ -23,17 +23,16 @@ use crate::ckb::helper::{Issue, OmniEth, Secp256k1, Selection, Tx, Xudt};
 pub struct MintTxBuilder<'a, C: CkbRpc> {
     ckb:               &'a C,
     seeder_key:        PrivateKey,
-    stakers:           Vec<(StakerEthAddr, Amount)>,
+    stakers:           HashMap<StakerEthAddr, Amount>,
     selection_type_id: H256,
     issue_type_id:     H256,
 }
 
-#[async_trait]
-impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
-    fn new(
+impl<'a, C: CkbRpc> MintTxBuilder<'a, C> {
+    pub fn new(
         ckb: &'a C,
         seeder_key: PrivateKey,
-        stakers: Vec<(StakerEthAddr, Amount)>,
+        stakers: HashMap<StakerEthAddr, Amount>,
         selection_type_id: H256,
         issue_type_id: H256,
     ) -> Self {
@@ -46,7 +45,7 @@ impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(self) -> Result<TransactionView> {
+    pub async fn build_tx(self) -> Result<TransactionView> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 
@@ -106,9 +105,7 @@ impl<'a, C: CkbRpc> IMintTxBuilder<'a, C> for MintTxBuilder<'a, C> {
 
         Ok(tx.inner())
     }
-}
 
-impl<'a, C: CkbRpc> MintTxBuilder<'a, C> {
     fn fill_outputs(
         &self,
         selection_cell: Cell,

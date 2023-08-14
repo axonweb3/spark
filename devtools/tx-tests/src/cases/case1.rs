@@ -35,10 +35,10 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     first_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
     add_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone()).await;
+    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
 
-    reedem_delegate_tx(ckb, delegator_key, staker_eth_addr).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone()).await;
+    reedem_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr).await;
+    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
 
     run_metadata_tx(ckb, kicker_key.clone()).await;
 

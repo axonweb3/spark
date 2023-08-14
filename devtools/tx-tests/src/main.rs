@@ -182,6 +182,10 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let staker_eth_addr = OmniEth::new(staker_key.clone()).address().unwrap();
 
+    if staker_key == delegator_key {
+        panic!("Stakers can't delegate themselves.");
+    }
+
     if faucet {
         run_faucet_tx(&ckb, priv_keys.clone()).await;
     } else if init {
@@ -207,7 +211,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if stake_smt {
         run_stake_smt_tx(&ckb, kicker_key).await;
     } else if delegate_smt {
-        run_delegate_smt_tx(&ckb, kicker_key).await;
+        run_delegate_smt_tx(&ckb, kicker_key, delegator_key).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_withdraw_tx(&ckb, user_key).await;

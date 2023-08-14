@@ -1,5 +1,6 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
-use async_trait::async_trait;
 use ckb_sdk::unlock::InfoCellData;
 use ckb_sdk::{ScriptGroup, ScriptGroupType};
 use ckb_types::H160;
@@ -13,7 +14,6 @@ use ckb_types::{
 use molecule::prelude::Builder;
 
 use common::traits::ckb_rpc_client::CkbRpc;
-use common::traits::tx_builder::IInitTxBuilder;
 use common::types::axon_types::{
     checkpoint::CheckpointCellData, delegate::DelegateSmtCellData as ADelegateSmtCellData,
     metadata::MetadataCellData as AMetadataCellData,
@@ -40,18 +40,17 @@ pub struct InitTxBuilder<'a, C: CkbRpc> {
     max_supply: Amount,
     checkpoint: Checkpoint,
     metadata:   MetadataInfo,
-    stakers:    Vec<StakerEthAddr>,
+    stakers:    HashSet<StakerEthAddr>,
 }
 
-#[async_trait]
-impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
-    fn new(
+impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
+    pub fn new(
         ckb: &'a C,
         seeder_key: PrivateKey,
         max_supply: Amount,
         checkpoint: Checkpoint,
         metadata: MetadataInfo,
-        stakers: Vec<StakerEthAddr>,
+        stakers: HashSet<StakerEthAddr>,
     ) -> Self {
         Self {
             ckb,
@@ -63,7 +62,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
         }
     }
 
-    async fn build_tx(mut self) -> Result<(TransactionView, TypeIds)> {
+    pub async fn build_tx(mut self) -> Result<(TransactionView, TypeIds)> {
         let omni_eth = OmniEth::new(self.seeder_key.clone());
         let seeder_lock = OmniEth::lock(&omni_eth.address()?);
 
@@ -144,9 +143,7 @@ impl<'a, C: CkbRpc> IInitTxBuilder<'a, C> for InitTxBuilder<'a, C> {
 
         Ok((tx.inner(), type_id_args))
     }
-}
 
-impl<'a, C: CkbRpc> InitTxBuilder<'a, C> {
     fn build_data(&mut self) -> Vec<Bytes> {
         self.metadata.epoch0_metadata.validators.sort();
         self.metadata.epoch1_metadata.validators.sort();
