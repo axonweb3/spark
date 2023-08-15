@@ -10,12 +10,12 @@ use tx_builder::ckb::delegate_smt::DelegateSmtTxBuilder;
 use tx_builder::ckb::helper::{Delegate, OmniEth, Tx, Xudt};
 
 use crate::config::parse_type_ids;
-use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
-pub async fn run_delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256) {
+pub async fn run_delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegator_key: H256) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
-    let omni_eth = OmniEth::new(kicker_key.clone());
+    let omni_eth = OmniEth::new(delegator_key.clone());
     println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
@@ -59,6 +59,6 @@ pub async fn run_delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     }
 
     println!("delegate smt tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("delegate smt tx committed");
 }

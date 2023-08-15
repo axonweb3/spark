@@ -275,6 +275,9 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
             if !item.is_increase {
                 return Err(CkbTxErr::Increase(item.is_increase));
             }
+            if item.staker == self.delegator {
+                return Err(CkbTxErr::DelegateYourself);
+            }
             total_delegate_amount += item.amount;
 
             log::info!(
@@ -401,6 +404,10 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                 self.delegator.to_string(),
                 delegate_item,
             );
+
+            if delegate_item.staker == self.delegator {
+                return Err(CkbTxErr::DelegateYourself);
+            }
 
             last_delegates.insert(delegate_item.staker.clone(), delegate_item);
         }

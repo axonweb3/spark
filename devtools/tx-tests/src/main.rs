@@ -18,6 +18,7 @@ pub const PRIV_KEYS_PATH: &str = "./src/config/priv_keys.toml";
 pub const TYPE_IDS_PATH: &str = "./src/config/type_ids.toml";
 pub const LOG_CONFIG_PATH: &str = "./src/config/log.toml";
 pub const ROCKSDB_PATH: &str = "./free-space/smt";
+pub const MAX_TRY: u64 = 1000;
 
 #[tokio::main]
 async fn main() {
@@ -45,7 +46,7 @@ async fn main() {
                 ),
         )
         .subcommand(
-            clap::Command::new("single-tx")
+            clap::Command::new("tx")
                 .about("Test single tx")
                 .arg(
                     clap::Arg::new("net")
@@ -144,7 +145,7 @@ async fn main() {
     let matches = cmd.get_matches();
     match matches.subcommand() {
         Some(("cases", matches)) => run_test_cases(matches, priv_keys).await,
-        Some(("single-tx", matches)) => run_single_tx(matches, priv_keys).await,
+        Some(("tx", matches)) => run_single_tx(matches, priv_keys).await,
         _ => unimplemented!(),
     }
 }
@@ -181,6 +182,10 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let staker_eth_addr = OmniEth::new(staker_key.clone()).address().unwrap();
 
+    if staker_key == delegator_key {
+        panic!("Stakers can't delegate themselves.");
+    }
+
     if faucet {
         run_faucet_tx(&ckb, priv_keys.clone()).await;
     } else if init {
@@ -190,7 +195,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
             "first" => first_stake_tx(&ckb, staker_key).await,
-            "add" => add_stake_tx(&ckb, staker_key).await,
+            "add" => add_stake_tx(&ckb, staker_key, 2).await,
             "redeem" => reedem_stake_tx(&ckb, staker_key).await,
             _ => unimplemented!(),
         }
@@ -206,7 +211,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if stake_smt {
         run_stake_smt_tx(&ckb, kicker_key).await;
     } else if delegate_smt {
-        run_delegate_smt_tx(&ckb, kicker_key).await;
+        run_delegate_smt_tx(&ckb, kicker_key, delegator_key).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_withdraw_tx(&ckb, user_key).await;

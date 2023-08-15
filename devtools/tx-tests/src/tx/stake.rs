@@ -10,7 +10,7 @@ use tx_builder::ckb::stake::StakeTxBuilder;
 
 use crate::config::parse_type_ids;
 use crate::mock::gen_bls_keypair;
-use crate::TYPE_IDS_PATH;
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
     println!("first stake");
@@ -39,18 +39,18 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
     .await;
 }
 
-pub async fn add_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
+pub async fn add_stake_tx(ckb: &CkbRpcClient, staker_key: H256, inauguration_epoch: u64) {
     println!("add stake");
 
     stake_tx(
         ckb,
         staker_key,
         StakeItem {
-            is_increase:        true,
-            amount:             10,
-            inauguration_epoch: 2,
+            is_increase: true,
+            amount: 10,
+            inauguration_epoch,
         },
-        0,
+        inauguration_epoch - 2,
         None,
     )
     .await;
@@ -134,6 +134,6 @@ async fn stake_tx(
     }
 
     println!("stake tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("stake tx committed");
 }

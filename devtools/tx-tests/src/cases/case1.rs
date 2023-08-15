@@ -19,11 +19,15 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let staker_eth_addr = OmniEth::new(staker_key.clone()).address().unwrap();
 
+    if staker_key == delegator_key {
+        panic!("Stakers can't delegate themselves.");
+    }
+
     run_init_tx(ckb, priv_keys.clone()).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, staker_key.clone()).await;
-    add_stake_tx(ckb, staker_key.clone()).await;
+    add_stake_tx(ckb, staker_key.clone(), 2).await;
     run_stake_smt_tx(ckb, kicker_key.clone()).await;
 
     reedem_stake_tx(ckb, staker_key.clone()).await;
@@ -31,15 +35,18 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     first_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
     add_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone()).await;
+    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
 
-    reedem_delegate_tx(ckb, delegator_key, staker_eth_addr).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone()).await;
+    reedem_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr).await;
+    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
 
     run_metadata_tx(ckb, kicker_key.clone()).await;
 
     run_checkpoint_tx(ckb, priv_keys.clone(), 1).await;
+    run_metadata_tx(ckb, kicker_key.clone()).await;
+
     run_checkpoint_tx(ckb, priv_keys.clone(), 2).await;
+    run_metadata_tx(ckb, kicker_key.clone()).await;
 
     run_reward_tx(ckb, staker_key.clone()).await;
 

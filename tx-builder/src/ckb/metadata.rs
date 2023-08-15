@@ -33,7 +33,7 @@ use common::types::axon_types::{
 };
 use common::types::ckb_rpc_client::Cell;
 use common::types::tx_builder::*;
-use common::utils::convert::{to_byte32, to_uint64};
+use common::utils::convert::{to_byte32, to_u64, to_uint64};
 use molecule::prelude::Builder;
 
 use crate::ckb::define::constants::*;
@@ -94,7 +94,8 @@ where
 
         let quorum = HMetadata::parse_quorum(&self.last_metadata_cell_data);
         log::info!(
-            "[metadta] quorum: {}, stakers count: {}",
+            "[metadata] epoch: {}, quorum: {}, stakers count: {}",
+            self.last_checkpoint_data.epoch,
             quorum,
             stakers.len(),
         );
@@ -109,6 +110,13 @@ where
                     staker,
                 )
                 .await?;
+
+                log::info!(
+                    "[metadata] staker: {}, amount: {} delegators: {}",
+                    staker.to_string(),
+                    amount,
+                    delegaters.len()
+                );
 
                 miner_groups.push(MinerGroupInfo {
                     staker: staker.0.into(),
@@ -173,6 +181,7 @@ where
         ])
         .await
         .unwrap();
+        log::info!("[metadata] old stake smt proof: {:?}", old_stake_smt_proof);
 
         let context = MetadataContext {
             miner_groups,
@@ -213,12 +222,20 @@ where
         .unwrap();
 
         let new_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
+            self.last_checkpoint_data.epoch + INAUGURATION,
             self.last_checkpoint_data.epoch + INAUGURATION + 1,
         ])
         .await
         .unwrap();
 
         let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
+
+        log::info!(
+            "[metadata] epoch: {}, new stake smt root: {:?}, new stake proof: {:?}",
+            self.last_checkpoint_data.epoch + INAUGURATION + 1,
+            new_stake_root,
+            new_stake_smt_proof
+        );
 
         let stake_smt_cell_data = StakeSmtCellData {
             smt_root:           Into::<[u8; 32]>::into(new_stake_root).into(),
@@ -256,6 +273,7 @@ where
 
         let mut delegator_staker_smt_roots = Vec::with_capacity(context.validators.len());
         let mut new_delegator_proofs = Vec::new();
+
         for v in context.validators.iter() {
             log::info!(
                 "[metadata] validator: {}, amount: {}",
@@ -265,11 +283,15 @@ where
 
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
                 &self.smt,
-                vec![self.last_checkpoint_data.epoch + INAUGURATION + 1],
+                vec![
+                    self.last_checkpoint_data.epoch + INAUGURATION,
+                    self.last_checkpoint_data.epoch + INAUGURATION + 1,
+                ],
                 v.staker,
             )
             .await
             .unwrap();
+
             new_delegator_proofs.push(DelegateProof {
                 staker: v.staker.0.into(),
                 proof:  delegate_new_epoch_proof.clone(),
@@ -283,6 +305,13 @@ where
                 )
                 .into(),
             });
+
+            log::info!(
+                "[metadata] epoch: {}, new delegate smt root: {:?}, new delegate proof: {:?}",
+                self.last_checkpoint_data.epoch + INAUGURATION + 1,
+                delegate_new_epoch_proof,
+                delegator_staker_smt_roots.last().unwrap().root,
+            );
         }
         let delegate_smt_cell_data = DelegateSmtCellData {
             smt_roots:          delegator_staker_smt_roots,
@@ -317,6 +346,12 @@ where
         ])
         .await
         .unwrap();
+        log::info!(
+            "[metadata] epoch: {}, proposal smt root: {:?}, proposal proof: {:?}",
+            self.last_checkpoint_data.epoch,
+            proposal_count_smt_root,
+            new_proposal_count_smt_proof,
+        );
 
         let new_metadata = {
             let mut new_validators = Vec::new();
@@ -380,7 +415,7 @@ where
             self.last_metadata_cell_data
                 .clone()
                 .as_builder()
-                .epoch(to_uint64(self.last_checkpoint_data.epoch + 1))
+                .epoch(to_uint64(to_u64(&self.last_metadata_cell_data.epoch()) + 1))
                 .propose_count_smt_root(to_byte32(
                     &Into::<[u8; 32]>::into(proposal_count_smt_root).into(),
                 ))

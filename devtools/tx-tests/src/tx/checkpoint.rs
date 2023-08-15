@@ -9,7 +9,7 @@ use tx_builder::ckb::helper::{OmniEth, Tx};
 use crate::config::parse_type_ids;
 use crate::config::types::PrivKeys;
 use crate::mock::{mock_axon_proof_v2, mock_axon_proposal_v2};
-use crate::TYPE_IDS_PATH;
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn run_checkpoint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys, epoch: u64) {
     let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
@@ -96,6 +96,6 @@ pub async fn checkpoint_tx(
     }
 
     println!("checkpoint tx ready");
-    tx.wait_until_committed(1000, 10).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("checkpoint tx committed");
 }

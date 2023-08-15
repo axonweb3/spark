@@ -1,11 +1,12 @@
-use common::traits::tx_builder::IMintTxBuilder;
+use std::collections::HashMap;
+
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::mint::MintTxBuilder;
 
 use crate::config::parse_type_ids;
 use crate::config::types::PrivKeys;
-use crate::TYPE_IDS_PATH;
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
@@ -14,22 +15,36 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let omni_eth = OmniEth::new(seeder_key.clone());
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
-    let mut stakers = vec![];
+    let mut users = HashMap::new();
+
     for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
         println!(
             "staker{} ckb addres: {}",
             i,
-            omni_eth.ckb_address().unwrap()
+            omni_eth.ckb_address().unwrap(),
         );
-        stakers.push((omni_eth.address().unwrap(), 500));
+        users.insert(omni_eth.address().unwrap(), 500);
     }
+
+    for (i, delegator_privkey) in priv_keys.delegator_privkeys.into_iter().enumerate() {
+        let privkey = delegator_privkey.clone().into_h256().unwrap();
+        let omni_eth = OmniEth::new(privkey);
+        println!(
+            "staker{} ckb addres: {}",
+            i,
+            omni_eth.ckb_address().unwrap(),
+        );
+        users.insert(omni_eth.address().unwrap(), 500);
+    }
+
+    let users = users.into_iter().collect();
 
     let selection_type_id = type_ids.selection_type_id.into_h256().unwrap();
     let issue_type_id = type_ids.issue_type_id.into_h256().unwrap();
 
-    let tx = MintTxBuilder::new(ckb, seeder_key, stakers, selection_type_id, issue_type_id)
+    let tx = MintTxBuilder::new(ckb, seeder_key, users, selection_type_id, issue_type_id)
         .build_tx()
         .await
         .unwrap();
@@ -42,6 +57,6 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     }
 
     println!("mint tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("mint tx committed");
 }

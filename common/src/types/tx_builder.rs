@@ -503,7 +503,7 @@ impl From<Metadata> for AMetadata {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct RewardMeta {
     pub base_reward:           Amount,
     pub half_reward_cycle:     Epoch,

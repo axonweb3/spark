@@ -10,7 +10,7 @@ use tx_builder::ckb::helper::{Checkpoint, OmniEth, Tx};
 use tx_builder::ckb::metadata::MetadataSmtTxBuilder;
 
 use crate::config::parse_type_ids;
-use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
@@ -58,6 +58,6 @@ pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     }
 
     println!("metadata tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("metadata tx committed");
 }

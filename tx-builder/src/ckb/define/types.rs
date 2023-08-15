@@ -631,7 +631,7 @@ impl From<NotClaimInfo> for ANotClaimInfo {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct EpochRewardStakeInfo {
     pub count_proof:        Proof,
     pub count_root:         SmtRoot,
@@ -662,7 +662,7 @@ impl From<EpochRewardStakeInfo> for AEpochRewardStakeInfo {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RewardStakeInfo {
     pub validator:            H160,
     pub propose_count:        u64,
@@ -689,7 +689,7 @@ impl From<RewardStakeInfo> for ARewardStakeInfo {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RewardDelegateInfo {
     pub delegator_addr: ethereum_types::H160,
     pub amount:         u128,

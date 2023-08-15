@@ -183,7 +183,7 @@ lazy_static::lazy_static! {
     pub static ref METADATA_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0xfe4364f856739ba52f79bcb39dd0848267c87c46d4e82b168e21609b243a96bb"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x754ad49e8a393e0d6f65f0a4fbd2a1f623a52fb8363dd0fcc921e5511ff1719f"),
+        tx_hash: h256!("0xebb4c0425c27f320e55a67c22e97caa215fbc009353d473ca1183582a744048f"),
         index: 0,
         dep_type: DepType::Code,
     };

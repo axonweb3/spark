@@ -17,7 +17,7 @@ use super::helper::sighash::Sighash;
 pub struct FaucetTxBuilder<'a, C: CkbRpc> {
     ckb:        &'a C,
     seeder_key: PrivateKey,
-    stakers:    Vec<(StakerEthAddr, Amount)>,
+    users:      Vec<(EthAddress, Amount)>,
 }
 
 impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
@@ -25,7 +25,7 @@ impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
         Self {
             ckb,
             seeder_key,
-            stakers,
+            users: stakers,
         }
     }
 
@@ -34,7 +34,7 @@ impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
         let mut outputs_data = vec![];
 
         // omni eth lock cells
-        for (staker, ckb_bytes) in self.stakers.into_iter() {
+        for (staker, ckb_bytes) in self.users.into_iter() {
             outputs.push(
                 CellOutput::new_builder()
                     .lock(OmniEth::lock(&staker))

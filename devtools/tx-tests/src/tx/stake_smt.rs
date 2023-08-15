@@ -10,7 +10,7 @@ use tx_builder::ckb::helper::{OmniEth, Stake, Tx, Xudt};
 use tx_builder::ckb::stake_smt::StakeSmtTxBuilder;
 
 use crate::config::parse_type_ids;
-use crate::{ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn run_stake_smt_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
@@ -59,6 +59,6 @@ pub async fn run_stake_smt_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     }
 
     println!("stake smt tx ready");
-    tx.wait_until_committed(1000, 100).await.unwrap();
+    tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("stake smt tx committed");
 }

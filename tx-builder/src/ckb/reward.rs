@@ -17,7 +17,7 @@ use common::{
     traits::smt::{DelegateSmtStorage, ProposalSmtStorage, RewardSmtStorage, StakeSmtStorage},
     traits::tx_builder::IRewardTxBuilder,
     types::axon_types::{
-        delegate::DelegateRequirement,
+        delegate::DelegateCellData,
         metadata::MetadataCellData,
         reward::{RewardSmtCellData as ARewardSmtCellData, RewardWitness as ARewardWitness},
     },
@@ -76,6 +76,12 @@ where
             metadata_cell.output_data.clone().unwrap().into_bytes(),
         );
 
+        let minimum_propose_count = Metadata::calc_minimum_propose_count(&metadata_cell_data);
+        log::info!("[reward] minimum propose count: {}", minimum_propose_count);
+
+        let reward_metadata = Metadata::parse_reward_meta(&metadata_cell_data);
+        log::info!("[reward] reward metadata: {:?}", reward_metadata);
+
         Self {
             ckb,
             type_ids,
@@ -85,7 +91,7 @@ where
             current_epoch,
             epoch_count,
             metadata_outpoint: metadata_cell.out_point,
-            minimum_propose_count: Metadata::calc_minimum_propose_count(&metadata_cell_data),
+            minimum_propose_count,
             commission_rates: HashMap::new(),
             stake_cell_deps: Vec::new(),
             requirement_cell_deps: Vec::new(),
@@ -234,6 +240,10 @@ where
             start_reward_epoch + self.epoch_count - 1,
         );
 
+        if start_reward_epoch < end_reward_epoch {
+            return Err(CkbTxErr::RewardEpoch(start_reward_epoch, end_reward_epoch).into());
+        }
+
         log::info!(
             "[reward] start epoch: {}, end epoch: {}",
             start_reward_epoch,
@@ -244,7 +254,9 @@ where
         let user = to_eth_h160(&self.user);
 
         for epoch in start_reward_epoch..=end_reward_epoch {
-            let propose_counts = ProposalSmtStorage::get_sub_leaves(&self.smt, epoch).await?;
+            let propose_counts = ProposalSmtStorage::get_sub_leaves(&self.smt, epoch)
+                .await
+                .unwrap();
 
             let mut epoch_reward_witness = EpochRewardStakeInfo::default();
             let mut validators = vec![];
@@ -261,19 +273,28 @@ where
 
             epoch_reward_witness.count_proof =
                 ProposalSmtStorage::generate_sub_proof(&self.smt, epoch, validators.clone())
-                    .await?;
+                    .await
+                    .unwrap();
             epoch_reward_witness.count_root = ProposalSmtStorage::get_sub_root(&self.smt, epoch)
-                .await?
+                .await
+                .unwrap()
                 .unwrap();
             epoch_reward_witness.count_epoch_proof =
-                ProposalSmtStorage::generate_top_proof(&self.smt, vec![epoch]).await?;
+                ProposalSmtStorage::generate_top_proof(&self.smt, vec![epoch])
+                    .await
+                    .unwrap();
             epoch_reward_witness.amount_proof =
-                StakeSmtStorage::generate_sub_proof(&self.smt, epoch, validators).await?;
+                StakeSmtStorage::generate_sub_proof(&self.smt, epoch, validators)
+                    .await
+                    .unwrap();
             epoch_reward_witness.amount_root = StakeSmtStorage::get_sub_root(&self.smt, epoch)
-                .await?
+                .await
+                .unwrap()
                 .unwrap();
             epoch_reward_witness.amount_epoch_proof =
-                StakeSmtStorage::generate_top_proof(&self.smt, vec![epoch]).await?;
+                StakeSmtStorage::generate_top_proof(&self.smt, vec![epoch])
+                    .await
+                    .unwrap();
 
             witness.reward_infos.push(epoch_reward_witness);
         }
@@ -286,11 +307,12 @@ where
             wallet_amount,
         );
 
-        RewardSmtStorage::insert(&self.smt, end_reward_epoch, user).await?;
+        RewardSmtStorage::insert(&self.smt, end_reward_epoch + 1, user).await?;
         witness.new_not_claim_info = NotClaimInfo {
-            epoch: end_reward_epoch,
+            epoch: end_reward_epoch + 1,
             proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
-                .await?,
+                .await
+                .unwrap(),
         };
 
         let reward_smt_root = RewardSmtStorage::get_root(&self.smt).await?;
@@ -314,14 +336,16 @@ where
     }
 
     async fn get_start_epoch(&self, witness: &mut RewardWitness) -> Result<Epoch> {
-        let start_reward_epoch =
-            RewardSmtStorage::get_epoch(&self.smt, to_eth_h160(&self.user)).await?;
+        let start_reward_epoch = RewardSmtStorage::get_epoch(&self.smt, to_eth_h160(&self.user))
+            .await
+            .unwrap();
 
         if start_reward_epoch.is_none() {
             witness.old_not_claim_info = NotClaimInfo {
                 epoch: START_EPOCH + INAUGURATION,
                 proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
-                    .await?,
+                    .await
+                    .unwrap(),
             };
             return Ok(START_EPOCH + INAUGURATION);
         }
@@ -329,10 +353,11 @@ where
         witness.old_not_claim_info = NotClaimInfo {
             epoch: start_reward_epoch.unwrap(),
             proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
-                .await?,
+                .await
+                .unwrap(),
         };
 
-        Ok(start_reward_epoch.unwrap() + 1)
+        Ok(start_reward_epoch.unwrap())
     }
 
     async fn commission_rate(&mut self, staker: &H160) -> Result<u8> {
@@ -367,9 +392,12 @@ where
         );
 
         let data = delegate_requirement_cell.output_data.unwrap().into_bytes();
-        let delegate_requirement = DelegateRequirement::new_unchecked(data);
+        let requirement_cell_data = DelegateCellData::new_unchecked(data);
 
-        Ok(delegate_requirement.commission_rate().into())
+        Ok(requirement_cell_data
+            .delegate_requirement()
+            .commission_rate()
+            .into())
     }
 
     async fn calc_epoch_reward(
@@ -389,7 +417,8 @@ where
 
             let delegate_amount =
                 DelegateSmtStorage::get_amount(&self.smt, epoch + INAUGURATION, validator, user)
-                    .await?;
+                    .await
+                    .unwrap();
 
             let in_delegate_smt = delegate_amount.is_some();
 
@@ -403,21 +432,17 @@ where
                 propose_count,
             );
 
-            let coef = if propose_count
-                >= self.minimum_propose_count * self.reward_meta.propose_discount_rate as u64 / 100
-            {
-                100
-            } else {
-                propose_count as u128 * 100 / self.reward_meta.propose_minimum_rate as u128
-            };
-            let total_reward = coef * self.reward_meta.base_reward
-                / 100
+            let mut total_reward = self.reward_meta.base_reward
                 / (2_u64.pow((self.current_epoch / self.reward_meta.half_reward_cycle) as u32))
                     as u128;
 
+            if propose_count < self.minimum_propose_count {
+                total_reward = total_reward * self.reward_meta.propose_discount_rate as u128 / 100;
+            }
+
             let stake_amount = StakeSmtStorage::get_amount(&self.smt, epoch, validator).await?;
             if stake_amount.is_none() {
-                return Err(CkbTxErr::StakeAmountNotFound(validator).into());
+                return Err(CkbTxErr::StakeAmountNotFound(epoch, validator).into());
             }
             let stake_amount = stake_amount.unwrap();
 
@@ -456,6 +481,11 @@ where
                 );
             }
 
+            log::info!(
+                "[reward] validator: {:?}, propose count: {}, stake amount: {}, delegators count: {}",
+                validator.to_string(), propose_count, stake_amount, all_delegates.len()
+            );
+
             epoch_reward_witness
                 .reward_stake_infos
                 .push(RewardStakeInfo {
@@ -474,7 +504,8 @@ where
                         vec![epoch],
                         validator,
                     )
-                    .await?,
+                    .await
+                    .unwrap(),
                 });
         }
         Ok(epoch_reward)
