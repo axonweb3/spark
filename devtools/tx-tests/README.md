@@ -34,7 +34,8 @@ delegator_privkeys = [
 ```
 cd spark/devtools/tx-tests
 
-cargo run -- cases -n test -1
+cargo run -- cases -n test --all
+cargo run -- cases -n test --delegate
 ```
 
 ## Run tx

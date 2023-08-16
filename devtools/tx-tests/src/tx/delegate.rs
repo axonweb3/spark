@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use ckb_types::H256;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
@@ -16,7 +17,7 @@ pub async fn first_delegate_tx(
     ckb: &CkbRpcClient,
     delegator_key: H256,
     staker_eth_addr: EthAddress,
-) {
+) -> Result<()> {
     println!("first delegate");
 
     delegate_tx(
@@ -31,61 +32,69 @@ pub async fn first_delegate_tx(
         0,
         true,
     )
-    .await;
+    .await
 }
 
-pub async fn add_delegate_tx(ckb: &CkbRpcClient, delegator_key: H256, staker_eth_addr: EthAddress) {
+pub async fn add_delegate_tx(
+    ckb: &CkbRpcClient,
+    delegator_key: H256,
+    staker_eth_addr: EthAddress,
+    amount: u128,
+    current_epoch: u64,
+) -> Result<()> {
     println!("add delegate");
 
     delegate_tx(
         ckb,
         delegator_key,
         vec![DelegateItem {
-            staker:             staker_eth_addr,
-            is_increase:        true,
-            amount:             10,
-            inauguration_epoch: 2,
+            staker: staker_eth_addr,
+            is_increase: true,
+            amount,
+            inauguration_epoch: current_epoch + 2,
         }],
-        0,
+        current_epoch,
         false,
     )
-    .await;
+    .await
 }
 
-pub async fn reedem_delegate_tx(
+pub async fn redeem_delegate_tx(
     ckb: &CkbRpcClient,
     delegator_key: H256,
     staker_eth_addr: EthAddress,
-) {
+    amount: u128,
+    current_epoch: u64,
+) -> Result<()> {
     println!("redeem delegate");
 
     delegate_tx(
         ckb,
         delegator_key,
         vec![DelegateItem {
-            staker:             staker_eth_addr,
-            is_increase:        false,
-            amount:             10,
-            inauguration_epoch: 2,
+            staker: staker_eth_addr,
+            is_increase: false,
+            amount,
+            inauguration_epoch: current_epoch + 2,
         }],
-        0,
+        current_epoch,
         false,
     )
-    .await;
+    .await
 }
 
-async fn delegate_tx(
+pub async fn delegate_tx(
     ckb: &CkbRpcClient,
     delegator_key: H256,
     delegates: Vec<DelegateItem>,
     current_epoch: u64,
     first_delegate: bool,
-) {
+) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let omni_eth = OmniEth::new(delegator_key.clone());
     println!(
-        "delegatorr ckb addres: {}\n",
+        "delegator ckb addres: {}\n",
         omni_eth.ckb_address().unwrap()
     );
 
@@ -109,8 +118,7 @@ async fn delegate_tx(
         smt,
     )
     .build_tx()
-    .await
-    .unwrap();
+    .await?;
 
     let mut tx = Tx::new(ckb, tx);
     let script_groups = tx.gen_script_group().await.unwrap();
@@ -139,4 +147,6 @@ async fn delegate_tx(
     println!("delegate tx ready");
     tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("delegate tx committed");
+
+    Ok(())
 }

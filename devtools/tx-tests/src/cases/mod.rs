@@ -1,3 +1,2 @@
-mod case1;
-
-pub use case1::run_case1;
+pub mod all;
+pub mod delegate;

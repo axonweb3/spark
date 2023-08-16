@@ -321,7 +321,7 @@ lazy_static::lazy_static! {
     pub static ref WITHDRAW_LOCK_DEVNET: Script = Script {
         code_hash: h256!("0xd2ce87ebc56f9229574fe0ec618afd168232480d93db2814c3bfcf36df163884"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x3b0e35d2155cb0a2f05a9db06abc1dba1ba0d0c2f33a42e5aed1f4195034bc42"),
+        tx_hash: h256!("0x9d78d411b2e5e8cd09c9d7b93fa7a92c3c4732cb742d8551c5ae439ec25ed2e6"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -344,7 +344,7 @@ lazy_static::lazy_static! {
     pub static ref REWARD_SMT_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0x30153c953e7a6e2f3394926b42e68dbdb7616eb4ea88f154e8986878ed0d0e0e"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x495b73ef599b1cc5bc259cb57d02003dca60da2e35b0fea08d8cf2f78df15409"),
+        tx_hash: h256!("0x525b57e643e1da37157f8e41638ddc6b05149491b1c67f02980005585f72a553"),
         index: 0,
         dep_type: DepType::Code,
     };

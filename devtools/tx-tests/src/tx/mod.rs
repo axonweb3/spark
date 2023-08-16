@@ -11,8 +11,8 @@ mod stake_smt;
 mod withdraw;
 
 pub use checkpoint::{checkpoint_tx, run_checkpoint_tx};
-pub use delegate::{add_delegate_tx, first_delegate_tx, reedem_delegate_tx};
-pub use delegate_smt::run_delegate_smt_tx;
+pub use delegate::{add_delegate_tx, delegate_tx, first_delegate_tx, redeem_delegate_tx};
+pub use delegate_smt::delegate_smt_tx;
 pub use faucet::run_faucet_tx;
 pub use init::{init_tx, run_init_tx};
 pub use metadata::run_metadata_tx;

@@ -20,6 +20,7 @@ pub async fn run_init_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let mut stakers = HashSet::new();
     let mut staker_privkeys = vec![];
     let mut propose_count = vec![];
+
     for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         staker_privkeys.push(privkey.clone());

@@ -9,7 +9,7 @@ use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
 // There is only one staker or delegator.
-pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
+pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     if Path::new(ROCKSDB_PATH).exists() {
         fs::remove_dir_all(ROCKSDB_PATH).unwrap();
     }
@@ -33,12 +33,18 @@ pub async fn run_case1(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     reedem_stake_tx(ckb, staker_key.clone()).await;
     run_stake_smt_tx(ckb, kicker_key.clone()).await;
 
-    first_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
-    add_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone()).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
+    first_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone())
+        .await
+        .unwrap();
+    add_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr.clone(), 10, 0)
+        .await
+        .unwrap();
+    delegate_smt_tx(ckb, kicker_key.clone(), vec![delegator_key.clone()]).await;
 
-    reedem_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr).await;
-    run_delegate_smt_tx(ckb, kicker_key.clone(), delegator_key.clone()).await;
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker_eth_addr, 10, 0)
+        .await
+        .unwrap();
+    delegate_smt_tx(ckb, kicker_key.clone(), vec![delegator_key.clone()]).await;
 
     run_metadata_tx(ckb, kicker_key.clone()).await;
 
