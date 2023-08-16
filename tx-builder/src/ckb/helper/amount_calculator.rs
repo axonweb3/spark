@@ -113,13 +113,32 @@ impl<'a> ElectAmountCalculator<'a> {
             total_elect_amount += new_amount;
         } else if self.last_info.has_expired {
             if self.last_info.is_increase {
-                let diff_amount = if new_amount >= self.last_info.amount {
+                if new_amount >= self.last_info.amount {
                     actual_amount = new_amount - self.last_info.amount;
-                    actual_amount
+                    let diff_amount = actual_amount;
+                    if wallet_amount < diff_amount {
+                        return Err(CkbTxErr::ExceedWalletAmount(
+                            self.wallet_amount,
+                            diff_amount,
+                        ));
+                    }
+                    wallet_amount -= diff_amount;
+                    total_elect_amount += diff_amount;
                 } else {
                     actual_amount = 0;
-                    self.last_info.amount - new_amount
-                };
+                    let diff_amount = self.last_info.amount - new_amount;
+                    if total_elect_amount < diff_amount {
+                        return Err(CkbTxErr::ExceedTotalAmount {
+                            total_amount: total_elect_amount,
+                            new_amount:   diff_amount,
+                        });
+                    }
+                    wallet_amount += diff_amount;
+                    total_elect_amount -= diff_amount;
+                }
+            } else {
+                actual_amount = new_amount;
+                let diff_amount = actual_amount;
                 if wallet_amount < diff_amount {
                     return Err(CkbTxErr::ExceedWalletAmount(
                         self.wallet_amount,
@@ -166,14 +185,7 @@ impl<'a> ElectAmountCalculator<'a> {
         let mut actual_is_increase = false;
 
         if self.last_info.amount == 0 {
-            wallet_amount += new_amount;
-            if total_elect_amount < new_amount {
-                return Err(CkbTxErr::ExceedTotalAmount {
-                    total_amount: total_elect_amount,
-                    new_amount,
-                });
-            }
-            total_elect_amount -= new_amount;
+            // do nothing
         } else if self.last_info.has_expired {
             if self.last_info.is_increase {
                 if new_amount >= self.last_info.amount {
@@ -182,10 +194,10 @@ impl<'a> ElectAmountCalculator<'a> {
                     actual_amount = 0;
                 }
                 wallet_amount += self.last_info.amount;
-                if total_elect_amount < new_amount {
+                if total_elect_amount < self.last_info.amount {
                     return Err(CkbTxErr::ExceedTotalAmount {
                         total_amount: total_elect_amount,
-                        new_amount,
+                        new_amount:   self.last_info.amount,
                     });
                 }
                 total_elect_amount -= self.last_info.amount;
@@ -194,10 +206,10 @@ impl<'a> ElectAmountCalculator<'a> {
             if new_amount >= self.last_info.amount {
                 actual_amount = new_amount - self.last_info.amount;
                 wallet_amount += self.last_info.amount;
-                if total_elect_amount < new_amount {
+                if total_elect_amount < self.last_info.amount {
                     return Err(CkbTxErr::ExceedTotalAmount {
                         total_amount: total_elect_amount,
-                        new_amount,
+                        new_amount:   self.last_info.amount,
                     });
                 }
                 total_elect_amount -= self.last_info.amount;
