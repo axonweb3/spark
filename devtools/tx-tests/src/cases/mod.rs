@@ -5,3 +5,4 @@ pub mod metadata;
 pub mod reward;
 pub mod stake;
 pub mod stake_smt;
+pub mod withdraw;

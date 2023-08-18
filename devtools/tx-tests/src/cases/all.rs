@@ -58,5 +58,5 @@ pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     run_reward_tx(ckb, staker_key.clone(), 4).await.unwrap();
 
-    run_withdraw_tx(ckb, staker_key.clone()).await;
+    run_withdraw_tx(ckb, staker_key.clone(), 4).await;
 }

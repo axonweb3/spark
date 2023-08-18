@@ -85,6 +85,13 @@ async fn main() {
                         .required(false)
                         .num_args(0)
                         .help("Test reward tx"),
+                )
+                .arg(
+                    clap::Arg::new("withraw")
+                        .long("withdraw")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test withdraw tx"),
                 ),
         )
         .subcommand(
@@ -201,6 +208,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let stake_smt = matches.get_one::<bool>("stake-smt").unwrap();
     let metadata = matches.get_one::<bool>("metadata").unwrap();
     let reward = matches.get_one::<bool>("reward").unwrap();
+    let withdraw = matches.get_one::<bool>("withdraw").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -230,6 +238,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *reward {
         cases::reward::run_reward_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *withdraw {
+        cases::withdraw::run_withdraw_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -292,7 +304,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
         delegate_smt_tx(&ckb, kicker_key, vec![delegator_key]).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-        run_withdraw_tx(&ckb, user_key).await;
+        run_withdraw_tx(&ckb, user_key, 2).await;
     } else if metadata {
         run_metadata_tx(&ckb, kicker_key).await;
     } else if reward {

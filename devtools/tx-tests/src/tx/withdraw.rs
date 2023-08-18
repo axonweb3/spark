@@ -9,7 +9,7 @@ use tx_builder::ckb::withdraw::WithdrawTxBuilder;
 use crate::config::parse_type_ids;
 use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn run_withdraw_tx(ckb: &CkbRpcClient, user_key: H256) {
+pub async fn run_withdraw_tx(ckb: &CkbRpcClient, user_key: H256, current_epoch: u64) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let omni_eth = OmniEth::new(user_key.clone());
@@ -27,7 +27,7 @@ pub async fn run_withdraw_tx(ckb: &CkbRpcClient, user_key: H256) {
             xudt_owner: xudt_args,
         },
         omni_eth.address().unwrap(),
-        2,
+        current_epoch,
     )
     .build_tx()
     .await
