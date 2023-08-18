@@ -1,3 +1,4 @@
+use anyhow::Result;
 use ckb_types::H256;
 use molecule::prelude::Entity;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
@@ -37,10 +38,16 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
             },
         }),
     )
-    .await;
+    .await
+    .unwrap();
 }
 
-pub async fn add_stake_tx(ckb: &CkbRpcClient, staker_key: H256, inauguration_epoch: u64) {
+pub async fn add_stake_tx(
+    ckb: &CkbRpcClient,
+    staker_key: H256,
+    amount: u128,
+    current_epoch: u64,
+) -> Result<()> {
     println!("add stake");
 
     stake_tx(
@@ -48,30 +55,35 @@ pub async fn add_stake_tx(ckb: &CkbRpcClient, staker_key: H256, inauguration_epo
         staker_key,
         StakeItem {
             is_increase: true,
-            amount: 10,
-            inauguration_epoch,
+            amount,
+            inauguration_epoch: current_epoch + 2,
         },
-        inauguration_epoch - 2,
+        current_epoch,
         None,
     )
-    .await;
+    .await
 }
 
-pub async fn reedem_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
+pub async fn redeem_stake_tx(
+    ckb: &CkbRpcClient,
+    staker_key: H256,
+    amount: u128,
+    current_epoch: u64,
+) -> Result<()> {
     println!("redeem stake");
 
     stake_tx(
         ckb,
         staker_key,
         StakeItem {
-            is_increase:        false,
-            amount:             10,
-            inauguration_epoch: 2,
+            is_increase: false,
+            amount,
+            inauguration_epoch: current_epoch + 2,
         },
-        0,
+        current_epoch,
         None,
     )
-    .await;
+    .await
 }
 
 async fn stake_tx(
@@ -80,7 +92,7 @@ async fn stake_tx(
     stake_item: StakeItem,
     current_epoch: u64,
     first_stake_info: Option<FirstStakeInfo>,
-) {
+) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let omni_eth = OmniEth::new(staker_key.clone());
@@ -104,8 +116,7 @@ async fn stake_tx(
         first_stake_info,
     )
     .build_tx()
-    .await
-    .unwrap();
+    .await?;
 
     // let json_tx = ckb_jsonrpc_types::TransactionView::from(tx);
     // println!("{}", serde_json::to_string_pretty(&json_tx).unwrap());
@@ -139,4 +150,6 @@ async fn stake_tx(
     println!("stake tx ready");
     tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("stake tx committed");
+
+    Ok(())
 }

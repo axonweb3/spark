@@ -18,6 +18,6 @@ pub use init::{init_tx, run_init_tx};
 pub use metadata::run_metadata_tx;
 pub use mint::run_mint_tx;
 pub use reward::run_reward_tx;
-pub use stake::{add_stake_tx, first_stake_tx, reedem_stake_tx};
-pub use stake_smt::run_stake_smt_tx;
+pub use stake::{add_stake_tx, first_stake_tx, redeem_stake_tx};
+pub use stake_smt::stake_smt_tx;
 pub use withdraw::run_withdraw_tx;

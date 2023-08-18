@@ -57,6 +57,13 @@ async fn main() {
                         .required(false)
                         .num_args(0)
                         .help("Test delegate smt tx"),
+                )
+                .arg(
+                    clap::Arg::new("stake")
+                        .long("stake")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test stake tx"),
                 ),
         )
         .subcommand(
@@ -169,6 +176,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let all = matches.get_one::<bool>("all").unwrap();
     let delegate = matches.get_one::<bool>("delegate").unwrap();
     let delegate_smt = matches.get_one::<bool>("delegate-smt").unwrap();
+    let stake = matches.get_one::<bool>("stake").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -182,6 +190,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *delegate_smt {
         cases::delegate_smt::run_delegate_smt_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *stake {
+        cases::stake::run_stake_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -219,8 +231,8 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
             "first" => first_stake_tx(&ckb, staker_key).await,
-            "add" => add_stake_tx(&ckb, staker_key, 2).await,
-            "redeem" => reedem_stake_tx(&ckb, staker_key).await,
+            "add" => add_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
+            "redeem" => redeem_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
             _ => unimplemented!(),
         }
     } else if delegate.is_some() {
@@ -239,7 +251,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if checkpoint {
         run_checkpoint_tx(&ckb, priv_keys, 1).await;
     } else if stake_smt {
-        run_stake_smt_tx(&ckb, kicker_key).await;
+        stake_smt_tx(&ckb, kicker_key, vec![staker_key.clone()]).await;
     } else if delegate_smt {
         delegate_smt_tx(&ckb, kicker_key, vec![delegator_key]).await;
     } else if withdraw {
