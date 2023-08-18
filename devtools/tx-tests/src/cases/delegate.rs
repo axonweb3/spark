@@ -34,7 +34,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         }
     }
 
-    run_init_tx(ckb, priv_keys.clone()).await;
+    run_init_tx(ckb, priv_keys.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
@@ -168,7 +168,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // wallet: 389, delegate: 111, delta: (staker1, -5)
 
     // New epoch
-    run_checkpoint_tx(ckb, priv_keys.clone(), 4).await;
+    run_checkpoint_tx(ckb, priv_keys.clone(), 5).await;
 
     // delegator: (staker1, -1)
     // When redeeming delegation, there are pending records of redeeming delegation
@@ -184,7 +184,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // wallet: 379, delegate: 121, delta: (staker1, +10)
 
     // New epoch
-    run_checkpoint_tx(ckb, priv_keys.clone(), 5).await;
+    run_checkpoint_tx(ckb, priv_keys.clone(), 6).await;
 
     // delegator: (staker1, -1)
     // When redeeming delegation, there are pending records of adding delegation

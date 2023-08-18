@@ -23,7 +23,7 @@ pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         panic!("Stakers can't delegate themselves.");
     }
 
-    run_init_tx(ckb, priv_keys.clone()).await;
+    run_init_tx(ckb, priv_keys.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, staker_key.clone(), 100).await;

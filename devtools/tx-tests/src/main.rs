@@ -70,7 +70,14 @@ async fn main() {
                         .long("stake-smt")
                         .required(false)
                         .num_args(0)
-                        .help("Test stake tx"),
+                        .help("Test stake smt tx"),
+                )
+                .arg(
+                    clap::Arg::new("metadata")
+                        .long("metadata")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test metadata tx"),
                 ),
         )
         .subcommand(
@@ -185,6 +192,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let delegate_smt = matches.get_one::<bool>("delegate-smt").unwrap();
     let stake = matches.get_one::<bool>("stake").unwrap();
     let stake_smt = matches.get_one::<bool>("stake-smt").unwrap();
+    let metadata = matches.get_one::<bool>("metadata").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -206,6 +214,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *stake_smt {
         cases::stake_smt::run_stake_smt_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *metadata {
+        cases::metadata::run_metadata_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -237,7 +249,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     if faucet {
         run_faucet_tx(&ckb, priv_keys.clone()).await;
     } else if init {
-        run_init_tx(&ckb, priv_keys.clone()).await;
+        run_init_tx(&ckb, priv_keys.clone(), 10).await;
     } else if mint {
         run_mint_tx(&ckb, priv_keys.clone().clone()).await;
     } else if stake.is_some() {

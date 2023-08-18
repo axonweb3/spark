@@ -28,7 +28,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let (delegators_key, _) = get_users(priv_keys.staker_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
 
-    run_init_tx(ckb, priv_keys.clone()).await;
+    run_init_tx(ckb, priv_keys.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
@@ -99,7 +99,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // staker2: (delegator1, 30)
 }
 
-pub async fn first_delegate_tx(
+async fn first_delegate_tx(
     ckb: &CkbRpcClient,
     delegator_key: H256,
     stakers_eth_addr: &Vec<EthAddress>,

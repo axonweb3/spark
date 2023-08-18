@@ -12,7 +12,7 @@ use crate::config::write_file;
 use crate::mock::mock_axon_validators_v2;
 use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn run_init_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
+pub async fn run_init_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys, quorum: u16) {
     let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
     let omni_eth = OmniEth::new(seeder_key.clone());
     println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
@@ -67,7 +67,7 @@ pub async fn run_init_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
             epoch1_metadata: Metadata {
                 epoch_len: 1,
                 period_len: 100,
-                quorum: 10,
+                quorum,
                 validators: mock_axon_validators_v2(&staker_privkeys),
                 ..Default::default()
             },

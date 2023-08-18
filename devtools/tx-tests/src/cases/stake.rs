@@ -25,7 +25,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let staker_key = stakers_key[0].clone();
     let kicker_key = stakers_key[0].clone();
 
-    run_init_tx(ckb, priv_keys.clone()).await;
+    run_init_tx(ckb, priv_keys.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     // staker: +100
@@ -123,7 +123,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // wallet: 389, stake: 111, delta: -5
 
     // New epoch
-    run_checkpoint_tx(ckb, priv_keys.clone(), 4).await;
+    run_checkpoint_tx(ckb, priv_keys.clone(), 5).await;
 
     // staker: -1
     // When redeeming stake, there are pending records of redeeming stake
@@ -137,7 +137,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // wallet: 379, stake: 121, delta: +10
 
     // New epoch
-    run_checkpoint_tx(ckb, priv_keys.clone(), 5).await;
+    run_checkpoint_tx(ckb, priv_keys.clone(), 6).await;
 
     // staker: -1
     // When redeeming stake, there are pending records of adding stake with a larger

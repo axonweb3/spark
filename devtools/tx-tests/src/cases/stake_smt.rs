@@ -20,7 +20,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let (stakers_key, _) = get_users(priv_keys.staker_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
 
-    run_init_tx(ckb, priv_keys.clone()).await;
+    run_init_tx(ckb, priv_keys.clone(), 1).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     // staker1: 10
