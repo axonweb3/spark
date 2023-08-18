@@ -51,6 +51,9 @@ pub enum CkbTxErr {
     #[error("User's reward epoch not found")]
     RewardEpochNotFound,
 
+    #[error("The current epoch `{0}` is too small, at least it should be 4")]
+    RewardCurrentEpoch(Epoch),
+
     #[error("The minimum value of the current epoch should be 2")]
     EpochTooSmall,
 

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Result;
 use ckb_types::H256;
 
 use common::traits::tx_builder::IRewardTxBuilder;
@@ -12,12 +13,12 @@ use tx_builder::ckb::reward::RewardTxBuilder;
 use crate::config::parse_type_ids;
 use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
-pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256) {
+pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256, current_epoch: u64) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let omni_eth = OmniEth::new(user_key.clone());
     println!("staker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-    let staker = omni_eth.address().unwrap();
+    let user = omni_eth.address().unwrap();
 
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
@@ -34,14 +35,13 @@ pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256) {
             xudt_owner:           type_ids.xudt_owner.into_h256().unwrap(),
         },
         smt,
-        staker,
-        4,
+        user,
+        current_epoch,
         1,
     )
     .await
     .build_tx()
-    .await
-    .unwrap();
+    .await?;
 
     let mut tx = Tx::new(ckb, tx);
 
@@ -68,4 +68,6 @@ pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256) {
     println!("reward tx ready");
     tx.wait_until_committed(1000, MAX_TRY).await.unwrap();
     println!("reward tx committed");
+
+    Ok(())
 }

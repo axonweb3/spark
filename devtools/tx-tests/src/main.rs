@@ -78,6 +78,13 @@ async fn main() {
                         .required(false)
                         .num_args(0)
                         .help("Test metadata tx"),
+                )
+                .arg(
+                    clap::Arg::new("reward")
+                        .long("reward")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test reward tx"),
                 ),
         )
         .subcommand(
@@ -193,6 +200,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let stake = matches.get_one::<bool>("stake").unwrap();
     let stake_smt = matches.get_one::<bool>("stake-smt").unwrap();
     let metadata = matches.get_one::<bool>("metadata").unwrap();
+    let reward = matches.get_one::<bool>("reward").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -218,6 +226,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *metadata {
         cases::metadata::run_metadata_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *reward {
+        cases::reward::run_reward_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -285,7 +297,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
         run_metadata_tx(&ckb, kicker_key).await;
     } else if reward {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-        run_reward_tx(&ckb, user_key).await;
+        run_reward_tx(&ckb, user_key, 4).await.unwrap();
     } else {
         unimplemented!();
     }

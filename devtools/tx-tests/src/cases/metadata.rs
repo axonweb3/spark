@@ -16,8 +16,8 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         fs::remove_dir_all(ROCKSDB_PATH).unwrap();
     }
 
-    if priv_keys.staker_privkeys.len() < 4 {
-        panic!("At least 4 stackers are required");
+    if priv_keys.staker_privkeys.len() < 3 {
+        panic!("At least 3 stakers are required");
     }
 
     let (stakers_key, stakers) = get_users(priv_keys.staker_privkeys.clone());

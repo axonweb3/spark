@@ -56,7 +56,7 @@ pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_checkpoint_tx(ckb, priv_keys.clone(), 2).await;
     run_metadata_tx(ckb, kicker_key.clone()).await;
 
-    run_reward_tx(ckb, staker_key.clone()).await;
+    run_reward_tx(ckb, staker_key.clone(), 4).await.unwrap();
 
     run_withdraw_tx(ckb, staker_key.clone()).await;
 }

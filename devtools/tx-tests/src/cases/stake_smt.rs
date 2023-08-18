@@ -14,7 +14,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     }
 
     if priv_keys.staker_privkeys.len() < 4 {
-        panic!("At least 4 stackers are required");
+        panic!("At least 4 stakers are required");
     }
 
     let (stakers_key, _) = get_users(priv_keys.staker_privkeys.clone());
