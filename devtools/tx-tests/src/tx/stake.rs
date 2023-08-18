@@ -14,7 +14,7 @@ use crate::helper::signer::{EthSigner, UnlockMode};
 use crate::mock::gen_bls_keypair;
 use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
+pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256, amount: u128) {
     println!("first stake");
 
     let bls_pub_key = gen_bls_keypair(staker_key.as_bytes()).1;
@@ -23,8 +23,8 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
         ckb,
         staker_key,
         StakeItem {
-            is_increase:        true,
-            amount:             100,
+            is_increase: true,
+            amount,
             inauguration_epoch: 2,
         },
         0,

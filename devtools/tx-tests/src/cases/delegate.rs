@@ -37,8 +37,8 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_init_tx(ckb, priv_keys.clone()).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
-    first_stake_tx(ckb, stakers_key[0].clone()).await;
-    first_stake_tx(ckb, stakers_key[1].clone()).await;
+    first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
+    first_stake_tx(ckb, stakers_key[1].clone(), 100).await;
 
     // delegator: (staker1, +100)
     first_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone())

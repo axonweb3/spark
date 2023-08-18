@@ -64,6 +64,13 @@ async fn main() {
                         .required(false)
                         .num_args(0)
                         .help("Test stake tx"),
+                )
+                .arg(
+                    clap::Arg::new("stake-smt")
+                        .long("stake-smt")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test stake tx"),
                 ),
         )
         .subcommand(
@@ -177,6 +184,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let delegate = matches.get_one::<bool>("delegate").unwrap();
     let delegate_smt = matches.get_one::<bool>("delegate-smt").unwrap();
     let stake = matches.get_one::<bool>("stake").unwrap();
+    let stake_smt = matches.get_one::<bool>("stake-smt").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -194,6 +202,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *stake {
         cases::stake::run_stake_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *stake_smt {
+        cases::stake_smt::run_stake_smt_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -230,7 +242,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
         run_mint_tx(&ckb, priv_keys.clone().clone()).await;
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
-            "first" => first_stake_tx(&ckb, staker_key).await,
+            "first" => first_stake_tx(&ckb, staker_key, 100).await,
             "add" => add_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
             "redeem" => redeem_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
             _ => unimplemented!(),

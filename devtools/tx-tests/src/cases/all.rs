@@ -26,7 +26,7 @@ pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_init_tx(ckb, priv_keys.clone()).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
-    first_stake_tx(ckb, staker_key.clone()).await;
+    first_stake_tx(ckb, staker_key.clone(), 100).await;
     add_stake_tx(ckb, staker_key.clone(), 10, 0).await.unwrap();
     stake_smt_tx(ckb, kicker_key.clone(), vec![staker_key.clone()]).await;
 

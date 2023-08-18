@@ -29,7 +29,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     // staker: +100
-    first_stake_tx(ckb, stakers_key[0].clone()).await;
+    first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
     // wallet: 400, stake: 100, delta: +100
 
     // Stake too mutch
