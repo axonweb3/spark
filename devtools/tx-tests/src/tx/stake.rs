@@ -32,7 +32,7 @@ pub async fn first_stake_tx(ckb: &CkbRpcClient, staker_key: H256) {
             bls_pub_key: Byte48::new_unchecked(bls_pub_key.into()),
             delegate:    DelegateRequirement {
                 commission_rate:    20,
-                maximum_delegators: 2,
+                maximum_delegators: 1,
                 threshold:          0,
             },
         }),

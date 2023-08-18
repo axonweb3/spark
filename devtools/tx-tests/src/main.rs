@@ -50,6 +50,13 @@ async fn main() {
                         .required(false)
                         .num_args(0)
                         .help("Test delegate tx"),
+                )
+                .arg(
+                    clap::Arg::new("delegate-smt")
+                        .long("delegate-smt")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test delegate smt tx"),
                 ),
         )
         .subcommand(
@@ -161,6 +168,7 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let net = matches.get_one::<String>("net").unwrap().as_str();
     let all = matches.get_one::<bool>("all").unwrap();
     let delegate = matches.get_one::<bool>("delegate").unwrap();
+    let delegate_smt = matches.get_one::<bool>("delegate-smt").unwrap();
 
     let ckb = parse_ckb_net(net);
 
@@ -170,6 +178,10 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     if *delegate {
         cases::delegate::run_delegate_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *delegate_smt {
+        cases::delegate_smt::run_delegate_smt_case(&ckb, priv_keys.clone()).await;
     }
 }
 

@@ -42,7 +42,7 @@ pub async fn add_delegate_tx(
     amount: u128,
     current_epoch: u64,
 ) -> Result<()> {
-    println!("add delegate");
+    println!("add delegation");
 
     delegate_tx(
         ckb,

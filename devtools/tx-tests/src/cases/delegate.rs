@@ -5,9 +5,9 @@ use anyhow::Result;
 use ckb_types::H256;
 use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
-use tx_builder::ckb::helper::OmniEth;
 
 use crate::config::types::PrivKeys;
+use crate::helper::user::get_users;
 use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
@@ -24,20 +24,8 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         panic!("At least one delegator is required");
     }
 
-    let stakers_key: Vec<H256> = priv_keys
-        .staker_privkeys
-        .clone()
-        .into_iter()
-        .map(|key| key.into_h256().unwrap())
-        .collect();
-    let stakers: Vec<EthAddress> = stakers_key
-        .clone()
-        .into_iter()
-        .map(|key| OmniEth::new(key).address().unwrap())
-        .collect();
-
+    let (stakers_key, stakers) = get_users(priv_keys.staker_privkeys.clone());
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
-
     let kicker_key = stakers_key[0].clone();
 
     for key in stakers_key.iter() {
@@ -64,7 +52,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
             .is_err()
     );
 
-    // The first staker exists in the delegate AT cell, while the second stacker
+    // The first staker exists in the delegate AT cell, while the second staker
     // does not exist
     add_delegates(ckb, delegator_key.clone(), stakers.clone(), 10)
         .await
@@ -197,7 +185,7 @@ async fn add_delegates(
     stakers_eth_addr: Vec<EthAddress>,
     amount: u128,
 ) -> Result<()> {
-    println!("add delegate");
+    println!("add delegation");
 
     let delegates = stakers_eth_addr
         .into_iter()
