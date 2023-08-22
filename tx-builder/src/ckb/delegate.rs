@@ -177,7 +177,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
         ];
 
         let witnesses = vec![
-            Delegate::witness(0u8).as_bytes(), // delegate AT cell lock, todo
+            Delegate::witness(0u8).as_bytes(),         // delegate AT cell lock
             OmniEth::witness_placeholder().as_bytes(), // AT cell lock
             OmniEth::witness_placeholder().as_bytes(), // capacity provider lock
         ];
@@ -338,10 +338,15 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
 
         let mut delegate_data = delegate_data;
         let delegate_data = DelegateAtCellData::new_unchecked(delegate_data.split_off(TOKEN_BYTES));
+        let last_delegates = self.collect_cell_delegates(
+            &delegate_data.lock(),
+            wallet_amount,
+            total_delegate_amount,
+        )?;
 
-        let (mut updated_delegates, new_stakers) = self
+        let (mut updated_delegates, stakers) = self
             .process_new_delegates(
-                &delegate_data.lock(),
+                &last_delegates,
                 &mut wallet_amount,
                 &mut total_delegate_amount,
             )
@@ -349,8 +354,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
 
         // process rest delegate infos in delegate AT cell
         self.process_rest_delegates(
-            &delegate_data.lock(),
-            &new_stakers,
+            last_delegates,
+            &stakers,
             &mut wallet_amount,
             &mut total_delegate_amount,
             &mut updated_delegates,
@@ -389,12 +394,14 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
         ])
     }
 
-    async fn process_new_delegates(
+    fn collect_cell_delegates(
         &self,
         cell_delegates: &DelegateAtCellLockData,
-        wallet_amount: &mut u128,
-        total_delegate_amount: &mut u128,
-    ) -> CkbTxResult<(Vec<DelegateItem>, HashSet<EthAddress>)> {
+        wallet_amount: u128,
+        total_delegate_amount: u128,
+    ) -> CkbTxResult<HashMap<ckb_types::H160, DelegateItem>> {
+        let mut total_redeem = 0;
+        let mut total_add = 0;
         let mut last_delegates = HashMap::new();
         for delegate in cell_delegates.delegator_infos() {
             let delegate_item = DelegateItem::from(delegate);
@@ -409,9 +416,39 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                 return Err(CkbTxErr::DelegateYourself);
             }
 
+            if !delegate_item.is_increase
+                && delegate_item.inauguration_epoch == self.current_epoch + INAUGURATION
+            {
+                total_redeem += delegate_item.amount;
+            }
+            if delegate_item.is_increase {
+                total_add += delegate_item.amount;
+            }
+
             last_delegates.insert(delegate_item.staker.clone(), delegate_item);
         }
 
+        if total_redeem > total_delegate_amount {
+            return Err(CkbTxErr::DelegateExceedTotalAmount {
+                total_amount:  total_delegate_amount,
+                redeem_amount: total_redeem,
+            });
+        }
+        if total_add > wallet_amount {
+            return Err(CkbTxErr::DelegateExceedWalletAmount {
+                wallet_amount,
+                delegate_amount: total_add,
+            });
+        }
+        Ok(last_delegates)
+    }
+
+    async fn process_new_delegates(
+        &self,
+        last_delegates: &HashMap<ckb_types::H160, DelegateItem>,
+        wallet_amount: &mut u128,
+        total_delegate_amount: &mut u128,
+    ) -> CkbTxResult<(Vec<DelegateItem>, HashSet<EthAddress>)> {
         let mut stakers = HashSet::new();
         let mut updated_delegates = Vec::new();
 
@@ -433,10 +470,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                     .await?;
 
                 log::info!(
-                    "[update delegate] exists in cell, actual delegate info: {}, wallet amount: {}, total delegate amount: {}",
+                    "[update delegate] exists in cell, actual delegate info: {}",
                     actual_info,
-                    wallet_amount,
-                    total_delegate_amount,
                 );
 
                 updated_delegates.push(DelegateItem {
@@ -446,6 +481,10 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                     inauguration_epoch: delegate.inauguration_epoch,
                 });
             } else {
+                log::info!(
+                    "[update delegate] not exists in cell, actual delegate info: {:?}",
+                    delegate
+                );
                 if delegate.is_increase {
                     if *wallet_amount < *total_delegate_amount {
                         return Err(CkbTxErr::ExceedWalletAmount(
@@ -455,11 +494,19 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                     }
                     *wallet_amount -= delegate.amount;
                     *total_delegate_amount += delegate.amount;
+                } else if self
+                    .delegate_smt_storage
+                    .get_amount(
+                        self.current_epoch + INAUGURATION,
+                        delegate.staker.0.into(),
+                        self.delegator.0.into(),
+                    )
+                    .await
+                    .unwrap()
+                    .is_none()
+                {
+                    return Err(CkbTxErr::NeverDelegated(delegate.staker.clone()));
                 }
-                log::info!(
-                    "[update delegate] not exists in cell, actual delegate info: {:?}",
-                    delegate
-                );
                 updated_delegates.push(delegate.to_owned());
             }
         }
@@ -469,26 +516,26 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
 
     fn process_rest_delegates(
         &self,
-        cell_delegates: &DelegateAtCellLockData,
-        new_stakers: &HashSet<EthAddress>,
+        last_delegates: HashMap<ckb_types::H160, DelegateItem>,
+        processed_stakers: &HashSet<EthAddress>,
         wallet_amount: &mut u128,
         total_delegate_amount: &mut u128,
         updated_delegates: &mut Vec<DelegateItem>,
     ) -> CkbTxResult<()> {
-        for delegate in cell_delegates.delegator_infos() {
-            let delta = DelegateItem::from(delegate);
-            log::info!(
-                "[update delegate] rest delegates, delegate info: {:?}",
-                delta
-            );
-            if !new_stakers.contains(&delta.staker) && delta.amount != 0 {
+        for (_, delegate) in last_delegates.into_iter() {
+            if !processed_stakers.contains(&delegate.staker) && delegate.amount != 0 {
+                log::info!(
+                    "[update delegate] rest delegates, delegate info: {:?}",
+                    delegate
+                );
                 // expired
-                if delta.inauguration_epoch < self.current_epoch + INAUGURATION && delta.is_increase
+                if delegate.inauguration_epoch < self.current_epoch + INAUGURATION
+                    && delegate.is_increase
                 {
-                    *wallet_amount += delta.amount;
-                    *total_delegate_amount -= delta.amount;
+                    *wallet_amount += delegate.amount;
+                    *total_delegate_amount -= delegate.amount;
                 } else {
-                    updated_delegates.push(delta);
+                    updated_delegates.push(delegate);
                 }
             }
         }
@@ -542,7 +589,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
         )
         .calc_actual_amount()?;
 
-        if actual_info.is_increase {
+        #[allow(clippy::nonminimal_bool)]
+        if actual_info.is_increase || (!actual_info.is_increase && last_delegate.is_increase) {
             *wallet_amount = actual_info.wallet_amount;
             *total_delegate_amount = actual_info.total_amount;
         }

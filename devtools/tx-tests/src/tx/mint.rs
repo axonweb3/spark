@@ -32,7 +32,7 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         let privkey = delegator_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
         println!(
-            "staker{} ckb addres: {}",
+            "delegator{} ckb addres: {}",
             i,
             omni_eth.ckb_address().unwrap(),
         );

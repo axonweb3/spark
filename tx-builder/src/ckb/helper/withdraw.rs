@@ -111,7 +111,17 @@ impl Withdraw {
 
         for item in withdraw_data.lock().withdraw_infos() {
             let epoch = to_u64(&item.unlock_epoch());
+            log::info!(
+                "withdraw unlock epoch: {}, amount: {}",
+                epoch,
+                to_u128(&item.amount())
+            );
             new_withdraw_infos = new_withdraw_infos.push(if epoch == unlock_epoch {
+                log::info!(
+                    "info exists, withdraw unlock epoch: {}, amount: {}",
+                    epoch,
+                    new_amount
+                );
                 inserted = true;
                 AWithdrawInfo::from(WithdrawInfo {
                     epoch:  unlock_epoch,
@@ -123,6 +133,11 @@ impl Withdraw {
         }
 
         if !inserted {
+            log::info!(
+                "new info, withdraw unlock epoch: {}, amount: {}",
+                unlock_epoch,
+                new_amount
+            );
             new_withdraw_infos = new_withdraw_infos.push(AWithdrawInfo::from(WithdrawInfo {
                 epoch:  unlock_epoch,
                 amount: new_amount,

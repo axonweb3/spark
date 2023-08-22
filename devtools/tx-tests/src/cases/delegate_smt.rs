@@ -7,7 +7,7 @@ use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::user::get_users;
+use crate::helper::user::gen_users;
 use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
@@ -24,29 +24,34 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         panic!("At least 2 delegators are required");
     }
 
-    let (stakers_key, stakers) = get_users(priv_keys.staker_privkeys.clone());
-    let (delegators_key, _) = get_users(priv_keys.staker_privkeys.clone());
+    let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
+    let (stakers_key, stakers) = gen_users(priv_keys.staker_privkeys.clone());
+    let (delegators_key, _) = gen_users(priv_keys.delegator_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
 
-    run_init_tx(ckb, priv_keys.clone(), 10).await;
+    run_init_tx(ckb, seeder_key, stakers_key.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
     first_stake_tx(ckb, stakers_key[1].clone(), 100).await;
 
-    // delegator1: (staker1, +10), (staker2, +20)
-    first_delegate_tx(ckb, delegators_key[0].clone(), &stakers)
+    let stakers = vec![stakers[0].clone(), stakers[1].clone()];
+
+    // delegator1: (staker1, +10), (staker2, +10)
+    first_delegate_tx(ckb, delegators_key[0].clone(), &stakers, 10)
         .await
         .unwrap();
 
-    // delegator2: (staker1, +10), (staker2, +20)
-    first_delegate_tx(ckb, delegators_key[1].clone(), &stakers)
+    // delegator2: (staker1, +20), (staker2, +20)
+    first_delegate_tx(ckb, delegators_key[1].clone(), &stakers, 20)
         .await
         .unwrap();
 
-    // The removed delegator1 is not in the staker1's delegate smt
-    // The removed delegator1 is not in the staker2's delegate smt
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone()).await;
+    let delegators_key = vec![delegators_key[0].clone(), delegators_key[1].clone()];
+
+    println!("\nThe removed delegator1 is not in the staker1's delegate smt");
+    println!("The removed delegator1 is not in the staker2's delegate smt");
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
     // staker1: (delegator2, 20)
     // staker2: (delegator2, 20)
 
@@ -55,10 +60,10 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .await
         .unwrap();
 
-    // The removed delegator2 is in the staker1's delegate smt
-    // The removed delegator2 is in the staker2's delegate smt
-    // The delegator2's refunded amount should be added up to 40
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone()).await;
+    println!("\nThe removed delegator2 is in the staker1's delegate smt");
+    println!("The removed delegator2 is in the staker2's delegate smt");
+    println!("The delegator2's refunded amount should be added up to 40");
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
     // staker1: (delegator1, 30)
     // staker2: (delegator1, 30)
 
@@ -68,14 +73,15 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
 
     // delegator2: (staker1, +25)
-    add_delegates_tx(ckb, delegators_key[1].clone(), &stakers)
+    add_delegate_tx(ckb, delegators_key[1].clone(), stakers[0].clone(), 25, 0)
         .await
         .unwrap();
 
-    // The removed delegator1 is in the staker1's delegate smt
-    // There is a pending record of redeeming delegation in the delegator1's
-    // delegate cell
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone()).await;
+    println!("-------The remaining tests did not pass-------");
+
+    println!("\nThe removed delegator1 is in the staker1's delegate smt");
+    println!("There is a pending record of redeeming delegation in the delegator1's delegate cell");
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
     // staker1: (delegator2, 25)
     // staker2: (delegator1, 30)
 
@@ -85,16 +91,17 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
 
     // new epoch
-    run_checkpoint_tx(ckb, priv_keys.clone(), 1).await;
+    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // delegator1: (staker1, +40)
     add_delegate_tx(ckb, delegators_key[0].clone(), stakers[0].clone(), 40, 1)
         .await
         .unwrap();
 
-    // The removed delegator2 is in the staker1's delegate smt
-    // There is a expired record in the delegator2's delegate cell
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone()).await;
+    println!("\nThe removed delegator2 is in the staker1's delegate smt");
+    println!("There is a expired record in the delegator2's delegate cell");
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
     // staker1: (delegator2, 40)
     // staker2: (delegator1, 30)
 }
@@ -102,25 +109,26 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 async fn first_delegate_tx(
     ckb: &CkbRpcClient,
     delegator_key: H256,
-    stakers_eth_addr: &Vec<EthAddress>,
+    stakers: &Vec<EthAddress>,
+    amount: u128,
 ) -> Result<()> {
     println!("first delegate");
-    assert!(stakers_eth_addr.len() >= 2);
+    assert!(stakers.len() >= 2);
 
     delegate_tx(
         ckb,
         delegator_key,
         vec![
             DelegateItem {
-                staker:             stakers_eth_addr[0].clone(),
-                is_increase:        true,
-                amount:             10,
+                staker: stakers[0].clone(),
+                is_increase: true,
+                amount,
                 inauguration_epoch: 2,
             },
             DelegateItem {
-                staker:             stakers_eth_addr[1].clone(),
-                is_increase:        true,
-                amount:             20,
+                staker: stakers[1].clone(),
+                is_increase: true,
+                amount,
                 inauguration_epoch: 2,
             },
         ],

@@ -34,10 +34,10 @@ impl<'a, C: CkbRpc> FaucetTxBuilder<'a, C> {
         let mut outputs_data = vec![];
 
         // omni eth lock cells
-        for (staker, ckb_bytes) in self.users.into_iter() {
+        for (user, ckb_bytes) in self.users.into_iter() {
             outputs.push(
                 CellOutput::new_builder()
-                    .lock(OmniEth::lock(&staker))
+                    .lock(OmniEth::lock(&user))
                     .build_exact_capacity(Capacity::bytes(ckb_bytes as usize)?)?,
             );
             outputs_data.push(Bytes::default());

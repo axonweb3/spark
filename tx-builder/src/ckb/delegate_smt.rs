@@ -209,13 +209,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .values()
                     .fold(0_u128, |acc, x| acc + x.to_owned());
 
-                log::info!(
-                        "[delegate smt] delegator: {}, new total delegate amount: {}, withdraw amount: {}",
-                        delegator.to_string(),
-                        old_total_delegate_amount - total_withdraw_amount,
-                        total_withdraw_amount,
-                    );
-
                 // outputs: withdraw AT cell
                 outputs_data.push(Withdraw::update_cell_data(
                     &old_withdraw_cell,
@@ -232,6 +225,21 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 );
             }
 
+            if old_total_delegate_amount < total_withdraw_amount {
+                return Err(CkbTxErr::ExceedTotalAmount {
+                    total_amount: old_total_delegate_amount,
+                    new_amount:   total_withdraw_amount,
+                }
+                .into());
+            }
+
+            log::info!(
+                "[delegate smt] delegator: {}, new total delegate amount: {}, withdraw amount: {}",
+                delegator.to_string(),
+                old_total_delegate_amount - total_withdraw_amount,
+                total_withdraw_amount,
+            );
+
             let new_delegate_data = {
                 let delegator_addr = old_delegate_data.lock().l2_address();
                 let new_delegate_data = old_delegate_data
@@ -243,7 +251,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .build()
                     .as_bytes();
                 token_cell_data(
-                    old_total_delegate_amount.to_owned() - total_withdraw_amount,
+                    old_total_delegate_amount - total_withdraw_amount,
                     new_delegate_data,
                 )
             };
@@ -515,7 +523,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         let new_delegators = new_smt
             .into_iter()
             .map(|(k, v)| {
-                log::info!("[delegae smt] delegator: {}, amount: {}", k.to_string(), v);
+                log::info!("[delegate smt] delegator: {}, amount: {}", k.to_string(), v);
                 UserAmount {
                     user:        k,
                     amount:      v,

@@ -62,6 +62,7 @@ struct MetadataContext {
     miner_groups:        Vec<MinerGroupInfo>,
     validators:          Vec<EpochStakeInfo>,
     no_top_stakers:      Vec<(H160, u128)>,
+    // HashMap<stake_address, HashMap<delegator_address, amount>>
     no_top_delegators:   HashMap<H160, HashMap<H160, u128>>,
     old_stake_smt_proof: Vec<u8>,
     epoch:               Epoch,
@@ -112,7 +113,7 @@ where
                 .await?;
 
                 log::info!(
-                    "[metadata] staker: {}, amount: {} delegators: {}",
+                    "[metadata] staker: {}, amount: {}, delegators: {}",
                     staker.to_string(),
                     amount,
                     delegaters.len()
@@ -166,9 +167,9 @@ where
                     no_top_stakers.push((i.staker, i.amount));
                     for (d, u) in i.delegaters {
                         no_top_delegaters
-                            .entry(d.0.into())
+                            .entry(i.staker.0.into())
                             .or_default()
-                            .insert(i.staker.0.into(), u);
+                            .insert(d.0.into(), u);
                     }
                 }
 
@@ -253,7 +254,7 @@ where
         let delegatets_remove_keys = context
             .no_top_delegators
             .iter()
-            .flat_map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(*d)))
+            .flat_map(|(d, i)| std::iter::repeat(*d).zip(i.keys().cloned()))
             .collect();
 
         DelegateSmtStorage::remove(
@@ -509,8 +510,9 @@ where
         let mut delegator_at_cell_datas = HashMap::with_capacity(context.no_top_delegators.len());
         for (staker_address, v) in context.no_top_delegators.iter() {
             log::info!(
-                "[metadata] staker: {}, none delegators: ",
-                staker_address.to_string()
+                "[metadata] staker: {}, none top delegators: {}",
+                staker_address.to_string(),
+                v.len(),
             );
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
@@ -583,8 +585,11 @@ where
                 .await?
                 .expect("Must have withdraw cell");
 
-            let withdraw_data =
-                Withdraw::update_cell_data(&withdraw_cell, self.last_checkpoint_data.epoch, amount);
+            let withdraw_data = Withdraw::update_cell_data(
+                &withdraw_cell,
+                self.last_checkpoint_data.epoch + INAUGURATION,
+                amount,
+            );
 
             withdraw_inputs.push(
                 CellInput::new_builder()
@@ -649,7 +654,7 @@ where
         let mut inputs = vec![
             // metadata
             CellInput::new_builder()
-                .previous_output(self.last_metadata_cell.out_point.into())
+                .previous_output(self.last_metadata_cell.out_point.clone().into())
                 .build(),
             // stake smt
             CellInput::new_builder()
@@ -713,6 +718,12 @@ where
             // checkpoint cell dep
             CellDep::new_builder()
                 .out_point(self.last_checkpoint.out_point.into())
+                .build(),
+            // metadata cell dep
+            // It should not have been placed here because it has already been placed in inputs.
+            // But if it is not placed here, the stake lock will report an error
+            CellDep::new_builder()
+                .out_point(self.last_metadata_cell.out_point.into())
                 .build(),
         ];
 

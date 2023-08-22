@@ -7,10 +7,11 @@ use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::user::get_users;
+use crate::helper::user::gen_users;
 use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
+// The test did not pass
 pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     if Path::new(ROCKSDB_PATH).exists() {
         fs::remove_dir_all(ROCKSDB_PATH).unwrap();
@@ -20,11 +21,23 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         panic!("At least 3 stakers are required");
     }
 
-    let (stakers_key, stakers) = get_users(priv_keys.staker_privkeys.clone());
-    let (delegators_key, _) = get_users(priv_keys.staker_privkeys.clone());
+    if priv_keys.delegator_privkeys.is_empty() {
+        panic!("At least one delegator is required");
+    }
+
+    let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
+    let (stakers_key, stakers) = gen_users(priv_keys.staker_privkeys.clone());
+    let (delegators_key, _) = gen_users(priv_keys.delegator_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
 
-    run_init_tx(ckb, priv_keys.clone(), 1).await;
+    let stakers_key = vec![
+        stakers_key[0].clone(),
+        stakers_key[1].clone(),
+        stakers_key[2].clone(),
+    ];
+    let stakers = vec![stakers[0].clone(), stakers[1].clone(), stakers[2].clone()];
+
+    run_init_tx(ckb, seeder_key, stakers_key.clone(), 1).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     // staker1: 10
@@ -34,17 +47,17 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // staker3: 30
     first_stake_tx(ckb, stakers_key[2].clone(), 30).await;
 
-    // delegator: (staker1, +10), (staker2, +10), (staker3, +10), (staker4, +10)
+    // delegator: (staker1, +10), (staker2, +10), (staker3, +10)
     first_delegates_tx(ckb, delegators_key[0].clone(), &stakers)
         .await
         .unwrap();
 
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone()).await;
+    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
     // staker3: 30
     // staker2: 20
     // staker1: 10
 
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key).await;
+    delegate_smt_tx(ckb, kicker_key.clone(), vec![delegators_key[0].clone()], 0).await;
     // staker1: (delegator1, 10)
     // staker2: (delegator1, 10)
     // staker3: (delegator1, 10)

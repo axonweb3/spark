@@ -7,21 +7,22 @@ use tx_builder::ckb::checkpoint::CheckpointTxBuilder;
 use tx_builder::ckb::helper::{OmniEth, Tx};
 
 use crate::config::parse_type_ids;
-use crate::config::types::PrivKeys;
 use crate::mock::{mock_axon_proof_v2, mock_axon_proposal_v2};
 use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn run_checkpoint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys, epoch: u64) {
-    let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-    let omni_eth = OmniEth::new(kicker_key.clone());
-    println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-
+pub async fn run_checkpoint_tx(
+    ckb: &CkbRpcClient,
+    kicker_key: H256,
+    stakers_key: Vec<H256>,
+    epoch: u64,
+) {
     let mut staker_privkeys = vec![];
     let mut propose_count = vec![];
-    for staker_privkey in priv_keys.staker_privkeys.into_iter() {
-        let privkey = staker_privkey.clone().into_h256().unwrap();
-        staker_privkeys.push(privkey);
 
+    for staker_privkey in stakers_key.into_iter() {
+        staker_privkeys.push(staker_privkey.clone());
+
+        let omni_eth = OmniEth::new(staker_privkey);
         propose_count.push(ProposeCount {
             proposer: omni_eth.address().unwrap(),
             count:    100,

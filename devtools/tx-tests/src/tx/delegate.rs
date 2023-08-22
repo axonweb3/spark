@@ -66,7 +66,7 @@ pub async fn redeem_delegate_tx(
     amount: u128,
     current_epoch: u64,
 ) -> Result<()> {
-    println!("redeem delegate");
+    println!("redeem delegation");
 
     delegate_tx(
         ckb,
@@ -91,19 +91,14 @@ pub async fn delegate_tx(
     first_delegate: bool,
 ) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
-
-    let omni_eth = OmniEth::new(delegator_key.clone());
-    println!(
-        "delegator ckb addres: {}\n",
-        omni_eth.ckb_address().unwrap()
-    );
-
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let xudt_args = type_ids.xudt_owner.into_h256().unwrap();
 
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
+
+    let omni_eth = OmniEth::new(delegator_key.clone());
 
     let tx = DelegateTxBuilder::new(
         ckb,

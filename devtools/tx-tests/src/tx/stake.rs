@@ -94,14 +94,12 @@ async fn stake_tx(
     first_stake_info: Option<FirstStakeInfo>,
 ) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
-
-    let omni_eth = OmniEth::new(staker_key.clone());
-    println!("staker0 ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-
     let first_stake = first_stake_info.is_some();
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let xudt_args = type_ids.xudt_owner.into_h256().unwrap();
+
+    let omni_eth = OmniEth::new(staker_key.clone());
 
     let tx = StakeTxBuilder::new(
         ckb,

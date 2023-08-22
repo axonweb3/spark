@@ -12,7 +12,12 @@ use tx_builder::ckb::helper::{Delegate, OmniEth, Tx, Xudt};
 use crate::config::parse_type_ids;
 use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
-pub async fn delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegators_key: Vec<H256>) {
+pub async fn delegate_smt_tx(
+    ckb: &CkbRpcClient,
+    kicker_key: H256,
+    delegators_key: Vec<H256>,
+    current_epoch: u64,
+) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
@@ -20,14 +25,8 @@ pub async fn delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegators_ke
     let xudt_owner = type_ids.xudt_owner.into_h256().unwrap();
 
     let mut delegate_cells = vec![];
-    for (i, delegator_key) in delegators_key.into_iter().enumerate() {
+    for delegator_key in delegators_key.into_iter() {
         let omni_eth = OmniEth::new(delegator_key.clone());
-        println!(
-            "delegator{} ckb addres: {}\n",
-            i,
-            omni_eth.ckb_address().unwrap()
-        );
-
         delegate_cells.push(
             Delegate::get_cell(
                 ckb,
@@ -40,16 +39,13 @@ pub async fn delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegators_ke
         );
     }
 
-    let omni_eth = OmniEth::new(kicker_key.clone());
-    println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
 
     let (tx, _) = DelegateSmtTxBuilder::new(
         ckb,
         kicker_key,
-        0,
+        current_epoch,
         DelegateSmtTypeIds {
             metadata_type_id,
             checkpoint_type_id,

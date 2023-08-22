@@ -6,7 +6,7 @@ use storage::SmtManager;
 
 use common::traits::tx_builder::IMetadataTxBuilder;
 use common::types::tx_builder::MetadataTypeIds;
-use tx_builder::ckb::helper::{Checkpoint, OmniEth, Tx};
+use tx_builder::ckb::helper::{Checkpoint, Tx};
 use tx_builder::ckb::metadata::MetadataSmtTxBuilder;
 
 use crate::config::parse_type_ids;
@@ -14,9 +14,6 @@ use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
-
-    let omni_eth = OmniEth::new(kicker_key.clone());
-    println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();

@@ -87,7 +87,7 @@ async fn main() {
                         .help("Test reward tx"),
                 )
                 .arg(
-                    clap::Arg::new("withraw")
+                    clap::Arg::new("withdraw")
                         .long("withdraw")
                         .required(false)
                         .num_args(0)
@@ -261,6 +261,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     let ckb = parse_ckb_net(net);
 
+    let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
@@ -273,7 +274,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     if faucet {
         run_faucet_tx(&ckb, priv_keys.clone()).await;
     } else if init {
-        run_init_tx(&ckb, priv_keys.clone(), 10).await;
+        run_init_tx(&ckb, seeder_key, vec![staker_key.clone()], 10).await;
     } else if mint {
         run_mint_tx(&ckb, priv_keys.clone().clone()).await;
     } else if stake.is_some() {
@@ -297,11 +298,11 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
             _ => unimplemented!(),
         }
     } else if checkpoint {
-        run_checkpoint_tx(&ckb, priv_keys, 1).await;
+        run_checkpoint_tx(&ckb, kicker_key.clone(), vec![staker_key.clone()], 1).await;
     } else if stake_smt {
-        stake_smt_tx(&ckb, kicker_key, vec![staker_key.clone()]).await;
+        stake_smt_tx(&ckb, kicker_key, vec![staker_key.clone()], 0).await;
     } else if delegate_smt {
-        delegate_smt_tx(&ckb, kicker_key, vec![delegator_key]).await;
+        delegate_smt_tx(&ckb, kicker_key, vec![delegator_key], 0).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_withdraw_tx(&ckb, user_key, 2).await;

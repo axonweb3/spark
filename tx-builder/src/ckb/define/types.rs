@@ -365,7 +365,7 @@ impl From<ADelegateAtCellLockData> for DelegateAtCellLockData {
         }
 
         DelegateAtCellLockData {
-            l2_address:      to_h160(&value.l1_address()),
+            l2_address:      to_h160(&value.l2_address()),
             delegator_infos: res,
         }
     }

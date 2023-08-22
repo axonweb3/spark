@@ -4,8 +4,8 @@ use tx_builder::ckb::helper::OmniEth;
 
 use crate::config::types::Privkey;
 
-pub fn get_users(staker_privkeys: Vec<Privkey>) -> (Vec<H256>, Vec<EthAddress>) {
-    let priv_keys: Vec<H256> = staker_privkeys
+pub fn gen_users(privkeys: Vec<Privkey>) -> (Vec<H256>, Vec<EthAddress>) {
+    let priv_keys: Vec<H256> = privkeys
         .into_iter()
         .map(|key| key.into_h256().unwrap())
         .collect();

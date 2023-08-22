@@ -19,10 +19,24 @@ pub enum CkbTxErr {
     )]
     ExceedWalletAmount(Amount, Amount),
 
-    #[error("The stake/delegate amount is too large, total elect amount: {total_amount:?}, stake/delegate amount: {new_amount:?}")]
+    #[error("The stake/delegate amount is too large, total amount: {total_amount:?}, stake/delegate amount: {new_amount:?}")]
     ExceedTotalAmount {
         total_amount: Amount,
         new_amount:   Amount,
+    },
+
+    #[error(
+        "The delegate amount is too large, wallet amount: {wallet_amount:?}, delegate amount: {delegate_amount:?}"
+    )]
+    DelegateExceedWalletAmount {
+        wallet_amount:   Amount,
+        delegate_amount: Amount,
+    },
+
+    #[error("The redeem amount is too large, total delegate amount: {total_amount:?}, total redeem amount: {redeem_amount:?}")]
+    DelegateExceedTotalAmount {
+        total_amount:  Amount,
+        redeem_amount: Amount,
     },
 
     #[error("Invalid is_increase: {0}")]
@@ -80,6 +94,9 @@ pub enum CkbTxErr {
         "Invalid delegate, staker: {0}, delegator: {1}, redeem amount: {2}, total amount: {3}"
     )]
     RedeemDelegate(CH160, CH160, Amount, Amount),
+
+    #[error("The staker `{0}` has not been delegated and cannot be redeemed")]
+    NeverDelegated(CH160),
 
     #[error("Do not delegate to yourself!")]
     DelegateYourself,
