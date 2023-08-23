@@ -62,6 +62,7 @@ struct MetadataContext {
     miner_groups:        Vec<MinerGroupInfo>,
     validators:          Vec<EpochStakeInfo>,
     no_top_stakers:      Vec<(H160, u128)>,
+    // HashMap<stake_address, HashMap<delegator_address, amount>>
     no_top_delegators:   HashMap<H160, HashMap<H160, u128>>,
     old_stake_smt_proof: Vec<u8>,
     epoch:               Epoch,
@@ -166,9 +167,9 @@ where
                     no_top_stakers.push((i.staker, i.amount));
                     for (d, u) in i.delegaters {
                         no_top_delegaters
-                            .entry(d.0.into())
+                            .entry(i.staker.0.into())
                             .or_default()
-                            .insert(i.staker.0.into(), u);
+                            .insert(d.0.into(), u);
                     }
                 }
 
@@ -253,7 +254,7 @@ where
         let delegatets_remove_keys = context
             .no_top_delegators
             .iter()
-            .flat_map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(*d)))
+            .flat_map(|(d, i)| std::iter::repeat(*d).zip(i.keys().cloned()))
             .collect();
 
         DelegateSmtStorage::remove(
