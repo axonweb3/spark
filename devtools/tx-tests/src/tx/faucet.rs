@@ -22,7 +22,7 @@ pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
         println!(
-            "staker{} ckb addres: {}",
+            "transfer to staker{}[{}] 10000 CKB",
             i,
             omni_eth.ckb_address().unwrap(),
         );
@@ -33,7 +33,7 @@ pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         let privkey = delegator_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
         println!(
-            "staker{} ckb addres: {}",
+            "transfer to delegator{}[{}]",
             i,
             omni_eth.ckb_address().unwrap(),
         );

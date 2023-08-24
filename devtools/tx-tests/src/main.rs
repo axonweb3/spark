@@ -5,7 +5,6 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::OmniEth;
 use tx_builder::set_network_type;
 
-use crate::cases::*;
 use crate::config::{parse_log_config, parse_priv_keys};
 use crate::tx::*;
 
@@ -39,11 +38,60 @@ async fn main() {
                         .help("Switch network"),
                 )
                 .arg(
-                    clap::Arg::new("case1")
-                        .short('1')
+                    clap::Arg::new("all")
+                        .long("all")
                         .required(false)
                         .num_args(0)
-                        .help("Test case 1"),
+                        .help("Test all tx"),
+                )
+                .arg(
+                    clap::Arg::new("delegate")
+                        .long("delegate")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test delegate tx"),
+                )
+                .arg(
+                    clap::Arg::new("delegate-smt")
+                        .long("delegate-smt")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test delegate smt tx"),
+                )
+                .arg(
+                    clap::Arg::new("stake")
+                        .long("stake")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test stake tx"),
+                )
+                .arg(
+                    clap::Arg::new("stake-smt")
+                        .long("stake-smt")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test stake smt tx"),
+                )
+                .arg(
+                    clap::Arg::new("metadata")
+                        .long("metadata")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test metadata tx"),
+                )
+                .arg(
+                    clap::Arg::new("reward")
+                        .long("reward")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test reward tx"),
+                )
+                .arg(
+                    clap::Arg::new("withdraw")
+                        .long("withdraw")
+                        .required(false)
+                        .num_args(0)
+                        .help("Test withdraw tx"),
                 ),
         )
         .subcommand(
@@ -153,12 +201,47 @@ async fn main() {
 
 async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let net = matches.get_one::<String>("net").unwrap().as_str();
-    let case1 = matches.get_one::<bool>("case1").unwrap();
+    let all = matches.get_one::<bool>("all").unwrap();
+    let delegate = matches.get_one::<bool>("delegate").unwrap();
+    let delegate_smt = matches.get_one::<bool>("delegate-smt").unwrap();
+    let stake = matches.get_one::<bool>("stake").unwrap();
+    let stake_smt = matches.get_one::<bool>("stake-smt").unwrap();
+    let metadata = matches.get_one::<bool>("metadata").unwrap();
+    let reward = matches.get_one::<bool>("reward").unwrap();
+    let withdraw = matches.get_one::<bool>("withdraw").unwrap();
 
     let ckb = parse_ckb_net(net);
 
-    if *case1 {
-        run_case1(&ckb, priv_keys).await;
+    if *all {
+        cases::all::run_all_tx(&ckb, priv_keys.clone()).await;
+    }
+
+    if *delegate {
+        cases::delegate::run_delegate_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *delegate_smt {
+        cases::delegate_smt::run_delegate_smt_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *stake {
+        cases::stake::run_stake_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *stake_smt {
+        cases::stake_smt::run_stake_smt_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *metadata {
+        cases::metadata::run_metadata_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *reward {
+        cases::reward::run_reward_case(&ckb, priv_keys.clone()).await;
+    }
+
+    if *withdraw {
+        cases::withdraw::run_withdraw_case(&ckb, priv_keys.clone()).await;
     }
 }
 
@@ -178,6 +261,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
 
     let ckb = parse_ckb_net(net);
 
+    let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let staker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
@@ -190,37 +274,43 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     if faucet {
         run_faucet_tx(&ckb, priv_keys.clone()).await;
     } else if init {
-        run_init_tx(&ckb, priv_keys.clone()).await;
+        run_init_tx(&ckb, seeder_key, vec![staker_key.clone()], 10).await;
     } else if mint {
         run_mint_tx(&ckb, priv_keys.clone().clone()).await;
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
-            "first" => first_stake_tx(&ckb, staker_key).await,
-            "add" => add_stake_tx(&ckb, staker_key, 2).await,
-            "redeem" => reedem_stake_tx(&ckb, staker_key).await,
+            "first" => first_stake_tx(&ckb, staker_key, 100).await,
+            "add" => add_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
+            "redeem" => redeem_stake_tx(&ckb, staker_key, 10, 0).await.unwrap(),
             _ => unimplemented!(),
         }
     } else if delegate.is_some() {
         match delegate.unwrap().as_str() {
-            "first" => first_delegate_tx(&ckb, delegator_key, staker_eth_addr).await,
-            "add" => add_delegate_tx(&ckb, delegator_key, staker_eth_addr).await,
-            "redeem" => reedem_delegate_tx(&ckb, delegator_key, staker_eth_addr).await,
+            "first" => first_delegate_tx(&ckb, delegator_key, staker_eth_addr)
+                .await
+                .unwrap(),
+            "add" => add_delegate_tx(&ckb, delegator_key, staker_eth_addr, 10, 0)
+                .await
+                .unwrap(),
+            "redeem" => redeem_delegate_tx(&ckb, delegator_key, staker_eth_addr, 10, 0)
+                .await
+                .unwrap(),
             _ => unimplemented!(),
         }
     } else if checkpoint {
-        run_checkpoint_tx(&ckb, priv_keys, 1).await;
+        run_checkpoint_tx(&ckb, kicker_key.clone(), vec![staker_key.clone()], 1).await;
     } else if stake_smt {
-        run_stake_smt_tx(&ckb, kicker_key).await;
+        stake_smt_tx(&ckb, kicker_key, vec![staker_key.clone()], 0).await;
     } else if delegate_smt {
-        run_delegate_smt_tx(&ckb, kicker_key, delegator_key).await;
+        delegate_smt_tx(&ckb, kicker_key, vec![delegator_key], 0).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-        run_withdraw_tx(&ckb, user_key).await;
+        run_withdraw_tx(&ckb, user_key, 2).await;
     } else if metadata {
         run_metadata_tx(&ckb, kicker_key).await;
     } else if reward {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-        run_reward_tx(&ckb, user_key).await;
+        run_reward_tx(&ckb, user_key, 4).await.unwrap();
     } else {
         unimplemented!();
     }

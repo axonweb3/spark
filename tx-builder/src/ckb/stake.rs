@@ -401,6 +401,8 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
             last_info,
         );
 
+        let last_is_increase = last_info.is_increase;
+
         let actual_info = ElectAmountCalculator::new(
             wallet_amount,
             total_stake_amount,
@@ -409,7 +411,8 @@ impl<'a, C: CkbRpc> StakeTxBuilder<'a, C> {
         )
         .calc_actual_amount()?;
 
-        if actual_info.is_increase {
+        #[allow(clippy::nonminimal_bool)]
+        if actual_info.is_increase || (!actual_info.is_increase && last_is_increase) {
             total_stake_amount = actual_info.total_amount;
             wallet_amount = actual_info.wallet_amount;
         }

@@ -113,7 +113,7 @@ where
                 .await?;
 
                 log::info!(
-                    "[metadata] staker: {}, amount: {} delegators: {}",
+                    "[metadata] staker: {}, amount: {}, delegators: {}",
                     staker.to_string(),
                     amount,
                     delegaters.len()
@@ -510,8 +510,9 @@ where
         let mut delegator_at_cell_datas = HashMap::with_capacity(context.no_top_delegators.len());
         for (staker_address, v) in context.no_top_delegators.iter() {
             log::info!(
-                "[metadata] staker: {}, none delegators: ",
-                staker_address.to_string()
+                "[metadata] staker: {}, none top delegators: {}",
+                staker_address.to_string(),
+                v.len(),
             );
             for (addr, amount) in v {
                 *withdraw_set.entry(*addr).or_default() += amount;
@@ -584,8 +585,11 @@ where
                 .await?
                 .expect("Must have withdraw cell");
 
-            let withdraw_data =
-                Withdraw::update_cell_data(&withdraw_cell, self.last_checkpoint_data.epoch, amount);
+            let withdraw_data = Withdraw::update_cell_data(
+                &withdraw_cell,
+                self.last_checkpoint_data.epoch + INAUGURATION,
+                amount,
+            );
 
             withdraw_inputs.push(
                 CellInput::new_builder()
@@ -650,7 +654,7 @@ where
         let mut inputs = vec![
             // metadata
             CellInput::new_builder()
-                .previous_output(self.last_metadata_cell.out_point.into())
+                .previous_output(self.last_metadata_cell.out_point.clone().into())
                 .build(),
             // stake smt
             CellInput::new_builder()
@@ -714,6 +718,12 @@ where
             // checkpoint cell dep
             CellDep::new_builder()
                 .out_point(self.last_checkpoint.out_point.into())
+                .build(),
+            // metadata cell dep
+            // It should not have been placed here because it has already been placed in inputs.
+            // But if it is not placed here, the stake lock will report an error
+            CellDep::new_builder()
+                .out_point(self.last_metadata_cell.out_point.into())
                 .build(),
         ];
 

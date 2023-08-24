@@ -118,7 +118,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
         for (i, input) in self.tx.inputs().into_iter().enumerate() {
             let output = self
                 .rpc
-                .get_live_cell(input.previous_output().into(), true)
+                .get_live_cell(input.previous_output().into(), false)
                 .await?;
             let output: CellOutput = output.cell.unwrap().output.into();
 
@@ -181,7 +181,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
     ) -> Result<u64> {
         let mut inputs = self.tx.inputs().into_iter().collect::<Vec<_>>();
 
-        let (mut extra_inputs, inputs_capacity) = get_live_cells(
+        let (extra_inputs, inputs_capacity) = get_live_cells(
             self.rpc,
             SearchKey {
                 script:               capacity_provider.into(),
@@ -196,7 +196,7 @@ impl<'a, C: CkbRpc> Tx<'a, C> {
         )
         .await?;
 
-        inputs.append(&mut extra_inputs);
+        inputs.extend(extra_inputs);
 
         self.tx = self.tx.as_advanced_builder().set_inputs(inputs).build();
 

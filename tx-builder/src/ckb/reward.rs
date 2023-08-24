@@ -99,6 +99,10 @@ where
     }
 
     async fn build_tx(mut self) -> Result<TransactionView> {
+        if self.current_epoch < 4 {
+            return Err(CkbTxErr::RewardCurrentEpoch(self.current_epoch).into());
+        }
+
         let reward_smt_cell = Reward::get_cell(self.ckb, &self.type_ids.reward_smt_type_id).await?;
         let selection_cell =
             Selection::get_cell(self.ckb, &self.type_ids.selection_type_id).await?;
@@ -110,7 +114,7 @@ where
                 .build(),
             // selection cell
             CellInput::new_builder()
-                .previous_output(selection_cell.out_point.into())
+                .previous_output(selection_cell.out_point.clone().into())
                 .build(),
         ];
 
@@ -132,7 +136,7 @@ where
                 .build_exact_capacity(Capacity::bytes(outputs_data[0].len())?)?,
             // selection cell
             CellOutput::new_builder()
-                .lock(AlwaysSuccess::lock())
+                .lock(selection_cell.output.lock.clone().into())
                 .type_(Some(Selection::type_(&self.type_ids.selection_type_id)).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // AT cell
@@ -240,7 +244,7 @@ where
             start_reward_epoch + self.epoch_count - 1,
         );
 
-        if start_reward_epoch < end_reward_epoch {
+        if start_reward_epoch > end_reward_epoch {
             return Err(CkbTxErr::RewardEpoch(start_reward_epoch, end_reward_epoch).into());
         }
 
@@ -411,6 +415,12 @@ where
         let mut epoch_reward = 0;
 
         for (validator, propose_count) in propose_counts.into_iter() {
+            log::info!(
+                "[reward] epoch: {}, validator: {}",
+                epoch,
+                validator.to_string(),
+            );
+
             validators.push(validator);
 
             let is_validator = user == validator;
@@ -425,9 +435,7 @@ where
             let commission_rate = self.commission_rate(&to_ckb_h160(&validator)).await? as u128;
 
             log::info!(
-                "[reward] epoch: {}, validator: {}, commission_rate: {}, propose count: {}",
-                epoch,
-                validator.to_string(),
+                "[reward] commission_rate: {}, propose count: {}",
                 commission_rate,
                 propose_count,
             );

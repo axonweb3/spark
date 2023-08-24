@@ -12,25 +12,32 @@ use tx_builder::ckb::helper::{Delegate, OmniEth, Tx, Xudt};
 use crate::config::parse_type_ids;
 use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
-pub async fn run_delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegator_key: H256) {
+pub async fn delegate_smt_tx(
+    ckb: &CkbRpcClient,
+    kicker_key: H256,
+    delegators_key: Vec<H256>,
+    current_epoch: u64,
+) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
-
-    let omni_eth = OmniEth::new(delegator_key.clone());
-    println!("kicker ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
     let checkpoint_type_id = type_ids.checkpoint_type_id.into_h256().unwrap();
     let delegate_smt_type_id = type_ids.delegate_smt_type_id.into_h256().unwrap();
     let xudt_owner = type_ids.xudt_owner.into_h256().unwrap();
 
-    let delegate_cell = Delegate::get_cell(
-        ckb,
-        Delegate::lock(&metadata_type_id, &omni_eth.address().unwrap()),
-        Xudt::type_(&xudt_owner.pack()),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let mut delegate_cells = vec![];
+    for delegator_key in delegators_key.into_iter() {
+        let omni_eth = OmniEth::new(delegator_key.clone());
+        delegate_cells.push(
+            Delegate::get_cell(
+                ckb,
+                Delegate::lock(&metadata_type_id, &omni_eth.address().unwrap()),
+                Xudt::type_(&xudt_owner.pack()),
+            )
+            .await
+            .unwrap()
+            .expect("delegate AT cell not found"),
+        );
+    }
 
     let path = PathBuf::from(ROCKSDB_PATH);
     let smt = SmtManager::new(path);
@@ -38,14 +45,14 @@ pub async fn run_delegate_smt_tx(ckb: &CkbRpcClient, kicker_key: H256, delegator
     let (tx, _) = DelegateSmtTxBuilder::new(
         ckb,
         kicker_key,
-        0,
+        current_epoch,
         DelegateSmtTypeIds {
             metadata_type_id,
             checkpoint_type_id,
             delegate_smt_type_id,
             xudt_owner,
         },
-        vec![delegate_cell],
+        delegate_cells,
         smt,
     )
     .build_tx()
