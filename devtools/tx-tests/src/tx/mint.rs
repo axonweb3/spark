@@ -12,30 +12,18 @@ pub async fn run_mint_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
-    let omni_eth = OmniEth::new(seeder_key.clone());
-    println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
 
     let mut users = HashMap::new();
 
-    for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
+    for staker_privkey in priv_keys.staker_privkeys {
         let privkey = staker_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
-        println!(
-            "staker{} ckb addres: {}",
-            i,
-            omni_eth.ckb_address().unwrap(),
-        );
         users.insert(omni_eth.address().unwrap(), 500);
     }
 
-    for (i, delegator_privkey) in priv_keys.delegator_privkeys.into_iter().enumerate() {
+    for delegator_privkey in priv_keys.delegator_privkeys {
         let privkey = delegator_privkey.clone().into_h256().unwrap();
         let omni_eth = OmniEth::new(privkey);
-        println!(
-            "delegator{} ckb addres: {}",
-            i,
-            omni_eth.ckb_address().unwrap(),
-        );
         users.insert(omni_eth.address().unwrap(), 500);
     }
 

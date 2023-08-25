@@ -185,6 +185,27 @@ async fn main() {
                         .num_args(0)
                         .help("Test reward tx"),
                 ),
+        )
+        .subcommand(
+            clap::Command::new("users")
+                .about("Show users information")
+                .arg(
+                    clap::Arg::new("net")
+                        .short('n')
+                        .required(false)
+                        .num_args(1)
+                        .value_parser(["dev", "test", "main"])
+                        .default_value("test")
+                        .help("Switch network"),
+                )
+                .arg(
+                    clap::Arg::new("address")
+                        .short('a')
+                        .long("address")
+                        .required(false)
+                        .num_args(0)
+                        .help("Show users address"),
+                ),
         );
 
     register_log();
@@ -195,6 +216,7 @@ async fn main() {
     match matches.subcommand() {
         Some(("cases", matches)) => run_test_cases(matches, priv_keys).await,
         Some(("tx", matches)) => run_single_tx(matches, priv_keys).await,
+        Some(("users", matches)) => view_users(matches, priv_keys),
         _ => unimplemented!(),
     }
 }
@@ -276,7 +298,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if init {
         run_init_tx(&ckb, seeder_key, vec![staker_key.clone()], 10).await;
     } else if mint {
-        run_mint_tx(&ckb, priv_keys.clone().clone()).await;
+        run_mint_tx(&ckb, priv_keys.clone()).await;
     } else if stake.is_some() {
         match stake.unwrap().as_str() {
             "first" => first_stake_tx(&ckb, staker_key, 100).await,
@@ -313,6 +335,45 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
         run_reward_tx(&ckb, user_key, 4).await.unwrap();
     } else {
         unimplemented!();
+    }
+}
+
+fn view_users(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
+    let net = matches.get_one::<String>("net").unwrap().as_str();
+    let address = matches.get_one::<bool>("address").unwrap();
+
+    parse_ckb_net(net);
+
+    if *address {
+        let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
+        let omni_eth = OmniEth::new(seeder_key);
+        println!(
+            "seeder ckb addres: {}, eth address: {}",
+            omni_eth.ckb_address().unwrap(),
+            omni_eth.address().unwrap(),
+        );
+
+        for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {
+            let privkey = staker_privkey.clone().into_h256().unwrap();
+            let omni_eth = OmniEth::new(privkey);
+            println!(
+                "staker{} ckb addres: {}, eth address: {}",
+                i,
+                omni_eth.ckb_address().unwrap(),
+                omni_eth.address().unwrap(),
+            );
+        }
+
+        for (i, delegator_privkey) in priv_keys.delegator_privkeys.into_iter().enumerate() {
+            let privkey = delegator_privkey.clone().into_h256().unwrap();
+            let omni_eth = OmniEth::new(privkey);
+            println!(
+                "delegator{} ckb addres: {}, eth address: {}",
+                i,
+                omni_eth.ckb_address().unwrap(),
+                omni_eth.address().unwrap(),
+            );
+        }
     }
 }
 

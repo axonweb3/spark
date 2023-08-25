@@ -19,22 +19,14 @@ pub async fn run_init_tx(
     stakers_key: Vec<H256>,
     quorum: u16,
 ) {
-    let omni_eth = OmniEth::new(seeder_key.clone());
-    println!("seeder ckb addres: {}\n", omni_eth.ckb_address().unwrap());
-
     let mut stakers = HashSet::new();
     let mut staker_privkeys = vec![];
     let mut propose_count = vec![];
 
-    for (i, staker_privkey) in stakers_key.into_iter().enumerate() {
+    for staker_privkey in stakers_key {
         staker_privkeys.push(staker_privkey.clone());
 
         let omni_eth = OmniEth::new(staker_privkey);
-        println!(
-            "staker{} ckb addres: {}",
-            i,
-            omni_eth.ckb_address().unwrap()
-        );
         stakers.insert(omni_eth.address().unwrap());
 
         propose_count.push(ProposeCount {
