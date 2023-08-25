@@ -10,12 +10,6 @@ use crate::MAX_TRY;
 pub async fn run_faucet_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let seeder_key = priv_keys.seeder_privkey.into_h256().unwrap();
 
-    let omni_eth = OmniEth::new(seeder_key.clone());
-    println!(
-        "seeder omni eth ckb addres: {}\n",
-        omni_eth.ckb_address().unwrap()
-    );
-
     let mut users = HashMap::new();
 
     for (i, staker_privkey) in priv_keys.staker_privkeys.into_iter().enumerate() {

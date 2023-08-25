@@ -27,6 +27,15 @@ delegator_privkeys = [
 ]
 ```
 
+# Faucet
+
+View users' addresses.
+```
+cargo run -- users -n test --address
+```
+
+Use users' ckb addresses to claim tokens from the [faucet](https://faucet.nervos.org).
+
 # Run
 
 ## Run cases
