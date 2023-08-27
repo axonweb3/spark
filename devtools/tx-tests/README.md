@@ -38,7 +38,9 @@ Use users' ckb addresses to claim tokens from the [faucet](https://faucet.nervos
 
 # Run
 
-## Run cases
+## Run integration tests
+
+The following tests can be found under folder `devtools/tx-tests/src/cases`.
 
 ```
 cd spark/devtools/tx-tests
@@ -53,11 +55,14 @@ cargo run -- cases -n test --reward
 cargo run -- cases -n test --metadata
 ```
 
-## Run tx
+## Debug tx
+
+The following commands are commonly used for debugging single tx under folder `devtools/tx-tests/src/tx`.
+
 ```
 cd spark/devtools/tx-tests
 
-cargo run -- tx -n test -f  // faucet (only used on the dev chain)
+cargo run -- tx -n dev -f   // faucet (only used on the dev chain)
 
 cargo run -- tx -n test -i  // init tx
 
