@@ -232,6 +232,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                             outputs_data.last().unwrap().len(),
                         )?)?,
                 );
+            } else {
+                log::info!(
+                    "[stake smt] staker: {}, new total stake amount: {}",
+                    staker.to_string(),
+                    new_total_stake_amount,
+                );
             }
 
             let inner_stake_data = old_stake_data.lock();
