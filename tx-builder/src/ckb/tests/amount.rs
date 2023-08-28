@@ -141,7 +141,7 @@ mod add_amount {
 
         assert_eq!(actual_info.wallet_amount, 0);
         assert_eq!(actual_info.total_amount, 2);
-        assert_eq!(actual_info.amount, 2);
+        assert_eq!(actual_info.amount, 3);
         assert!(actual_info.is_increase);
 
         let wallet_amount = 1;
@@ -171,7 +171,7 @@ mod add_amount {
 
         assert_eq!(actual_info.wallet_amount, 2);
         assert_eq!(actual_info.total_amount, 0);
-        assert_eq!(actual_info.amount, 0);
+        assert_eq!(actual_info.amount, 1);
 
         let total_amount = 0;
         let actual_info = calc_actual_info(wallet_amount, total_amount, &last_info, &new_info);

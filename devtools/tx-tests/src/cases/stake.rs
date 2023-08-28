@@ -99,14 +99,12 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
 
-    println!("-------The remaining tests did not pass-------");
-
     // staker: +15
     println!(
         "\nWhen adding stake, there are expired records of adding stake with a smaller amount"
     );
     add_stake_tx(ckb, staker_key.clone(), 15, 2).await.unwrap();
-    // wallet: 395, stake: 105, delta: +5
+    // wallet: 395, stake: 105, delta: +15
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
@@ -114,11 +112,11 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // staker: +1
     println!("\nWhen adding stake, there are expired adding stake with a larger amount");
     add_stake_tx(ckb, staker_key.clone(), 1, 3).await.unwrap();
-    // wallet: 389, stake: 111, delta: 0
+    // wallet: 409, stake: 91, delta: 1
 
     // staker: +10
     add_stake_tx(ckb, staker_key.clone(), 10, 3).await.unwrap();
-    // wallet: 379, stake: 121, delta: +10
+    // wallet: 399, stake: 101, delta: +11
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
@@ -130,21 +128,21 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     redeem_stake_tx(ckb, staker_key.clone(), 15, 4)
         .await
         .unwrap();
-    // wallet: 389, stake: 111, delta: -5
+    // wallet: 410, stake: 90, delta: -4
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 5).await;
 
     // staker: -1
     println!("\nWhen redeeming stake, there are pending records of redeeming stake");
-    redeem_stake_tx(ckb, staker_key.clone(), 1, 4)
+    redeem_stake_tx(ckb, staker_key.clone(), 1, 5)
         .await
         .unwrap();
-    // wallet: 389, stake: 111, delta: -1
+    // wallet: 410, stake: 90, delta: -1
 
     // staker: +11
-    add_stake_tx(ckb, staker_key.clone(), 11, 3).await.unwrap();
-    // wallet: 379, stake: 121, delta: +10
+    add_stake_tx(ckb, staker_key.clone(), 11, 5).await.unwrap();
+    // wallet: 400, stake: 100, delta: +10
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 6).await;
@@ -153,8 +151,8 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     println!(
         "\nWhen redeeming stake, there are pending records of adding stake with a larger amount"
     );
-    redeem_stake_tx(ckb, staker_key.clone(), 1, 4)
+    redeem_stake_tx(ckb, staker_key.clone(), 1, 6)
         .await
         .unwrap();
-    // wallet: 389,  stake: 111, delta: 0
+    // wallet: 410,  stake: 90, delta: 0
 }

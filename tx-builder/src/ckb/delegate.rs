@@ -568,7 +568,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateTxBuilder<'a, C, D> {
                         new_delegate.staker.clone(),
                         self.delegator.clone(),
                         new_delegate.amount,
-                        smt_amount,
+                        last_delegate.amount + smt_amount,
                     ));
                 }
             } else if new_delegate.amount + last_delegate.amount > smt_amount {

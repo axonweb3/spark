@@ -113,9 +113,9 @@ impl<'a> ElectAmountCalculator<'a> {
             total_elect_amount += new_amount;
         } else if self.last_info.has_expired {
             if self.last_info.is_increase {
+                actual_amount = new_amount;
                 if new_amount >= self.last_info.amount {
-                    actual_amount = new_amount - self.last_info.amount;
-                    let diff_amount = actual_amount;
+                    let diff_amount = new_amount - self.last_info.amount;
                     if wallet_amount < diff_amount {
                         return Err(CkbTxErr::ExceedWalletAmount(
                             self.wallet_amount,
@@ -125,7 +125,6 @@ impl<'a> ElectAmountCalculator<'a> {
                     wallet_amount -= diff_amount;
                     total_elect_amount += diff_amount;
                 } else {
-                    actual_amount = 0;
                     let diff_amount = self.last_info.amount - new_amount;
                     if total_elect_amount < diff_amount {
                         return Err(CkbTxErr::ExceedTotalAmount {
