@@ -28,14 +28,14 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let (stakers_key, stakers) = gen_users(priv_keys.staker_privkeys.clone());
     let (delegators_key, _) = gen_users(priv_keys.delegator_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
+    let stakers_key = vec![stakers_key[0].clone(), stakers_key[1].clone()];
+    let delegators_key = vec![delegators_key[0].clone(), delegators_key[1].clone()];
 
     run_init_tx(ckb, seeder_key, stakers_key.clone(), 10).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
 
     first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
     first_stake_tx(ckb, stakers_key[1].clone(), 100).await;
-
-    let stakers = vec![stakers[0].clone(), stakers[1].clone()];
 
     // delegator1: (staker1, +10), (staker2, +10)
     first_delegate_tx(ckb, delegators_key[0].clone(), &stakers, 10)
@@ -46,8 +46,6 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     first_delegate_tx(ckb, delegators_key[1].clone(), &stakers, 20)
         .await
         .unwrap();
-
-    let delegators_key = vec![delegators_key[0].clone(), delegators_key[1].clone()];
 
     println!("\nThe removed delegator1 is not in the staker1's delegate smt");
     println!("The removed delegator1 is not in the staker2's delegate smt");

@@ -28,6 +28,11 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let (stakers_key, stakers) = gen_users(priv_keys.staker_privkeys.clone());
     let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
     let kicker_key = stakers_key[0].clone();
+    let stakers_key = vec![stakers_key[0].clone(), stakers_key[1].clone()];
+    let staker3 = stakers[2].clone();
+    let staker = stakers[0].clone();
+    let stakers = vec![stakers[0].clone(), stakers[1].clone()];
+    let delegators_key = vec![delegator_key.clone()];
 
     for key in stakers_key.iter() {
         if key == &delegator_key {
@@ -42,7 +47,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     first_stake_tx(ckb, stakers_key[1].clone(), 100).await;
 
     // delegator: (staker1, +100)
-    first_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone())
+    first_delegate_tx(ckb, delegator_key.clone(), staker.clone())
         .await
         .unwrap();
     // wallet: 400, delegate: 100, delta: +100
@@ -58,65 +63,60 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     println!(
         "\nThe first staker exists in the delegate AT cell, while the second staker does not exist"
     );
-    add_delegates(
-        ckb,
-        delegator_key.clone(),
-        vec![stakers[0].clone(), stakers[1].clone()],
-        10,
-    )
-    .await
-    .unwrap();
+    add_delegates(ckb, delegator_key.clone(), stakers.clone(), 10)
+        .await
+        .unwrap();
     // wallet: 380, delegate: 120, delta: (staker1, +110), (staker2, +10)
 
     // delegator: (staker1, -10)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a larger amount");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 0)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 0)
         .await
         .unwrap();
     // wallet: 390, delegate: 110, delta: (staker1, +100), (staker2, +10)
 
     println!("\nRedeem from a staker who has never been delegated");
     assert!(
-        redeem_delegate_tx(ckb, delegator_key.clone(), stakers[3].clone(), 10, 0)
+        redeem_delegate_tx(ckb, delegator_key.clone(), staker3, 10, 0)
             .await
             .is_err()
     );
 
     println!("\nClear all pending records");
-    delegate_smt_tx(ckb, kicker_key.clone(), vec![delegator_key.clone()], 0).await;
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
     // wallet: 390, delegate: 110, delta: none
 
     // delegator: (staker1, -10)
     println!("\nRedeem from a staker who has been delegated");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 0)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 0)
         .await
         .unwrap();
     // wallet: 390, delegate: 110, delta: (staker1, -10)
 
     // delegator: (staker1, -10)
     println!("\nWhen redeeming delegation, there are pending records of redeeming delegation");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 0)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 0)
         .await
         .unwrap();
     // wallet: 390, delegate: 110, delta: (staker1, -20)
 
     // delegator: (staker1, +10)
     println!("\nWhen adding delegation, there are pending records of redeeming delegation with a larger amount");
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 0)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 0)
         .await
         .unwrap();
     // wallet: 390, delegate: 110, delta: (staker1, -10)
 
     // delegator: (staker1, +15)
     println!("\nWhen adding delegation, there are pending records of redeeming delegation with a smaller amount");
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 15, 0)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 0)
         .await
         .unwrap();
     // wallet: 385, delegate: 115, delta: (staker1, +5)
 
     // delegator: (staker1, -15)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a smaller amount");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 15, 0)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 0)
         .await
         .unwrap();
     // wallet: 390, delegate: 110, delta: (staker1, -10)
@@ -126,7 +126,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, +10)
     println!("\nWhen adding delegation, there are expired records of redeeming delegation");
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 1)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 1)
         .await
         .unwrap();
     // wallet: 380, delegate: 120, delta: (staker1, +10)
@@ -138,7 +138,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, +15)
     println!("\nWhen adding delegation, there are expired records of adding delegation with a smaller amount");
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 15, 2)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 2)
         .await
         .unwrap();
     // wallet: 375, delegate: 125, delta: (staker1, +5)
@@ -148,13 +148,13 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, +1)
     println!("\nWhen adding delegation, there are expired adding delegation with a larger amount");
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 1, 3)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 3)
         .await
         .unwrap();
     // wallet: 389, delegate: 111, delta: (staker1, 0)
 
     // delegator: (staker1, +10)
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 10, 3)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 3)
         .await
         .unwrap();
     // wallet: 379, delegate: 121, delta: (staker1, +10)
@@ -164,7 +164,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, -15)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a smaller amount");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 15, 4)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 4)
         .await
         .unwrap();
     // wallet: 389, delegate: 111, delta: (staker1, -5)
@@ -174,13 +174,13 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, -1)
     println!("\nWhen redeeming delegation, there are pending records of redeeming delegation");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 1, 4)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 4)
         .await
         .unwrap();
     // wallet: 389, delegate: 111, delta: (staker1, -1)
 
     // delegator: (staker1, +11)
-    add_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 11, 3)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 11, 3)
         .await
         .unwrap();
     // wallet: 379, delegate: 121, delta: (staker1, +10)
@@ -190,7 +190,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // delegator: (staker1, -1)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a larger amount");
-    redeem_delegate_tx(ckb, delegator_key.clone(), stakers[0].clone(), 1, 4)
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 4)
         .await
         .unwrap();
     // wallet: 389,  delegate: 111, delta: (staker1, 0)

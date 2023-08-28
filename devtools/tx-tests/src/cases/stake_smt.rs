@@ -20,6 +20,12 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let (stakers_key, _) = gen_users(priv_keys.staker_privkeys.clone());
     let kicker_key = stakers_key[0].clone();
+    let stakers_key = vec![
+        stakers_key[0].clone(),
+        stakers_key[1].clone(),
+        stakers_key[2].clone(),
+        stakers_key[3].clone(),
+    ];
 
     run_init_tx(ckb, seeder_key, stakers_key.clone(), 1).await;
     run_mint_tx(ckb, priv_keys.clone()).await;
@@ -32,13 +38,6 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     first_stake_tx(ckb, stakers_key[2].clone(), 30).await;
     // staker4: 40
     first_stake_tx(ckb, stakers_key[3].clone(), 40).await;
-
-    let stakers_key = vec![
-        stakers_key[0].clone(),
-        stakers_key[1].clone(),
-        stakers_key[2].clone(),
-        stakers_key[3].clone(),
-    ];
 
     println!("\nThe removed staker1 is not in the stake smt");
     stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
@@ -71,6 +70,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
 
     // new epoch
+    run_metadata_tx(ckb, kicker_key.clone()).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // staker2: +35
