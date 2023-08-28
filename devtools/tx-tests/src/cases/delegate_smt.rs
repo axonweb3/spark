@@ -89,7 +89,6 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
 
     // new epoch
-    run_metadata_tx(ckb, kicker_key.clone()).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // delegator1: (staker1, +40)
