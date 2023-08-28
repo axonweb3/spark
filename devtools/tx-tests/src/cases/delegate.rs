@@ -1,10 +1,14 @@
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
-use ckb_types::H256;
+use ckb_types::{H160, H256};
+use common::traits::smt::DelegateSmtStorage;
+use common::types::smt::UserAmount;
 use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
 use crate::helper::user::gen_users;
@@ -26,7 +30,9 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let (stakers_key, stakers) = gen_users(priv_keys.staker_privkeys.clone());
-    let delegator_key = priv_keys.delegator_privkeys[0].clone().into_h256().unwrap();
+    let (delegators_key, delegators) = gen_users(priv_keys.delegator_privkeys.clone());
+    let delegator_key = delegators_key[0].clone();
+    let delegator = delegators[0].clone();
     let kicker_key = stakers_key[0].clone();
     let stakers_key = vec![stakers_key[0].clone(), stakers_key[1].clone()];
     let staker3 = stakers[2].clone();
@@ -134,14 +140,12 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
 
-    println!("-------The remaining tests did not pass-------");
-
     // delegator: (staker1, +15)
     println!("\nWhen adding delegation, there are expired records of adding delegation with a smaller amount");
     add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 2)
         .await
         .unwrap();
-    // wallet: 375, delegate: 125, delta: (staker1, +5)
+    // wallet: 375, delegate: 125, delta: (staker1, +15)
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
@@ -151,49 +155,64 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 3)
         .await
         .unwrap();
-    // wallet: 389, delegate: 111, delta: (staker1, 0)
+    // wallet: 389, delegate: 111, delta: (staker1, +1)
 
     // delegator: (staker1, +10)
     add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 10, 3)
         .await
         .unwrap();
-    // wallet: 379, delegate: 121, delta: (staker1, +10)
+    // wallet: 379, delegate: 121, delta: (staker1, +11)
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
 
     // delegator: (staker1, -15)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a smaller amount");
+    mock_delegate_smt(6, &staker, &delegator).await;
     redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 15, 4)
         .await
         .unwrap();
-    // wallet: 389, delegate: 111, delta: (staker1, -5)
+    // wallet: 390, delegate: 110, delta: (staker1, -4)
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 5).await;
 
     // delegator: (staker1, -1)
     println!("\nWhen redeeming delegation, there are pending records of redeeming delegation");
-    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 4)
+    mock_delegate_smt(7, &staker, &delegator).await;
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 5)
         .await
         .unwrap();
-    // wallet: 389, delegate: 111, delta: (staker1, -1)
+    // wallet: 390, delegate: 110, delta: (staker1, -1)
 
     // delegator: (staker1, +11)
-    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 11, 3)
+    add_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 11, 5)
         .await
         .unwrap();
-    // wallet: 379, delegate: 121, delta: (staker1, +10)
+    // wallet: 380, delegate: 120, delta: (staker1, +11)
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 6).await;
 
     // delegator: (staker1, -1)
     println!("\nWhen redeeming delegation, there are pending records of adding delegation with a larger amount");
-    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 4)
+    mock_delegate_smt(8, &staker, &delegator).await;
+    redeem_delegate_tx(ckb, delegator_key.clone(), staker.clone(), 1, 6)
         .await
         .unwrap();
-    // wallet: 389,  delegate: 111, delta: (staker1, 0)
+    // wallet: 390,  delegate: 110, delta: (staker1, 0)
+}
+
+async fn mock_delegate_smt(epoch: u64, staker: &H160, delegator: &H160) {
+    let path = PathBuf::from(ROCKSDB_PATH);
+    let smt = SmtManager::new(path);
+    DelegateSmtStorage::insert(&smt, epoch, staker.0.into(), vec![UserAmount {
+        user:        delegator.0.into(),
+        amount:      100,
+        is_increase: true,
+    }])
+    .await
+    .unwrap();
 }
 
 async fn add_delegates(

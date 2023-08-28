@@ -55,7 +55,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .await
         .unwrap();
 
-    println!("-------The remaining tests did not pass-------");
+    println!("-------The remaining tests did not pass: 41-------");
 
     println!("The removed staker2 is in the stake smt");
     println!("There is a pending record of redeeming stake in the staker2's stake cell");

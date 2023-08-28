@@ -58,6 +58,8 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .await
         .unwrap();
 
+    println!("-------The remaining tests did not pass: 117-------");
+
     println!("\nThe removed delegator2 is in the staker1's delegate smt");
     println!("The removed delegator2 is in the staker2's delegate smt");
     println!("The delegator2's refunded amount should be added up to 40");
@@ -74,8 +76,6 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     add_delegate_tx(ckb, delegators_key[1].clone(), stakers[0].clone(), 25, 0)
         .await
         .unwrap();
-
-    println!("-------The remaining tests did not pass-------");
 
     println!("\nThe removed delegator1 is in the staker1's delegate smt");
     println!("There is a pending record of redeeming delegation in the delegator1's delegate cell");
