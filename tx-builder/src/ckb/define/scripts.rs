@@ -300,7 +300,7 @@ lazy_static::lazy_static! {
     pub static ref DELEGATE_SMT_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0xc3be385ece4c7dfc742087cd79547a988d4f4bfa9ceabaf1276a65d1d4446d3a"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xced09fc26da25df0efcae7ebf1e4970e0c3b648625ce16c7c835830c119ca499"),
+        tx_hash: h256!("0xfa86c6da736122b481cc9d4f25afc9aa6f0bc368a124122c0afc5229fcd13bd9"),
         index: 0,
         dep_type: DepType::Code,
     };

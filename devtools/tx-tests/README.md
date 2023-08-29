@@ -4,17 +4,17 @@ Create file `devtools/tx-tests/src/config/type_ids.toml`
 ```
 touch devtools/tx-tests/src/config/type_ids.toml
 ```
-You can fill type_ids.toml by running `cargo run -- tx -n test -i`.  
+This fill will be automatically filled in when running integration tests. You can also fill it by running `cargo run -- tx -n test -i` after claiming CKB from the faucet as described in the next chapter.
 
-This file stores the type ids of config cells which every Axon-Based chain needs.  
-For example, every Axon-Based chain needs a selection cell to control the issue of ATs. selection_type_id is the type id of selection cell.
+`type_ids.toml` stores the type ids of config cells which every Axon-Based chain needs.
+For example, every Axon-Based chain needs a selection cell to control the issue of ATs. And the `selection_type_id` is the type id of selection cell.
 
 Create file `devtools/tx-tests/src/config/priv_keys.toml`
 ```
 touch devtools/tx-tests/src/config/priv_keys.toml
 ```
 
-Then fill priv_keys.toml as follows.
+Then fill `priv_keys.toml` as follows.
 ```
 seeder_privkey = "0x111111b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60"
 
@@ -38,7 +38,7 @@ View users' addresses.
 cargo run -- users -n test --address
 ```
 
-Use users' ckb addresses to claim tokens from the [faucet](https://faucet.nervos.org).
+Then use users' ckb addresses to claim tokens from the [faucet](https://faucet.nervos.org).
 
 # Run
 
@@ -61,7 +61,7 @@ cargo run -- cases -n test --metadata
 
 ## Debug tx
 
-The following commands are commonly used for debugging single tx under folder `devtools/tx-tests/src/tx`.
+The following commands are commonly used for debugging single tx located in folder `devtools/tx-tests/src/tx`.
 
 ```
 cd devtools/tx-tests
