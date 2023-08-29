@@ -37,12 +37,12 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     first_stake_tx(ckb, stakers_key[0].clone(), 100).await;
     first_stake_tx(ckb, stakers_key[1].clone(), 100).await;
 
-    // delegator1: (staker1, +10), (staker2, +10)
+    // delegator1: (staker1, +10), (staker2, +10), 20
     first_delegate_tx(ckb, delegators_key[0].clone(), &stakers, 10)
         .await
         .unwrap();
 
-    // delegator2: (staker1, +20), (staker2, +20)
+    // delegator2: (staker1, +20), (staker2, +20), 40
     first_delegate_tx(ckb, delegators_key[1].clone(), &stakers, 20)
         .await
         .unwrap();
@@ -50,29 +50,29 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     println!("\nThe removed delegator1 is not in the staker1's delegate smt");
     println!("The removed delegator1 is not in the staker2's delegate smt");
     delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
-    // staker1: (delegator2, 20)
-    // staker2: (delegator2, 20)
+    // delegate-staker1 smt: (delegator2, 20)
+    // delegate-staker2 smt: (delegator2, 20)
 
-    // delegator1: (staker1, +30) (staker2, +30)
+    // delegator1: (staker1, +30) (staker2, +30), 20 + 60 = 80
     add_delegates_tx(ckb, delegators_key[0].clone(), &stakers)
         .await
         .unwrap();
-
-    println!("-------The remaining tests did not pass: 117-------");
 
     println!("\nThe removed delegator2 is in the staker1's delegate smt");
     println!("The removed delegator2 is in the staker2's delegate smt");
     println!("The delegator2's refunded amount should be added up to 40");
     delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
-    // staker1: (delegator1, 30)
-    // staker2: (delegator1, 30)
+    // delegate-staker1 smt: (delegator1, 30)
+    // delegate-staker2 smt: (delegator1, 30)
+    // delegator1 cell: 80
+    // delegator2 cell: 40 - 40 = 0
 
-    // delegator1: (staker1, -10)
+    // delegator1: (staker1, -10), 80
     redeem_delegate_tx(ckb, delegators_key[0].clone(), stakers[0].clone(), 10, 0)
         .await
         .unwrap();
 
-    // delegator2: (staker1, +25)
+    // delegator2: (staker1, +25), 25
     add_delegate_tx(ckb, delegators_key[1].clone(), stakers[0].clone(), 25, 0)
         .await
         .unwrap();
@@ -80,10 +80,12 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     println!("\nThe removed delegator1 is in the staker1's delegate smt");
     println!("There is a pending record of redeeming delegation in the delegator1's delegate cell");
     delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
-    // staker1: (delegator2, 25)
-    // staker2: (delegator1, 30)
+    // delegate-staker1 smt: (delegator2, 25)
+    // delegate-staker2 smt: (delegator1, 30)
+    // delegator1 cell: 80 - 30 = 50
+    // delegator2 cell: 25
 
-    // delegator2: (staker1, +5)
+    // delegator2: (staker1, +5), 30
     add_delegate_tx(ckb, delegators_key[1].clone(), stakers[0].clone(), 5, 0)
         .await
         .unwrap();
@@ -91,16 +93,18 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // new epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
-    // delegator1: (staker1, +40)
+    // delegator1: (staker1, +40), 90
     add_delegate_tx(ckb, delegators_key[0].clone(), stakers[0].clone(), 40, 1)
         .await
         .unwrap();
 
     println!("\nThe removed delegator2 is in the staker1's delegate smt");
     println!("There is a expired record in the delegator2's delegate cell");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
-    // staker1: (delegator2, 40)
-    // staker2: (delegator1, 30)
+    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 1).await;
+    // delegate-staker1 smt: (delegator1, 40)
+    // delegate-staker2 smt: (delegator1, 30)
+    // delegator1 cell: 90
+    // delegator2 cell: 25
 }
 
 async fn first_delegate_tx(

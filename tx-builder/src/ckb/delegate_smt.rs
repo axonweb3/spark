@@ -289,6 +289,14 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 .delegate_smt_storage
                 .get_sub_leaves(self.current_epoch + INAUGURATION, staker.0.into())
                 .await?;
+            for (user, amount) in old_smt.iter() {
+                log::info!(
+                    "[delegate smt] old smt, staker: {}, delegator: {}, amount: {}",
+                    staker.to_string(),
+                    user.to_string(),
+                    amount
+                );
+            }
 
             let mut new_smt = old_smt.clone();
 
@@ -303,6 +311,15 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
             )
             .await?;
 
+            for (user, amount) in new_smt.iter() {
+                log::info!(
+                    "[delegate smt] new smt, staker: {}, delegator: {}, amount: {}",
+                    staker.to_string(),
+                    user.to_string(),
+                    amount
+                );
+            }
+
             // get the old epoch proof for witness
             let old_epoch_proof = self
                 .delegate_smt_storage
@@ -311,8 +328,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
 
             new_roots.insert(
                 staker.clone(),
-                self.update_delegate_smt(staker.clone(), new_smt.clone())
-                    .await?,
+                self.update_delegate_smt(staker.clone(), new_smt).await?,
             );
 
             // get the new epoch proof for witness
@@ -357,8 +373,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     .as_bytes(),
             )?;
 
-            log::info!("[delegate smt] delegator: {}", delegator.to_string());
-
             let mut cell_bytes = cell.output_data.clone().unwrap().into_bytes();
             let delegate = DelegateAtCellData::new_unchecked(cell_bytes.split_off(TOKEN_BYTES));
             let delegate_infos = delegate.lock().delegator_infos();
@@ -370,6 +384,11 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                     expired = true;
                     break;
                 } else {
+                    log::info!(
+                        "[delegate smt] delegator: {}, delta: {:?}",
+                        delegator.to_string(),
+                        item
+                    );
                     delegates
                         .entry(item.staker.clone())
                         .and_modify(|e: &mut HashMap<ckb_types::H160, DelegateItem>| {
@@ -480,6 +499,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 log::info!("[delegate smt] in delegate smt");
 
                 in_smt = true;
+                let smt_amount = *old_smt.get(delegator).unwrap();
 
                 withdraw_amounts
                     .entry(tx_delegator.clone())
@@ -487,7 +507,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                         e.insert(staker.clone(), *amount);
                     })
                     .or_insert_with(HashMap::new)
-                    .insert(staker.clone(), *amount);
+                    .insert(staker.clone(), smt_amount);
 
                 if !self.inputs_delegate_cells.contains_key(&tx_delegator) {
                     let cell = Delegate::get_cell(
@@ -519,16 +539,12 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         staker: Staker,
         new_smt: HashMap<SmtDelegator, Amount>,
     ) -> Result<StakerSmtRoot> {
-        log::info!("[delegate smt] staker: {}, new smt: ", staker.to_string());
         let new_delegators = new_smt
             .into_iter()
-            .map(|(k, v)| {
-                log::info!("[delegate smt] delegator: {}, amount: {}", k.to_string(), v);
-                UserAmount {
-                    user:        k,
-                    amount:      v,
-                    is_increase: true,
-                }
+            .map(|(k, v)| UserAmount {
+                user:        k,
+                amount:      v,
+                is_increase: true,
             })
             .collect();
 
