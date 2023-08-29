@@ -123,7 +123,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // staker: -15
     println!(
-        "\nWhen redeeming stake, there are pending records of adding stake with a smaller amount"
+        "\nWhen redeeming stake, there are pending stale records of adding stake with a smaller amount"
     );
     redeem_stake_tx(ckb, staker_key.clone(), 15, 4)
         .await
