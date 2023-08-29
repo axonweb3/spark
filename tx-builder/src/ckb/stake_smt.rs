@@ -278,6 +278,13 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .stake_smt_storage
             .get_sub_leaves(self.current_epoch + INAUGURATION)
             .await?;
+        for (user, amount) in old_smt.iter() {
+            log::info!(
+                "[stake smt] old smt, user: {}, amount: {}",
+                user.to_string(),
+                amount
+            );
+        }
 
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
