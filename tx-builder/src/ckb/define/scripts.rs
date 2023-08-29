@@ -229,7 +229,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_SMT_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0x5844f7c21dae12d096deaf07a346bd611211658b17ebd63230c44830d7348e45"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x72cc68562fadcde1ce1dbf0f049dd3c071f6273eea94280e54c2b888e7d78948"),
+        tx_hash: h256!("0xef9501d0087e381a309a97f53759dfe0340f2fdc217a0be1af8d95186a1db8a5"),
         index: 0,
         dep_type: DepType::Code,
     };

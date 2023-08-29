@@ -24,6 +24,7 @@ use common::types::tx_builder::{
     Amount, Epoch, InStakeSmt, NonTopStakers, PrivateKey, StakeItem, StakeSmtTypeIds,
     Staker as TxStaker,
 };
+use common::utils::convert::{to_u128, to_u64};
 
 use crate::ckb::define::{constants::INAUGURATION, error::CkbTxErr, types::StakeInfo};
 use crate::ckb::helper::{
@@ -187,9 +188,13 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
 
             let (old_total_stake_amount, old_stake_data) = Stake::parse_stake_data(stake_cell);
             log::info!(
-                "[stake smt] staker: {}, old total stake amount: {}",
-                staker.to_string(),
+                "[stake smt] l2 address: {:?}, old total stake amount: {}, \
+                old delta: [amount: {}, is increase: {}, inauguration epoch: {}]",
+                old_stake_data.lock().l2_address(),
                 old_total_stake_amount,
+                to_u128(&old_stake_data.lock().delta().amount()),
+                old_stake_data.lock().delta().is_increase().as_slice()[0],
+                to_u64(&old_stake_data.lock().delta().inauguration_epoch()),
             );
 
             let withdraw_lock = Withdraw::lock(&self.type_ids.metadata_type_id, staker);
@@ -232,6 +237,12 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
                             outputs_data.last().unwrap().len(),
                         )?)?,
                 );
+            } else {
+                log::info!(
+                    "[stake smt] staker: {}, new total stake amount: {}",
+                    staker.to_string(),
+                    new_total_stake_amount,
+                );
             }
 
             let inner_stake_data = old_stake_data.lock();
@@ -267,6 +278,13 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> StakeSmtTxBuilder<'a, C, S
             .stake_smt_storage
             .get_sub_leaves(self.current_epoch + INAUGURATION)
             .await?;
+        for (user, amount) in old_smt.iter() {
+            log::info!(
+                "[stake smt] old smt, user: {}, amount: {}",
+                user.to_string(),
+                amount
+            );
+        }
 
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
 
