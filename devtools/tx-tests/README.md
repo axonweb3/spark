@@ -4,13 +4,17 @@ Create file `devtools/tx-tests/src/config/type_ids.toml`
 ```
 touch devtools/tx-tests/src/config/type_ids.toml
 ```
+You can fill type_ids.toml by running `cargo run -- tx -n test -i`.  
+
+This file stores the type ids of config cells which every Axon-Based chain needs.  
+For example, every Axon-Based chain needs a selection cell to control the issue of ATs. selection_type_id is the type id of selection cell.
 
 Create file `devtools/tx-tests/src/config/priv_keys.toml`
 ```
 touch devtools/tx-tests/src/config/priv_keys.toml
 ```
 
-Then fill the content as follows.
+Then fill priv_keys.toml as follows.
 ```
 seeder_privkey = "0x111111b054d5dd04013156dced8ba2ce4d8cc5973e10d905a228ea1abc267e60"
 
@@ -43,7 +47,7 @@ Use users' ckb addresses to claim tokens from the [faucet](https://faucet.nervos
 The following tests can be found under folder `devtools/tx-tests/src/cases`.
 
 ```
-cd spark/devtools/tx-tests
+cd devtools/tx-tests
 
 cargo run -- cases -n test --all
 cargo run -- cases -n test --stake
@@ -60,7 +64,7 @@ cargo run -- cases -n test --metadata
 The following commands are commonly used for debugging single tx under folder `devtools/tx-tests/src/tx`.
 
 ```
-cd spark/devtools/tx-tests
+cd devtools/tx-tests
 
 cargo run -- tx -n dev -f   // faucet (only used on the dev chain)
 
