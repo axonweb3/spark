@@ -116,7 +116,7 @@ async fn verify_proof(current_epoch: u64, tx: &TransactionView) {
             .await
             .unwrap();
         for (k, v) in leaves.iter() {
-            println!("stake smt leaves: {:?} {}", k, v);
+            println!("stake smt leaves: {:?} {}", k.0, v);
         }
 
         let kvs: Vec<(SH256, LeafValue)> = leaves
