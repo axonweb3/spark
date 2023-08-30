@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -11,14 +9,13 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
+use crate::helper::misc::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
 pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    if Path::new(ROCKSDB_PATH).exists() {
-        fs::remove_dir_all(ROCKSDB_PATH).unwrap();
-    }
+    remove_smt();
 
     if priv_keys.staker_privkeys.len() < 3 {
         panic!("At least 3 stakers are required");

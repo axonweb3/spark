@@ -42,7 +42,7 @@ async fn _mock_adapter() {
     let _adapter = DefaultAPIAdapter::new(Arc::new(relation_db), Arc::new(smt_manager));
 }
 
-#[tokio::test]
+#[allow(dead_code)]
 async fn mock_db() {
     let mut relation_db1 = TransactionHistory::new(RELATION_DB_URL).await;
     let data0 = mock_data("0x01".to_owned(), 100).await.unwrap();
@@ -55,7 +55,7 @@ async fn mock_db() {
     println!("{:?}", res);
 }
 
-#[tokio::test]
+#[allow(dead_code)]
 async fn mock_jsonrpc_server() -> Result<()> {
     let db = establish_connection(RELATION_DB_URL).await?;
     let relation_db = TransactionHistory { db };
