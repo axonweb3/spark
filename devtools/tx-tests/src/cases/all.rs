@@ -1,18 +1,13 @@
-use std::fs;
-use std::path::Path;
-
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::OmniEth;
 
 use crate::config::types::PrivKeys;
+use crate::helper::misc::remove_smt;
 use crate::tx::*;
-use crate::ROCKSDB_PATH;
 
 // There is only one staker or delegator.
 pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    if Path::new(ROCKSDB_PATH).exists() {
-        fs::remove_dir_all(ROCKSDB_PATH).unwrap();
-    }
+    remove_smt();
 
     let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
