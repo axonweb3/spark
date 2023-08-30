@@ -91,6 +91,15 @@ where
             self.last_checkpoint_data.epoch + INAUGURATION,
         )
         .await?;
+
+        for (staker, amount) in stakers.iter() {
+            log::info!(
+                "[metadata] old stake smt, staker: {}, amount: {}",
+                staker.to_string(),
+                amount
+            );
+        }
+
         let mut miner_groups = Vec::with_capacity(stakers.len());
 
         let quorum = HMetadata::parse_quorum(&self.last_metadata_cell_data);
@@ -112,12 +121,14 @@ where
                 )
                 .await?;
 
-                log::info!(
-                    "[metadata] staker: {}, amount: {}, delegators: {}",
-                    staker.to_string(),
-                    amount,
-                    delegaters.len()
-                );
+                for (delegator, amount) in delegaters.iter() {
+                    log::info!(
+                        "[metadata] old delegate smt, staker: {}, delegator: {}, amount: {}",
+                        staker.to_string(),
+                        delegator.to_string(),
+                        amount
+                    );
+                }
 
                 miner_groups.push(MinerGroupInfo {
                     staker: staker.0.into(),
@@ -251,7 +262,7 @@ where
         &self,
         context: &MetadataContext,
     ) -> Result<(Vec<DelegateProof>, DelegateSmtCellData)> {
-        let delegatets_remove_keys = context
+        let delegatets_remove_keys: Vec<(H160, H160)> = context
             .no_top_delegators
             .iter()
             .flat_map(|(d, i)| std::iter::repeat(*d).zip(i.keys().cloned()))
@@ -553,11 +564,9 @@ where
                             ))
                         }
                     };
-
                 *total_amount -= amount;
-
                 log::info!(
-                    "[metadata] none top delegator: {}, smt amount: {}, old total stake amount: {}, withdraw amount: {}",
+                    "[metadata] none top delegator: {}, smt amount: {}, new total delegate amount: {}, withdraw amount: {}",
                     addr.to_string(), amount, total_amount, amount,
                 );
             }

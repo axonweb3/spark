@@ -56,7 +56,7 @@ pub async fn run_init_tx(
             epoch0_metadata: Metadata {
                 epoch_len: 1,
                 period_len: 100,
-                quorum: 10,
+                quorum,
                 validators: mock_axon_validators_v2(&staker_privkeys),
                 ..Default::default()
             },
