@@ -10,6 +10,7 @@ edition = "2021"
 anyhow = "1.0"
 async-trait = "0.1"
 blake2b-rs = "0.2"
+ckb-types = "0.108"
 dashmap = "5.4"
 ethereum-types = { version = "0.14", features = ["arbitrary", "codec", "rlp", "serialize", "std"] }
 lazy_static = "1.4"

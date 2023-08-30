@@ -6,21 +6,17 @@ use ckb_types::prelude::Unpack;
 use ckb_types::{core::TransactionView, prelude::Pack, H256};
 use common::types::axon_types::stake::StakeSmtWitness;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
-use sparse_merkle_tree::{
-    blake2b::Blake2bHasher, default_store::DefaultStore, merkle_proof::CompiledMerkleProof,
-    traits::Value, SparseMerkleTree, H256 as SH256,
-};
 
 use common::traits::smt::StakeSmtStorage;
 use common::traits::tx_builder::IStakeSmtTxBuilder;
 use common::types::axon_types::stake::StakeSmtCellData;
-use common::types::smt::{LeafValue, SmtKeyEncode, SmtValueEncode};
 use common::types::tx_builder::StakeSmtTypeIds;
 use storage::SmtManager;
 use tx_builder::ckb::helper::{OmniEth, Stake, Tx, Xudt};
 use tx_builder::ckb::stake_smt::StakeSmtTxBuilder;
 
 use crate::config::parse_type_ids;
+use crate::helper::smt::{generate_smt_root, to_root, verify_proof};
 use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
 
 pub async fn stake_smt_tx(
@@ -70,7 +66,7 @@ pub async fn stake_smt_tx(
     .await
     .unwrap();
 
-    verify_proof(current_epoch, &tx).await;
+    verify_new_stake_smt(&tx, current_epoch).await;
 
     let mut tx = Tx::new(ckb, tx);
     match tx.send().await {
@@ -83,14 +79,12 @@ pub async fn stake_smt_tx(
     println!("stake smt tx committed");
 }
 
-async fn verify_proof(current_epoch: u64, tx: &TransactionView) {
-    println!("------------verify stake smt proof start-----------");
+async fn verify_new_stake_smt(tx: &TransactionView, current_epoch: u64) {
+    println!("------------verify new stake smt start-----------");
     let new_top_root = {
         let smt_data = tx.outputs_data().get(0).unwrap();
         let smt_data = StakeSmtCellData::new_unchecked(smt_data.unpack());
-        let mut new_root = [0u8; 32];
-        new_root.copy_from_slice(&smt_data.smt_root().as_bytes());
-        let new_root = SH256::from(new_root);
+        let new_root = to_root(&smt_data.smt_root().as_bytes());
         println!("new top root: {:?}", new_root);
         new_root
     };
@@ -119,44 +113,25 @@ async fn verify_proof(current_epoch: u64, tx: &TransactionView) {
             println!("stake smt leaves: {:?} {}", k.0, v);
         }
 
-        let kvs: Vec<(SH256, LeafValue)> = leaves
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    SmtKeyEncode::Address(k).to_h256(),
-                    SmtValueEncode::Amount(v).to_leaf_value(),
-                )
-            })
-            .collect();
-
-        type Smt = SparseMerkleTree<Blake2bHasher, LeafValue, DefaultStore<LeafValue>>;
-        let mut mem_smt = Smt::default();
-        mem_smt.update_all(kvs).expect("update");
-        println!("bottom root created from kv: {:?}", *mem_smt.root());
-        *mem_smt.root()
+        let root = generate_smt_root(leaves);
+        println!("bottom root created from kv: {:?}", root);
+        root
     };
 
-    let bottom_root_gotten = {
-        let bottom_root = StakeSmtStorage::get_sub_root(&smt, current_epoch + 2)
-            .await
-            .unwrap()
-            .unwrap();
-        println!("bottom root gotten from smt: {:?}", bottom_root);
-        bottom_root
-    };
+    let bottom_root_gotten = StakeSmtStorage::get_sub_root(&smt, current_epoch + 2)
+        .await
+        .unwrap()
+        .unwrap();
+    println!("bottom root gotten from smt: {:?}", bottom_root_gotten);
 
     assert_eq!(bottom_root_created, bottom_root_gotten);
 
-    let proof = CompiledMerkleProof(new_epoch_proof);
-    let leaves = vec![(
-        SmtKeyEncode::Epoch(current_epoch + 2).to_h256(),
-        SmtValueEncode::Root(bottom_root_created)
-            .to_leaf_value()
-            .to_h256(),
-    )];
-    let ok = proof
-        .verify::<Blake2bHasher>(&new_top_root, leaves)
-        .unwrap();
+    let ok = verify_proof(
+        new_top_root,
+        new_epoch_proof,
+        current_epoch + 2,
+        bottom_root_gotten,
+    );
     println!("verify result: {}", ok);
-    println!("------------verify stake smt proof end-----------");
+    println!("------------verify new stake smt end-----------");
 }

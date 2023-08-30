@@ -4149,6 +4149,7 @@ dependencies = [
  "async-trait",
  "blake2b-rs",
  "ckb-rocksdb",
+ "ckb-types",
  "common",
  "dashmap",
  "ethereum-types",

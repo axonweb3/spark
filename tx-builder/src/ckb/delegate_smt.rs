@@ -289,6 +289,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 .delegate_smt_storage
                 .get_sub_leaves(self.current_epoch + INAUGURATION, staker.0.into())
                 .await?;
+
             for (user, amount) in old_smt.iter() {
                 log::info!(
                     "[delegate smt] old smt, staker: {}, delegator: {}, amount: {}",
@@ -326,10 +327,8 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 .generate_top_proof(vec![self.current_epoch + INAUGURATION], staker.0.into())
                 .await?;
 
-            new_roots.insert(
-                staker.clone(),
-                self.update_delegate_smt(staker.clone(), new_smt).await?,
-            );
+            let new_root = self.update_delegate_smt(staker.clone(), new_smt).await?;
+            new_roots.insert(staker.clone(), new_root);
 
             // get the new epoch proof for witness
             let new_epoch_proof = self
@@ -342,7 +341,6 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
                 delegate_old_epoch_proof: old_epoch_proof,
                 delegate_new_epoch_proof: new_epoch_proof,
                 delegate_infos:           old_smt
-                    .clone()
                     .into_iter()
                     .map(|(addr, amount)| DelegateInfo {
                         delegator_addr: to_ckb_h160(&addr),
@@ -539,7 +537,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> DelegateSmtTxBuilder<'a, C, D> {
         staker: Staker,
         new_smt: HashMap<SmtDelegator, Amount>,
     ) -> Result<StakerSmtRoot> {
-        let new_delegators = new_smt
+        let new_delegators: Vec<UserAmount> = new_smt
             .into_iter()
             .map(|(k, v)| UserAmount {
                 user:        k,

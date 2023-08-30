@@ -321,8 +321,8 @@ where
             log::info!(
                 "[metadata] epoch: {}, new delegate smt root: {:?}, new delegate proof: {:?}",
                 self.last_checkpoint_data.epoch + INAUGURATION + 1,
-                delegate_new_epoch_proof,
                 delegator_staker_smt_roots.last().unwrap().root,
+                delegate_new_epoch_proof,
             );
         }
         let delegate_smt_cell_data = DelegateSmtCellData {

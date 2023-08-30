@@ -4,7 +4,7 @@ use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::misc::remove_smt;
+use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 

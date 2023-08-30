@@ -4,7 +4,7 @@ use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::misc::remove_smt;
+use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
@@ -63,7 +63,7 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // (staker3, 30): (delegator1, 10)
     // Remove staker1 and staker2 from the stake smt
     // The delegator1's refunded amount should be added up to 20
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
 }
 
 async fn first_delegates_tx(
