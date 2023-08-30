@@ -178,14 +178,14 @@ lazy_static::lazy_static! {
     pub static ref METADATA_TYPE_TESTNET: Script = Script {
         code_hash: h256!("0x2c8f63ac17c1e5e660dddbf49e88994cd1c49d4d6e99e7a7fd3f8879700d3cd1"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xd20b807a14f8c0fcd4e5558a697dd0806b034bd12b20da993c923f6a77dffbfa"),
+        tx_hash: h256!("0x1a5195e0be7c1b4effa45c19b4c31a6b98e3c31499034c6ba65d1dde18e14af6"),
         index: 0,
         dep_type: DepType::Code,
     };
     pub static ref METADATA_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0xfe4364f856739ba52f79bcb39dd0848267c87c46d4e82b168e21609b243a96bb"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xb06a16c773ab064bd629fd0db6c1a250018e071e4c986b427f87edf2ae5da343"),
+        tx_hash: h256!("0x7a4f603944e41825f475b43ef7943b0d44f68c0ea423ea5ecf05c22bb804bd1b"),
         index: 0,
         dep_type: DepType::Code,
     };
