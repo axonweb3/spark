@@ -178,7 +178,7 @@ lazy_static::lazy_static! {
     pub static ref METADATA_TYPE_TESTNET: Script = Script {
         code_hash: h256!("0x2c8f63ac17c1e5e660dddbf49e88994cd1c49d4d6e99e7a7fd3f8879700d3cd1"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x1a5195e0be7c1b4effa45c19b4c31a6b98e3c31499034c6ba65d1dde18e14af6"),
+        tx_hash: h256!("0x5cdb07735e0e1bf0a845945c580441cf7d85c8d00980a3cfa2b8040e18369cc8"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -224,8 +224,8 @@ lazy_static::lazy_static! {
     pub static ref STAKE_SMT_TYPE_TESTNET: Script = Script {
         code_hash: h256!("0x4b40fbfc384278eb1a8bcda34a08b37642d33d49a804e56185926ff6e779e01d"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x698078712359628eb7c33458aef917ab3a879f0a9a15eb8f08fef31eb07b98a9"),
-        index: 1,
+        tx_hash: h256!("0x884fdb2409323d8c660b1c7f85089a0ccd86ab18e11012fbee6582b49243d7b3"),
+        index: 0,
         dep_type: DepType::Code,
     };
     pub static ref STAKE_SMT_TYPE_DEVNET: Script = Script {
