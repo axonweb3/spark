@@ -185,7 +185,7 @@ lazy_static::lazy_static! {
     pub static ref METADATA_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0xfe4364f856739ba52f79bcb39dd0848267c87c46d4e82b168e21609b243a96bb"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0x7a4f603944e41825f475b43ef7943b0d44f68c0ea423ea5ecf05c22bb804bd1b"),
+        tx_hash: h256!("0x2c4386343a7cb3527499e2c81744e6b77942c8481820613c840c0f1313981aef"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -231,7 +231,7 @@ lazy_static::lazy_static! {
     pub static ref STAKE_SMT_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0x5844f7c21dae12d096deaf07a346bd611211658b17ebd63230c44830d7348e45"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xef9501d0087e381a309a97f53759dfe0340f2fdc217a0be1af8d95186a1db8a5"),
+        tx_hash: h256!("0xd10a08401dd9c479f9c6fd6c7bbfa1c195393051a55ea72db9f7ea8f1c97eb80"),
         index: 0,
         dep_type: DepType::Code,
     };
@@ -300,7 +300,7 @@ lazy_static::lazy_static! {
     pub static ref DELEGATE_SMT_TYPE_DEVNET: Script = Script {
         code_hash: h256!("0xc3be385ece4c7dfc742087cd79547a988d4f4bfa9ceabaf1276a65d1d4446d3a"),
         hash_type: ScriptHashType::Type,
-        tx_hash: h256!("0xfa86c6da736122b481cc9d4f25afc9aa6f0bc368a124122c0afc5229fcd13bd9"),
+        tx_hash: h256!("0xee786d36ae1682549954c16383ecc60b15eaffd851feb307f12282c2019a9040"),
         index: 0,
         dep_type: DepType::Code,
     };

@@ -329,7 +329,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_withdraw_tx(&ckb, user_key, 2).await;
     } else if metadata {
-        run_metadata_tx(&ckb, kicker_key).await;
+        run_metadata_tx(&ckb, kicker_key, 0).await;
     } else if reward {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_reward_tx(&ckb, user_key, 4).await.unwrap();

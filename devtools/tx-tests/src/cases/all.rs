@@ -2,7 +2,7 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use tx_builder::ckb::helper::OmniEth;
 
 use crate::config::types::PrivKeys;
-use crate::helper::misc::remove_smt;
+use crate::helper::smt::remove_smt;
 use crate::tx::*;
 
 // There is only one staker or delegator.
@@ -45,13 +45,13 @@ pub async fn run_all_tx(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
     delegate_smt_tx(ckb, kicker_key.clone(), vec![delegator_key.clone()], 0).await;
 
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 1).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 2).await;
 
     run_reward_tx(ckb, staker_key.clone(), 4).await.unwrap();
 

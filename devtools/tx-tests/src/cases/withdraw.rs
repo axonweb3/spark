@@ -1,7 +1,7 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::misc::remove_smt;
+use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
@@ -34,7 +34,7 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // Update withdraw cell: (amount: 10, unlock epoch: 2), (amount: 10, unlock
@@ -45,9 +45,9 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 1).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 2).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
 
     // Withdraw all
@@ -60,7 +60,7 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 3).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
 
     // Update withdraw cell: (amount: 10, unlock epoch: 5), (amount: 10, unlock
@@ -71,7 +71,7 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 4).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 5).await;
 
     // Update withdraw cell:

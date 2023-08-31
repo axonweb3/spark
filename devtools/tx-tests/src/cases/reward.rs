@@ -1,7 +1,7 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 
 use crate::config::types::PrivKeys;
-use crate::helper::misc::remove_smt;
+use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
@@ -41,13 +41,13 @@ pub async fn run_reward_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .unwrap();
     delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
 
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 1).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
-    run_metadata_tx(ckb, kicker_key.clone()).await;
+    run_metadata_tx(ckb, kicker_key.clone(), 2).await;
 
     println!("reward should failed");
     assert!(run_reward_tx(ckb, staker_key.clone(), 3).await.is_err());
