@@ -1,11 +1,15 @@
+use std::sync::{Arc, Mutex};
+
 use common::logger;
 use common::types::tx_builder::NetworkType;
 use config::types::PrivKeys;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 use tx_builder::ckb::helper::OmniEth;
 use tx_builder::set_network_type;
 
 use crate::config::{parse_log_config, parse_priv_keys};
+use crate::helper::smt::create_smt;
 use crate::tx::*;
 
 mod cases;
@@ -19,6 +23,10 @@ pub const TYPE_IDS_PATH: &str = "./src/config/type_ids.toml";
 pub const LOG_CONFIG_PATH: &str = "./src/config/log.toml";
 pub const ROCKSDB_PATH: &str = "./free-space/smt";
 pub const MAX_TRY: u64 = 1000;
+
+lazy_static::lazy_static! {
+    pub static ref SMT: Arc<Mutex<SmtManager>> = Arc::new(Mutex::new(SmtManager::new(ROCKSDB_PATH)));
+}
 
 #[tokio::main]
 async fn main() {
@@ -233,37 +241,38 @@ async fn run_test_cases(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let withdraw = matches.get_one::<bool>("withdraw").unwrap();
 
     let ckb = parse_ckb_net(net);
+    let smt = create_smt();
 
     if *all {
-        cases::all::run_all_tx(&ckb, priv_keys.clone()).await;
+        cases::all::run_all_tx(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *delegate {
-        cases::delegate::run_delegate_case(&ckb, priv_keys.clone()).await;
+        cases::delegate::run_delegate_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *delegate_smt {
-        cases::delegate_smt::run_delegate_smt_case(&ckb, priv_keys.clone()).await;
+        cases::delegate_smt::run_delegate_smt_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *stake {
-        cases::stake::run_stake_case(&ckb, priv_keys.clone()).await;
+        cases::stake::run_stake_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *stake_smt {
-        cases::stake_smt::run_stake_smt_case(&ckb, priv_keys.clone()).await;
+        cases::stake_smt::run_stake_smt_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *metadata {
-        cases::metadata::run_metadata_case(&ckb, priv_keys.clone()).await;
+        cases::metadata::run_metadata_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *reward {
-        cases::reward::run_reward_case(&ckb, priv_keys.clone()).await;
+        cases::reward::run_reward_case(&ckb, &smt, priv_keys.clone()).await;
     }
 
     if *withdraw {
-        cases::withdraw::run_withdraw_case(&ckb, priv_keys.clone()).await;
+        cases::withdraw::run_withdraw_case(&ckb, &smt, priv_keys.clone()).await;
     }
 }
 
@@ -282,6 +291,7 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     let reward = *matches.get_one::<bool>("reward").unwrap();
 
     let ckb = parse_ckb_net(net);
+    let smt = create_smt();
 
     let seeder_key = priv_keys.seeder_privkey.clone().into_h256().unwrap();
     let kicker_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
@@ -322,17 +332,17 @@ async fn run_single_tx(matches: &clap::ArgMatches, priv_keys: PrivKeys) {
     } else if checkpoint {
         run_checkpoint_tx(&ckb, kicker_key.clone(), vec![staker_key.clone()], 1).await;
     } else if stake_smt {
-        stake_smt_tx(&ckb, kicker_key, vec![staker_key.clone()], 0).await;
+        stake_smt_tx(&ckb, &smt, kicker_key, vec![staker_key.clone()], 0).await;
     } else if delegate_smt {
-        delegate_smt_tx(&ckb, kicker_key, vec![delegator_key], 0).await;
+        delegate_smt_tx(&ckb, &smt, kicker_key, vec![delegator_key], 0).await;
     } else if withdraw {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
         run_withdraw_tx(&ckb, user_key, 2).await;
     } else if metadata {
-        run_metadata_tx(&ckb, kicker_key, 0).await;
+        run_metadata_tx(&ckb, &smt, kicker_key, 0).await;
     } else if reward {
         let user_key = priv_keys.staker_privkeys[0].clone().into_h256().unwrap();
-        run_reward_tx(&ckb, user_key, 4).await.unwrap();
+        run_reward_tx(&ckb, &smt, user_key, 4).await.unwrap();
     } else {
         unimplemented!();
     }

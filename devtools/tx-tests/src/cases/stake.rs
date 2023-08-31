@@ -1,13 +1,11 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
-pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_stake_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.is_empty() {
         panic!("At least one stakers are required");
     }
@@ -44,7 +42,7 @@ pub async fn run_stake_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // wallet: 410, stake: 90, delta: +90
 
     // Clear all pending records
-    stake_smt_tx(ckb, kicker_key.clone(), vec![staker_key.clone()], 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), vec![staker_key.clone()], 0).await;
     // wallet: 410, stake: 90, delta: 0
 
     // staker: -10

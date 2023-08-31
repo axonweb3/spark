@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::{path::PathBuf, vec};
 
 use ckb_types::packed::WitnessArgs;
 use ckb_types::prelude::{Entity, Unpack};
@@ -17,10 +16,11 @@ use tx_builder::ckb::helper::{Delegate, OmniEth, Tx, Xudt};
 
 use crate::config::parse_type_ids;
 use crate::helper::smt::{generate_smt_root, to_root, verify_proof};
-use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
 pub async fn delegate_smt_tx(
     ckb: &CkbRpcClient,
+    smt: &SmtManager,
     kicker_key: H256,
     delegators_key: Vec<H256>,
     current_epoch: u64,
@@ -46,11 +46,9 @@ pub async fn delegate_smt_tx(
         );
     }
 
-    let path = PathBuf::from(ROCKSDB_PATH);
-    let smt = SmtManager::new(path);
-
     let (tx, _) = DelegateSmtTxBuilder::new(
         ckb,
+        smt,
         kicker_key,
         current_epoch,
         DelegateSmtTypeIds {
@@ -60,13 +58,12 @@ pub async fn delegate_smt_tx(
             xudt_owner,
         },
         delegate_cells,
-        smt,
     )
     .build_tx()
     .await
     .unwrap();
 
-    verify_new_delegate_smt(&tx, current_epoch).await;
+    verify_new_delegate_smt(smt, &tx, current_epoch).await;
 
     let mut tx = Tx::new(ckb, tx);
     match tx.send().await {
@@ -79,7 +76,7 @@ pub async fn delegate_smt_tx(
     println!("delegate smt tx committed");
 }
 
-async fn verify_new_delegate_smt(tx: &TransactionView, current_epoch: u64) {
+async fn verify_new_delegate_smt(smt: &SmtManager, tx: &TransactionView, current_epoch: u64) {
     println!("------------verify new delegate smt start-----------");
     let new_delegate_smt_roots = {
         let delegate_smt_data = tx.outputs_data().get(0).unwrap();
@@ -107,9 +104,6 @@ async fn verify_new_delegate_smt(tx: &TransactionView, current_epoch: u64) {
             .all_stake_group_infos()
     };
 
-    let path = PathBuf::from(ROCKSDB_PATH);
-    let smt = SmtManager::new(path);
-
     for group in stake_group {
         let staker = to_h160(&group.staker());
         let root = new_delegate_smt_roots.get(&staker).unwrap().to_owned();
@@ -118,7 +112,7 @@ async fn verify_new_delegate_smt(tx: &TransactionView, current_epoch: u64) {
 
         let bottom_root_created = {
             let leaves =
-                DelegateSmtStorage::get_sub_leaves(&smt, current_epoch + 2, staker.0.into())
+                DelegateSmtStorage::get_sub_leaves(smt, current_epoch + 2, staker.0.into())
                     .await
                     .unwrap();
             for (k, v) in leaves.iter() {
@@ -131,7 +125,7 @@ async fn verify_new_delegate_smt(tx: &TransactionView, current_epoch: u64) {
         };
 
         let bottom_root_gotten =
-            DelegateSmtStorage::get_sub_root(&smt, current_epoch + 2, staker.0.into())
+            DelegateSmtStorage::get_sub_root(smt, current_epoch + 2, staker.0.into())
                 .await
                 .unwrap()
                 .unwrap();

@@ -1,13 +1,11 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
-pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_stake_smt_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.len() < 4 {
         panic!("At least 4 stakers are required");
     }
@@ -35,7 +33,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     first_stake_tx(ckb, stakers_key[3].clone(), 40).await;
 
     println!("\nThe removed staker1 is not in the stake smt");
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
     // staker4: 40
     // staker3: 30
     // staker2: 20
@@ -54,7 +52,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     println!("The removed staker2 is in the stake smt");
     println!("There is a pending record of redeeming stake in the staker2's stake cell");
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
     // staker4: 40
     // staker3: 30
     // staker1: 15
@@ -74,7 +72,7 @@ pub async fn run_stake_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     println!("\nThe removed staker1 is in the stake smt");
     println!("There is a expired record in the staker1's stake cell");
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 1).await;
     // staker4: 40
     // staker2: 35
     // staker3: 30

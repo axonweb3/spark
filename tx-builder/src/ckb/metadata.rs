@@ -47,10 +47,10 @@ const DEFAULT_CONTEXT_PATH: &str = "metadata_context";
 
 pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
     ckb:                     &'a C,
+    smt:                     &'a PSmt,
     kicker:                  PrivateKey,
     type_ids:                MetadataTypeIds,
     last_checkpoint:         Cell,
-    smt:                     PSmt,
     last_checkpoint_data:    Checkpoint,
     last_metadata_cell:      Cell,
     last_metadata_cell_data: AMetadataCellData,
@@ -87,7 +87,7 @@ where
         }
 
         let stakers = StakeSmtStorage::get_sub_leaves(
-            &self.smt,
+            self.smt,
             self.last_checkpoint_data.epoch + INAUGURATION,
         )
         .await?;
@@ -115,7 +115,7 @@ where
 
             for (staker, amount) in stakers.clone().into_iter() {
                 let delegaters = DelegateSmtStorage::get_sub_leaves(
-                    &self.smt,
+                    self.smt,
                     self.last_checkpoint_data.epoch + INAUGURATION,
                     staker,
                 )
@@ -134,7 +134,7 @@ where
                     staker: staker.0.into(),
                     amount,
                     delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
-                        &self.smt,
+                        self.smt,
                         vec![self.last_checkpoint_data.epoch + INAUGURATION],
                         staker,
                     )
@@ -188,7 +188,7 @@ where
             }
         };
 
-        let old_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
+        let old_stake_smt_proof = StakeSmtStorage::generate_top_proof(self.smt, vec![
             self.last_checkpoint_data.epoch + INAUGURATION,
         ])
         .await
@@ -214,7 +214,7 @@ where
         context: &MetadataContext,
     ) -> Result<(Vec<u8>, StakeSmtCellData)> {
         StakeSmtStorage::remove(
-            &self.smt,
+            self.smt,
             self.last_checkpoint_data.epoch + INAUGURATION,
             context
                 .no_top_stakers
@@ -226,21 +226,18 @@ where
         .await
         .unwrap();
 
-        StakeSmtStorage::new_epoch(
-            &self.smt,
-            self.last_checkpoint_data.epoch + INAUGURATION + 1,
-        )
-        .await
-        .unwrap();
+        StakeSmtStorage::new_epoch(self.smt, self.last_checkpoint_data.epoch + INAUGURATION + 1)
+            .await
+            .unwrap();
 
-        let new_stake_smt_proof = StakeSmtStorage::generate_top_proof(&self.smt, vec![
+        let new_stake_smt_proof = StakeSmtStorage::generate_top_proof(self.smt, vec![
             self.last_checkpoint_data.epoch + INAUGURATION,
             self.last_checkpoint_data.epoch + INAUGURATION + 1,
         ])
         .await
         .unwrap();
 
-        let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
+        let new_stake_root = StakeSmtStorage::get_top_root(self.smt).await.unwrap();
 
         log::info!(
             "[metadata] epoch: {}, new stake smt root: {:?}, new stake proof: {:?}",
@@ -269,19 +266,16 @@ where
             .collect();
 
         DelegateSmtStorage::remove(
-            &self.smt,
+            self.smt,
             self.last_checkpoint_data.epoch + INAUGURATION,
             delegatets_remove_keys,
         )
         .await
         .unwrap();
 
-        DelegateSmtStorage::new_epoch(
-            &self.smt,
-            self.last_checkpoint_data.epoch + INAUGURATION + 1,
-        )
-        .await
-        .unwrap();
+        DelegateSmtStorage::new_epoch(self.smt, self.last_checkpoint_data.epoch + INAUGURATION + 1)
+            .await
+            .unwrap();
 
         let mut delegator_staker_smt_roots = Vec::with_capacity(context.validators.len());
         let mut new_delegator_proofs = Vec::new();
@@ -294,7 +288,7 @@ where
             );
 
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
-                &self.smt,
+                self.smt,
                 vec![
                     self.last_checkpoint_data.epoch + INAUGURATION,
                     self.last_checkpoint_data.epoch + INAUGURATION + 1,
@@ -311,7 +305,7 @@ where
             delegator_staker_smt_roots.push(StakerSmtRoot {
                 staker: v.staker.0.into(),
                 root:   Into::<[u8; 32]>::into(
-                    DelegateSmtStorage::get_top_root(&self.smt, v.staker)
+                    DelegateSmtStorage::get_top_root(self.smt, v.staker)
                         .await
                         .unwrap(),
                 )
@@ -342,7 +336,7 @@ where
     ) -> Result<(AMetadataCellData, WitnessArgs)> {
         let xudt = Xudt::type_(&self.type_ids.xudt_owner.pack());
         ProposalSmtStorage::insert(
-            &self.smt,
+            self.smt,
             self.last_checkpoint_data.epoch,
             self.last_checkpoint_data
                 .propose_count
@@ -352,12 +346,11 @@ where
         )
         .await?;
 
-        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
-        let new_proposal_count_smt_proof = ProposalSmtStorage::generate_top_proof(&self.smt, vec![
-            self.last_checkpoint_data.epoch,
-        ])
-        .await
-        .unwrap();
+        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(self.smt).await?;
+        let new_proposal_count_smt_proof =
+            ProposalSmtStorage::generate_top_proof(self.smt, vec![self.last_checkpoint_data.epoch])
+                .await
+                .unwrap();
         log::info!(
             "[metadata] epoch: {}, proposal smt root: {:?}, proposal proof: {:?}",
             self.last_checkpoint_data.epoch,
@@ -770,10 +763,10 @@ where
 {
     async fn new(
         ckb: &'a C,
+        smt: &'a PSmt,
         kicker: PrivateKey,
         type_ids: MetadataTypeIds,
         last_checkpoint: Cell,
-        smt: PSmt,
         dir: PathBuf,
     ) -> Self {
         let checkpoint_data = last_checkpoint.output_data.clone().unwrap().into_bytes();
@@ -791,11 +784,11 @@ where
         );
         Self {
             ckb,
+            smt,
             kicker,
             type_ids,
             last_checkpoint,
             last_checkpoint_data,
-            smt,
             last_metadata_cell,
             last_metadata_cell_data,
             dir,

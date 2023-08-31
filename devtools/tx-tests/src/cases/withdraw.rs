@@ -1,13 +1,11 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
-pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_withdraw_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.is_empty() {
         panic!("At least one stakers are required");
     }
@@ -27,14 +25,14 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     // Generate a withdraw cell: (amount: 10, unlock epoch: 2)
     first_stake_tx(ckb, staker_key.clone(), 200).await;
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
     redeem_stake_tx(ckb, staker_key.clone(), 10, 0)
         .await
         .unwrap();
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 0).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // Update withdraw cell: (amount: 10, unlock epoch: 2), (amount: 10, unlock
@@ -42,12 +40,12 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     redeem_stake_tx(ckb, staker_key.clone(), 10, 1)
         .await
         .unwrap();
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 1).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone(), 1).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 1).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
-    run_metadata_tx(ckb, kicker_key.clone(), 2).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 2).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
 
     // Withdraw all
@@ -57,10 +55,10 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     redeem_stake_tx(ckb, staker_key.clone(), 10, 3)
         .await
         .unwrap();
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 3).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 3).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone(), 3).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 3).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
 
     // Update withdraw cell: (amount: 10, unlock epoch: 5), (amount: 10, unlock
@@ -68,10 +66,10 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     redeem_stake_tx(ckb, staker_key.clone(), 10, 4)
         .await
         .unwrap();
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 4).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 4).await;
 
     // New epoch
-    run_metadata_tx(ckb, kicker_key.clone(), 4).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 4).await;
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 5).await;
 
     // Update withdraw cell:
@@ -80,7 +78,7 @@ pub async fn run_withdraw_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     redeem_stake_tx(ckb, staker_key.clone(), 30, 5)
         .await
         .unwrap();
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 5).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 5).await;
 
     // New epoch
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 6).await;

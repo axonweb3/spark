@@ -40,11 +40,11 @@ use crate::ckb::helper::{
 
 pub struct DelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
     ckb:                   &'a C,
+    delegate_smt_storage:  &'a D,
     kicker:                PrivateKey,
     current_epoch:         Epoch,
     type_ids:              DelegateSmtTypeIds,
     delegate_cells:        Vec<Cell>,
-    delegate_smt_storage:  D,
     inputs_delegate_cells: HashMap<Delegator, Cell>,
     maximum_delegators:    HashMap<Staker, usize>,
     stake_cell_deps:       Vec<CellDep>,
@@ -57,19 +57,19 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
 {
     fn new(
         ckb: &'a C,
+        delegate_smt_storage: &'a D,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: DelegateSmtTypeIds,
         delegate_cells: Vec<Cell>,
-        delegate_smt_storage: D,
     ) -> Self {
         Self {
             ckb,
+            delegate_smt_storage,
             kicker,
             current_epoch,
             type_ids,
             delegate_cells,
-            delegate_smt_storage,
             inputs_delegate_cells: HashMap::new(),
             maximum_delegators: HashMap::new(),
             stake_cell_deps: Vec::new(),

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use ckb_types::H256;
 
@@ -11,19 +9,22 @@ use tx_builder::ckb::helper::{OmniEth, Tx};
 use tx_builder::ckb::reward::RewardTxBuilder;
 
 use crate::config::parse_type_ids;
-use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256, current_epoch: u64) -> Result<()> {
+pub async fn run_reward_tx(
+    ckb: &CkbRpcClient,
+    smt: &SmtManager,
+    user_key: H256,
+    current_epoch: u64,
+) -> Result<()> {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let omni_eth = OmniEth::new(user_key.clone());
     let user = omni_eth.address().unwrap();
 
-    let path = PathBuf::from(ROCKSDB_PATH);
-    let smt = SmtManager::new(path);
-
     let tx = RewardTxBuilder::new(
         ckb,
+        smt,
         RewardTypeIds {
             selection_type_id:    type_ids.selection_type_id.into_h256().unwrap(),
             metadata_type_id:     type_ids.metadata_type_id.into_h256().unwrap(),
@@ -33,7 +34,6 @@ pub async fn run_reward_tx(ckb: &CkbRpcClient, user_key: H256, current_epoch: u6
             delegate_smt_type_id: type_ids.delegate_smt_type_id.into_h256().unwrap(),
             xudt_owner:           type_ids.xudt_owner.into_h256().unwrap(),
         },
-        smt,
         user,
         current_epoch,
         1,

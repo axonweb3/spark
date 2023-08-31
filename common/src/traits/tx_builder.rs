@@ -52,8 +52,8 @@ where
 {
     async fn new(
         ckb: &'a C,
+        smt: &'a S,
         type_ids: RewardTypeIds,
-        smt: S,
         user: EthAddress,
         current_epoch: Epoch,
         epoch_count: u64,
@@ -83,10 +83,10 @@ where
 pub trait IMetadataTxBuilder<'a, C, PSmt> {
     async fn new(
         ckb: &'a C,
+        smt: &'a PSmt,
         kicker: PrivateKey,
         type_ids: MetadataTypeIds,
         last_checkpoint: Cell,
-        smt: PSmt,
         path: std::path::PathBuf,
     ) -> Self;
 
@@ -97,11 +97,11 @@ pub trait IMetadataTxBuilder<'a, C, PSmt> {
 pub trait IStakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage> {
     fn new(
         ckb: &'a C,
+        stake_smt_storage: &'a S,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
         stake_cells: Vec<Cell>,
-        stake_smt_storage: S,
     ) -> Self;
 
     async fn build_tx(self) -> Result<(TransactionView, NonTopStakers)>;
@@ -111,11 +111,11 @@ pub trait IStakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage> {
 pub trait IDelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
     fn new(
         ckb: &'a C,
+        delegate_smt_storage: &'a D,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: DelegateSmtTypeIds,
         delegate_at_cells: Vec<Cell>,
-        delegate_smt_storage: D,
     ) -> Self;
 
     async fn build_tx(mut self) -> Result<(TransactionView, NonTopDelegators)>;

@@ -2,15 +2,13 @@ use anyhow::Result;
 use ckb_types::H256;
 use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
-pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.len() < 2 {
         panic!("At least 2 stackers are required");
     }
@@ -44,7 +42,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     println!("\nThe removed delegator1 is not in the staker1's delegate smt");
     println!("The removed delegator1 is not in the staker2's delegate smt");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 0).await;
     // delegate-staker1 smt: (delegator2, 20)
     // delegate-staker2 smt: (delegator2, 20)
 
@@ -56,7 +54,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     println!("\nThe removed delegator2 is in the staker1's delegate smt");
     println!("The removed delegator2 is in the staker2's delegate smt");
     println!("The delegator2's refunded amount should be added up to 40");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 0).await;
     // delegate-staker1 smt: (delegator1, 30)
     // delegate-staker2 smt: (delegator1, 30)
     // delegator1 cell: 80
@@ -74,7 +72,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     println!("\nThe removed delegator1 is in the staker1's delegate smt");
     println!("There is a pending record of redeeming delegation in the delegator1's delegate cell");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 0).await;
     // delegate-staker1 smt: (delegator2, 25)
     // delegate-staker2 smt: (delegator1, 30)
     // delegator1 cell: 80 - 30 = 50
@@ -95,7 +93,7 @@ pub async fn run_delegate_smt_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
 
     println!("\nThe removed delegator2 is in the staker1's delegate smt");
     println!("There is a expired record in the delegator2's delegate cell");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 1).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 1).await;
     // delegate-staker1 smt: (delegator1, 40)
     // delegate-staker2 smt: (delegator1, 30)
     // delegator1 cell: 90

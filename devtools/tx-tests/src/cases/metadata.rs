@@ -2,16 +2,14 @@ use anyhow::Result;
 use ckb_types::H256;
 use common::types::tx_builder::{DelegateItem, EthAddress};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
 // The test did not pass
-pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_metadata_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.len() < 3 {
         panic!("At least 3 stakers are required");
     }
@@ -47,12 +45,19 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
         .await
         .unwrap();
 
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
     // staker3: 30
     // staker2: 20
     // staker1: 10
 
-    delegate_smt_tx(ckb, kicker_key.clone(), vec![delegators_key[0].clone()], 0).await;
+    delegate_smt_tx(
+        ckb,
+        smt,
+        kicker_key.clone(),
+        vec![delegators_key[0].clone()],
+        0,
+    )
+    .await;
     // staker1: (delegator1, 10)
     // staker2: (delegator1, 10)
     // staker3: (delegator1, 10)
@@ -63,7 +68,7 @@ pub async fn run_metadata_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     // (staker3, 30): (delegator1, 10)
     // Remove staker1 and staker2 from the stake smt
     // The delegator1's refunded amount should be added up to 20
-    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 0).await;
 }
 
 async fn first_delegates_tx(

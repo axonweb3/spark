@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use sparse_merkle_tree::{
     blake2b::Blake2bHasher, default_store::DefaultStore, merkle_proof::CompiledMerkleProof,
@@ -8,15 +8,20 @@ use sparse_merkle_tree::{
 };
 
 use common::types::smt::{Address, LeafValue, SmtKeyEncode, SmtValueEncode};
+use storage::SmtManager;
 
 use crate::ROCKSDB_PATH;
 
 type Smt = SparseMerkleTree<Blake2bHasher, LeafValue, DefaultStore<LeafValue>>;
 
-pub fn remove_smt() {
-    if Path::new(ROCKSDB_PATH).is_dir() {
+pub fn create_smt() -> SmtManager {
+    let path = PathBuf::from(ROCKSDB_PATH);
+
+    if path.is_dir() {
         fs::remove_dir_all(ROCKSDB_PATH).unwrap();
     }
+
+    SmtManager::new(path)
 }
 
 pub fn to_root(v: &bytes::Bytes) -> H256 {

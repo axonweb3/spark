@@ -9,14 +9,11 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 use crate::ROCKSDB_PATH;
 
-pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_delegate_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.len() < 3 {
         panic!("At least 3 stakers are required");
     }
@@ -86,7 +83,7 @@ pub async fn run_delegate_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     );
 
     println!("\nClear all pending records");
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 0).await;
     // wallet: 390, delegate: 110, delta: none
 
     // delegator: (staker1, -10)

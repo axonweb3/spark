@@ -34,10 +34,10 @@ use crate::ckb::helper::{
 
 pub struct StakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
     ckb:               &'a C,
+    stake_smt_storage: &'a S,
     kicker:            PrivateKey,
     current_epoch:     Epoch,
     stake_cells:       Vec<Cell>,
-    stake_smt_storage: S,
     type_ids:          StakeSmtTypeIds,
 }
 
@@ -47,18 +47,18 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
 {
     fn new(
         ckb: &'a C,
+        stake_smt_storage: &'a S,
         kicker: PrivateKey,
         current_epoch: Epoch,
         type_ids: StakeSmtTypeIds,
         stake_cells: Vec<Cell>,
-        stake_smt_storage: S,
     ) -> Self {
         Self {
             ckb,
+            stake_smt_storage,
             kicker,
             current_epoch,
             stake_cells,
-            stake_smt_storage,
             type_ids,
         }
     }

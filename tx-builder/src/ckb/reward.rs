@@ -42,9 +42,9 @@ where
     S: RewardSmtStorage + StakeSmtStorage + DelegateSmtStorage + ProposalSmtStorage,
 {
     ckb:                   &'a C,
+    smt:                   &'a S,
     type_ids:              RewardTypeIds,
     reward_meta:           RewardMeta,
-    smt:                   S,
     user:                  EthAddress,
     current_epoch:         Epoch,
     epoch_count:           u64,
@@ -63,8 +63,8 @@ where
 {
     async fn new(
         ckb: &'a C,
+        smt: &'a S,
         type_ids: RewardTypeIds,
-        smt: S,
         user: EthAddress,
         current_epoch: Epoch,
         epoch_count: u64,
@@ -84,9 +84,9 @@ where
 
         Self {
             ckb,
+            smt,
             type_ids,
             reward_meta: Metadata::parse_reward_meta(&metadata_cell_data),
-            smt,
             user,
             current_epoch,
             epoch_count,
@@ -258,7 +258,7 @@ where
         let user = to_eth_h160(&self.user);
 
         for epoch in start_reward_epoch..=end_reward_epoch {
-            let propose_counts = ProposalSmtStorage::get_sub_leaves(&self.smt, epoch)
+            let propose_counts = ProposalSmtStorage::get_sub_leaves(self.smt, epoch)
                 .await
                 .unwrap();
 
@@ -276,27 +276,27 @@ where
                 .await?;
 
             epoch_reward_witness.count_proof =
-                ProposalSmtStorage::generate_sub_proof(&self.smt, epoch, validators.clone())
+                ProposalSmtStorage::generate_sub_proof(self.smt, epoch, validators.clone())
                     .await
                     .unwrap();
-            epoch_reward_witness.count_root = ProposalSmtStorage::get_sub_root(&self.smt, epoch)
+            epoch_reward_witness.count_root = ProposalSmtStorage::get_sub_root(self.smt, epoch)
                 .await
                 .unwrap()
                 .unwrap();
             epoch_reward_witness.count_epoch_proof =
-                ProposalSmtStorage::generate_top_proof(&self.smt, vec![epoch])
+                ProposalSmtStorage::generate_top_proof(self.smt, vec![epoch])
                     .await
                     .unwrap();
             epoch_reward_witness.amount_proof =
-                StakeSmtStorage::generate_sub_proof(&self.smt, epoch, validators)
+                StakeSmtStorage::generate_sub_proof(self.smt, epoch, validators)
                     .await
                     .unwrap();
-            epoch_reward_witness.amount_root = StakeSmtStorage::get_sub_root(&self.smt, epoch)
+            epoch_reward_witness.amount_root = StakeSmtStorage::get_sub_root(self.smt, epoch)
                 .await
                 .unwrap()
                 .unwrap();
             epoch_reward_witness.amount_epoch_proof =
-                StakeSmtStorage::generate_top_proof(&self.smt, vec![epoch])
+                StakeSmtStorage::generate_top_proof(self.smt, vec![epoch])
                     .await
                     .unwrap();
 
@@ -311,15 +311,15 @@ where
             wallet_amount,
         );
 
-        RewardSmtStorage::insert(&self.smt, end_reward_epoch + 1, user).await?;
+        RewardSmtStorage::insert(self.smt, end_reward_epoch + 1, user).await?;
         witness.new_not_claim_info = NotClaimInfo {
             epoch: end_reward_epoch + 1,
-            proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
+            proof: RewardSmtStorage::generate_proof(self.smt, vec![to_eth_h160(&self.user)])
                 .await
                 .unwrap(),
         };
 
-        let reward_smt_root = RewardSmtStorage::get_root(&self.smt).await?;
+        let reward_smt_root = RewardSmtStorage::get_root(self.smt).await?;
 
         Ok((
             vec![
@@ -340,14 +340,14 @@ where
     }
 
     async fn get_start_epoch(&self, witness: &mut RewardWitness) -> Result<Epoch> {
-        let start_reward_epoch = RewardSmtStorage::get_epoch(&self.smt, to_eth_h160(&self.user))
+        let start_reward_epoch = RewardSmtStorage::get_epoch(self.smt, to_eth_h160(&self.user))
             .await
             .unwrap();
 
         if start_reward_epoch.is_none() {
             witness.old_not_claim_info = NotClaimInfo {
                 epoch: START_EPOCH + INAUGURATION,
-                proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
+                proof: RewardSmtStorage::generate_proof(self.smt, vec![to_eth_h160(&self.user)])
                     .await
                     .unwrap(),
             };
@@ -356,7 +356,7 @@ where
 
         witness.old_not_claim_info = NotClaimInfo {
             epoch: start_reward_epoch.unwrap(),
-            proof: RewardSmtStorage::generate_proof(&self.smt, vec![to_eth_h160(&self.user)])
+            proof: RewardSmtStorage::generate_proof(self.smt, vec![to_eth_h160(&self.user)])
                 .await
                 .unwrap(),
         };
@@ -426,7 +426,7 @@ where
             let is_validator = user == validator;
 
             let delegate_amount =
-                DelegateSmtStorage::get_amount(&self.smt, epoch + INAUGURATION, validator, user)
+                DelegateSmtStorage::get_amount(self.smt, epoch + INAUGURATION, validator, user)
                     .await
                     .unwrap();
 
@@ -448,14 +448,14 @@ where
                 total_reward = total_reward * self.reward_meta.propose_discount_rate as u128 / 100;
             }
 
-            let stake_amount = StakeSmtStorage::get_amount(&self.smt, epoch, validator).await?;
+            let stake_amount = StakeSmtStorage::get_amount(self.smt, epoch, validator).await?;
             if stake_amount.is_none() {
                 return Err(CkbTxErr::StakeAmountNotFound(epoch, validator).into());
             }
             let stake_amount = stake_amount.unwrap();
 
             let all_delegates =
-                DelegateSmtStorage::get_sub_leaves(&self.smt, epoch, validator).await?;
+                DelegateSmtStorage::get_sub_leaves(self.smt, epoch, validator).await?;
             let total_delegate_amount = all_delegates.values().sum::<Amount>();
 
             let total_amount = stake_amount + total_delegate_amount;
@@ -508,7 +508,7 @@ where
                         })
                         .collect(),
                     delegate_epoch_proof: DelegateSmtStorage::generate_top_proof(
-                        &self.smt,
+                        self.smt,
                         vec![epoch],
                         validator,
                     )

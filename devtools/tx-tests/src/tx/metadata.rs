@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use ckb_types::packed::WitnessArgs;
 use ckb_types::prelude::{Entity, Unpack};
@@ -17,9 +16,14 @@ use tx_builder::ckb::metadata::MetadataSmtTxBuilder;
 
 use crate::config::parse_type_ids;
 use crate::helper::smt::{generate_smt_root, to_root, verify_proof};
-use crate::{MAX_TRY, ROCKSDB_PATH, TYPE_IDS_PATH};
+use crate::{MAX_TRY, TYPE_IDS_PATH};
 
-pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256, current_epoch: u64) {
+pub async fn run_metadata_tx(
+    ckb: &CkbRpcClient,
+    smt: &SmtManager,
+    kicker_key: H256,
+    current_epoch: u64,
+) {
     let type_ids = parse_type_ids(TYPE_IDS_PATH);
 
     let metadata_type_id = type_ids.metadata_type_id.into_h256().unwrap();
@@ -32,13 +36,12 @@ pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256, current_epoch
         .await
         .unwrap();
 
-    let path = PathBuf::from(ROCKSDB_PATH);
-    let smt = SmtManager::new(path);
     // disable load context from file
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let tx = MetadataSmtTxBuilder::new(
         ckb,
+        smt,
         kicker_key,
         MetadataTypeIds {
             metadata_type_id,
@@ -47,7 +50,6 @@ pub async fn run_metadata_tx(ckb: &CkbRpcClient, kicker_key: H256, current_epoch
             xudt_owner,
         },
         checkpoint_cell,
-        smt,
         tmp_dir.path().to_path_buf(),
     )
     .await

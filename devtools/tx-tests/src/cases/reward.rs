@@ -1,13 +1,11 @@
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::SmtManager;
 
 use crate::config::types::PrivKeys;
-use crate::helper::smt::remove_smt;
 use crate::helper::user::gen_users;
 use crate::tx::*;
 
-pub async fn run_reward_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
-    remove_smt();
-
+pub async fn run_reward_case(ckb: &CkbRpcClient, smt: &SmtManager, priv_keys: PrivKeys) {
     if priv_keys.staker_privkeys.is_empty() {
         panic!("At least one stakers are required");
     }
@@ -34,37 +32,45 @@ pub async fn run_reward_case(ckb: &CkbRpcClient, priv_keys: PrivKeys) {
     for key in stakers_key.iter() {
         first_stake_tx(ckb, key.clone(), 100).await;
     }
-    stake_smt_tx(ckb, kicker_key.clone(), stakers_key.clone(), 0).await;
+    stake_smt_tx(ckb, smt, kicker_key.clone(), stakers_key.clone(), 0).await;
 
     first_delegate_tx(ckb, delegator_key.clone(), staker.clone())
         .await
         .unwrap();
-    delegate_smt_tx(ckb, kicker_key.clone(), delegators_key.clone(), 0).await;
+    delegate_smt_tx(ckb, smt, kicker_key.clone(), delegators_key.clone(), 0).await;
 
-    run_metadata_tx(ckb, kicker_key.clone(), 0).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 0).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 1).await;
-    run_metadata_tx(ckb, kicker_key.clone(), 1).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 1).await;
 
     run_checkpoint_tx(ckb, kicker_key.clone(), stakers_key.clone(), 2).await;
-    run_metadata_tx(ckb, kicker_key.clone(), 2).await;
+    run_metadata_tx(ckb, smt, kicker_key.clone(), 2).await;
 
     println!("reward should failed");
-    assert!(run_reward_tx(ckb, staker_key.clone(), 3).await.is_err());
+    assert!(run_reward_tx(ckb, smt, staker_key.clone(), 3)
+        .await
+        .is_err());
 
     // Validator
     println!("validator claims rewards");
-    run_reward_tx(ckb, staker_key.clone(), 4).await.unwrap();
+    run_reward_tx(ckb, smt, staker_key.clone(), 4)
+        .await
+        .unwrap();
 
     // Claim the reward again
     println!("validator claims rewards again");
-    assert!(run_reward_tx(ckb, staker_key.clone(), 4).await.is_err());
+    assert!(run_reward_tx(ckb, smt, staker_key.clone(), 4)
+        .await
+        .is_err());
 
     // Delegator
     println!("delegator claims rewards");
-    run_reward_tx(ckb, delegator_key.clone(), 4).await.unwrap();
+    run_reward_tx(ckb, smt, delegator_key.clone(), 4)
+        .await
+        .unwrap();
 
     // Neither a validator nor delegator
     println!("neither a validator nor delegator claims rewards");
-    run_reward_tx(ckb, delegator_key1, 4).await.unwrap();
+    run_reward_tx(ckb, smt, delegator_key1, 4).await.unwrap();
 }
