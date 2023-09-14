@@ -81,17 +81,14 @@ macro_rules! get_sub_leaves {
         let cf_iter = $db.get_iter_cf(cf, &read_opt, mode).unwrap();
         cf_iter
             .into_iter()
-            .filter_map(|(k, v)| {
-                if key_len != k.len() {
-                    None
-                } else {
-                    let leaf_key: [u8; 32] = k[prefix_len..].try_into().expect("checked 32 bytes");
-                    let leaf_value: [u8; 32] = v[..].try_into().expect("checked 32 bytes");
-                    Some((
-                        Address::from_slice(&leaf_key[..20]),
-                        <$ty>::from(LeafValue(leaf_value)),
-                    ))
-                }
+            .take_while(|(k, _)| key_len == k.len() && k[..prefix_len] == $prefix[..])
+            .map(|(k, v)| {
+                let leaf_key: [u8; 32] = k[prefix_len..].try_into().expect("checked 32 bytes");
+                let leaf_value: [u8; 32] = v[..].try_into().expect("checked 32 bytes");
+                (
+                    Address::from_slice(&leaf_key[..20]),
+                    <$ty>::from(LeafValue(leaf_value)),
+                )
             })
             .collect::<HashMap<Address, $ty>>()
     }};
