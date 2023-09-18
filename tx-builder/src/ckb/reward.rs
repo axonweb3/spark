@@ -141,7 +141,7 @@ where
                 .build_exact_capacity(Capacity::bytes(outputs_data[1].len())?)?,
             // AT cell
             CellOutput::new_builder()
-                .lock(OmniEth::lock(&self.user))
+                .lock(Secp256k1::lock(Bytes::from(self.user.0.to_vec())))
                 .type_(Some(Xudt::type_(&self.type_ids.xudt_owner.pack())).pack())
                 .build_exact_capacity(Capacity::bytes(outputs_data[2].len())?)?,
         ];

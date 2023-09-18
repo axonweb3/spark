@@ -15,7 +15,9 @@ static ROCKSDB_PATH: &str = "./free-space/smt";
 async fn test_stake_functions() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("stake");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let staker = [5u8; 20].into();
@@ -74,7 +76,9 @@ async fn test_stake_functions() {
 async fn test_delegate_smt() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("delegate1");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let stakers: Vec<Staker> = vec![
@@ -116,7 +120,9 @@ async fn test_delegate_smt() {
 async fn test_delegate_smt_no_extra_data() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("delegate2");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let stakers: Vec<Staker> = vec![
@@ -163,7 +169,9 @@ async fn test_delegate_smt_no_extra_data() {
 async fn test_delegate_functions() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("delegate");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let staker = [5u8; 20].into();
@@ -223,7 +231,9 @@ async fn test_delegate_functions() {
 async fn test_reward_functions() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("reward");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let address = [5u8; 20].into();
@@ -244,7 +254,9 @@ async fn test_reward_functions() {
 async fn test_proposal_functions() {
     let mut path = PathBuf::from(ROCKSDB_PATH);
     path.push("proposal");
-    fs::remove_dir_all(path.clone()).unwrap();
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 
     let smt_manager = SmtManager::new(path);
     let validator = [5u8; 20].into();

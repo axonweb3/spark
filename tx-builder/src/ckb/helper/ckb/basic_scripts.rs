@@ -78,6 +78,26 @@ impl Secp256k1 {
             ),
         }
     }
+
+    pub fn lock(args: Bytes) -> Script {
+        match **NETWORK_TYPE.load() {
+            NetworkType::Mainnet => script!(
+                &SECP2561_BLAKE160_MAINNET.code_hash,
+                SECP2561_BLAKE160_MAINNET.hash_type,
+                args
+            ),
+            NetworkType::Testnet => script!(
+                &SECP2561_BLAKE160_TESTNET.code_hash,
+                SECP2561_BLAKE160_TESTNET.hash_type,
+                args
+            ),
+            NetworkType::Devnet => script!(
+                &SECP2561_BLAKE160_DEVNET.code_hash,
+                SECP2561_BLAKE160_DEVNET.hash_type,
+                args
+            ),
+        }
+    }
 }
 
 impl TypeId {
